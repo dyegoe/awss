@@ -57,6 +57,7 @@ func init() {
 }
 
 func ec2NamesSearch() {
+	aws.Search(profile, region, ec2Names)
 	fmt.Println("---- ec2 ----")
 	aws.Print("Profile:", profile)
 	aws.Print("Region:", region)
