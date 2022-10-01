@@ -105,7 +105,7 @@ func (instances *Instances) JSON() {
 }
 
 // Search returns the instances
-func (instances *Instances) Search(by string, value string) {
+func (instances *Instances) Search(by string, value []string) {
 	switch by {
 	case "ids":
 		instances.instancesByIds(value)
@@ -119,9 +119,9 @@ func (instances *Instances) Search(by string, value string) {
 }
 
 // instancesByIds returns the instances by id
-func (instances *Instances) instancesByIds(ids string) {
+func (instances *Instances) instancesByIds(ids []string) {
 	input := &ec2.DescribeInstancesInput{
-		InstanceIds: split(ids),
+		InstanceIds: ids,
 	}
 	ctx := context.TODO()
 
@@ -130,12 +130,12 @@ func (instances *Instances) instancesByIds(ids string) {
 }
 
 // instancesByNames returns the instances by name
-func (instances *Instances) instancesByNames(names string) {
+func (instances *Instances) instancesByNames(names []string) {
 	input := &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			{
 				Name:   aws.String("tag:Name"),
-				Values: split(names),
+				Values: names,
 			},
 		},
 	}
@@ -146,12 +146,12 @@ func (instances *Instances) instancesByNames(names string) {
 }
 
 // instancesByPrivateIps returns the instances by private ip
-func (instances *Instances) instancesByPrivateIps(privateIps string) {
+func (instances *Instances) instancesByPrivateIps(privateIps []string) {
 	input := &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			{
 				Name:   aws.String("private-ip-address"),
-				Values: split(privateIps),
+				Values: privateIps,
 			},
 		},
 	}
@@ -162,12 +162,12 @@ func (instances *Instances) instancesByPrivateIps(privateIps string) {
 }
 
 // instancesByPublicIps returns the instances by public ip
-func (instances *Instances) instancesByPublicIps(publicIps string) {
+func (instances *Instances) instancesByPublicIps(publicIps []string) {
 	input := &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			{
 				Name:   aws.String("ip-address"),
-				Values: split(publicIps),
+				Values: publicIps,
 			},
 		},
 	}
