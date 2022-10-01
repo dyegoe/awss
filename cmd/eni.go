@@ -21,8 +21,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var eniPrivateIps string
-var eniPublicIps string
+var eniPrivateIps, eniPublicIps []string
 
 // eniCmd represents the eni command
 var eniCmd = &cobra.Command{
@@ -31,12 +30,13 @@ var eniCmd = &cobra.Command{
 	Long: `Use it to search across ENIs (Elastic Network Interfaces).
 	       You can search by private IPs or public IPs.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if eniPrivateIps != "" {
-			eniPrivateIpsSearch()
+		fmt.Println("Not implemented yet.")
+		if len(eniPrivateIps) > 0 {
+			fmt.Println(eniPrivateIps)
 			return
 		}
-		if eniPublicIps != "" {
-			eniPublicIpsSearch()
+		if len(eniPublicIps) > 0 {
+			fmt.Println(eniPublicIps)
 			return
 		}
 	},
@@ -45,20 +45,6 @@ var eniCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(eniCmd)
 
-	eniCmd.Flags().StringVar(&eniPrivateIps, "privateIps", "", "Provide a list of comma-separated private IPs. e.g. --privateIps `172.16.0.1,172.17.1.254`")
-	eniCmd.Flags().StringVar(&eniPublicIps, "publicIps", "", "Provide a list of comma-separated public IPs. e.g. --publicIps `52.28.19.20,52.30.31.32`")
-}
-
-func eniPrivateIpsSearch() {
-	fmt.Println("---- eni ----")
-	fmt.Println("Profile:", profile)
-	fmt.Println("Region:", region)
-	fmt.Println("Private IPs:", eniPrivateIps)
-}
-
-func eniPublicIpsSearch() {
-	fmt.Println("---- eni ----")
-	fmt.Println("Profile:", profile)
-	fmt.Println("Region:", region)
-	fmt.Println("Public IPs:", eniPublicIps)
+	eniCmd.Flags().StringSliceVarP(&eniPrivateIps, "privateIps", "p", []string{}, "Provide a list of comma-separated private IPs. e.g. --privateIps `172.16.0.1,172.17.1.254`")
+	eniCmd.Flags().StringSliceVarP(&eniPublicIps, "publicIps", "P", []string{}, "Provide a list of comma-separated public IPs. e.g. --publicIps `52.28.19.20,52.30.31.32`")
 }

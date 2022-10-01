@@ -21,9 +21,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var elbArns string
-var elbNames string
-var elbDnsNames string
+var elbArns, elbNames, elbDnsNames []string
 
 // elbCmd represents the elb command
 var elbCmd = &cobra.Command{
@@ -32,16 +30,17 @@ var elbCmd = &cobra.Command{
 	Long: `Use it to search across ELBv2 (Elastic Load Balancer).
 	       You can search by ARNs, by names or by DNS names.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if elbNames != "" {
-			elbNamesSearch()
+		fmt.Println("Not implemented yet.")
+		if len(elbArns) > 0 {
+			fmt.Println("elbArns:", elbArns)
 			return
 		}
-		if elbArns != "" {
-			elbArnsSearch()
+		if len(elbNames) > 0 {
+			fmt.Println("elbNames:", elbNames)
 			return
 		}
-		if elbDnsNames != "" {
-			elbDnsNamesSearch()
+		if len(elbDnsNames) > 0 {
+			fmt.Println("elbDnsNames:", elbDnsNames)
 			return
 		}
 	},
@@ -50,28 +49,7 @@ var elbCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(elbCmd)
 
-	elbCmd.Flags().StringVar(&elbNames, "names", "", "Provide a list of comma-separated names. It searchs using the 'tag:Name'. e.g. --names `instance-1,instance-2`")
-	elbCmd.Flags().StringVar(&elbArns, "privateIps", "", "Provide a list of comma-separated private IPs. e.g. --privateIps `172.16.0.1,172.17.1.254`")
-	elbCmd.Flags().StringVar(&elbDnsNames, "DnsNames", "", "Provide a list of comma-separated public IPs. e.g. --DnsNames `52.28.19.20,52.30.31.32`")
-}
-
-func elbNamesSearch() {
-	fmt.Println("---- elb ----")
-	fmt.Println("Profile:", profile)
-	fmt.Println("Region:", region)
-	fmt.Println("Names:", elbNames)
-}
-
-func elbArnsSearch() {
-	fmt.Println("---- elb ----")
-	fmt.Println("Profile:", profile)
-	fmt.Println("Region:", region)
-	fmt.Println("Private IPs:", elbArns)
-}
-
-func elbDnsNamesSearch() {
-	fmt.Println("---- elb ----")
-	fmt.Println("Profile:", profile)
-	fmt.Println("Region:", region)
-	fmt.Println("Public IPs:", elbDnsNames)
+	elbCmd.Flags().StringSliceVarP(&elbNames, "names", "n", []string{}, "Provide a list of comma-separated names. It searchs using the 'tag:Name'. e.g. --names `instance-1,instance-2`")
+	elbCmd.Flags().StringSliceVarP(&elbArns, "privateIps", "p", []string{}, "Provide a list of comma-separated private IPs. e.g. --privateIps `172.16.0.1,172.17.1.254`")
+	elbCmd.Flags().StringSliceVarP(&elbDnsNames, "DnsNames", "d", []string{}, "Provide a list of comma-separated public IPs. e.g. --DnsNames `52.28.19.20,52.30.31.32`")
 }
