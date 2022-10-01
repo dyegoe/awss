@@ -95,8 +95,8 @@ func (instances *Instances) parseInstances(result *ec2.DescribeInstancesOutput) 
 	}
 }
 
-// JSON returns the instances as JSON
-func (instances *Instances) JSON() {
+// printJSON returns the instances as JSON
+func (instances *Instances) printJSON() {
 	json, err := json.Marshal(instances)
 	if err != nil {
 		log.Default().Printf("[ERROR] marshalling instances: %v", err)
@@ -115,6 +115,18 @@ func (instances *Instances) Search(by string, value []string) {
 		instances.instancesByPrivateIps(value)
 	case "public-ips":
 		instances.instancesByPublicIps(value)
+	}
+}
+
+// Print prints the instances
+func (instances *Instances) Print(output string) {
+	switch output {
+	case "json":
+		instances.printJSON()
+	case "table":
+		fmt.Println("Not implemented yet")
+	case "yaml":
+		fmt.Println("Not implemented yet")
 	}
 }
 

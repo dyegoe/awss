@@ -35,22 +35,22 @@ var ec2Cmd = &cobra.Command{
 		}
 		if len(ec2Ids) > 0 {
 			s.Search("ids", ec2Ids)
-			s.JSON()
+			s.Print(output)
 			return
 		}
 		if len(ec2Names) > 0 {
 			s.Search("names", ec2Names)
-			s.JSON()
+			s.Print(output)
 			return
 		}
 		if len(ec2PrivateIps) > 0 {
 			s.Search("private-ips", ec2PrivateIps)
-			s.JSON()
+			s.Print(output)
 			return
 		}
 		if len(ec2PublicIps) > 0 {
 			s.Search("public-ips", ec2PublicIps)
-			s.JSON()
+			s.Print(output)
 			return
 		}
 	},
