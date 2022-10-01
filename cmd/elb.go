@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/dyegoe/awss/aws"
 	"github.com/spf13/cobra"
 )
 
@@ -58,21 +57,21 @@ func init() {
 
 func elbNamesSearch() {
 	fmt.Println("---- elb ----")
-	aws.Print("Profile:", profile)
-	aws.Print("Region:", region)
-	aws.Print("Names:", elbNames)
+	fmt.Println("Profile:", profile)
+	fmt.Println("Region:", region)
+	fmt.Println("Names:", elbNames)
 }
 
 func elbArnsSearch() {
 	fmt.Println("---- elb ----")
-	aws.Print("Profile:", profile)
-	aws.Print("Region:", region)
-	aws.Print("Private IPs:", elbArns)
+	fmt.Println("Profile:", profile)
+	fmt.Println("Region:", region)
+	fmt.Println("Private IPs:", elbArns)
 }
 
 func elbDnsNamesSearch() {
 	fmt.Println("---- elb ----")
-	aws.Print("Profile:", profile)
-	aws.Print("Region:", region)
-	aws.Print("Public IPs:", elbDnsNames)
+	fmt.Println("Profile:", profile)
+	fmt.Println("Region:", region)
+	fmt.Println("Public IPs:", elbDnsNames)
 }

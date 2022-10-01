@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/dyegoe/awss/aws"
 	"github.com/spf13/cobra"
 )
 
@@ -58,21 +57,21 @@ func init() {
 
 func ec2NamesSearch() {
 	fmt.Println("---- ec2 ----")
-	aws.Print("Profile:", profile)
-	aws.Print("Region:", region)
-	aws.Print("Names:", ec2Names)
+	fmt.Println("Profile:", profile)
+	fmt.Println("Region:", region)
+	fmt.Println("Names:", ec2Names)
 }
 
 func ec2PrivateIpsSearch() {
 	fmt.Println("---- ec2 ----")
-	aws.Print("Profile:", profile)
-	aws.Print("Region:", region)
-	aws.Print("Private IPs:", ec2PrivateIps)
+	fmt.Println("Profile:", profile)
+	fmt.Println("Region:", region)
+	fmt.Println("Private IPs:", ec2PrivateIps)
 }
 
 func ec2PublicIpsSearch() {
 	fmt.Println("---- ec2 ----")
-	aws.Print("Profile:", profile)
-	aws.Print("Region:", region)
-	aws.Print("Public IPs:", ec2PublicIps)
+	fmt.Println("Profile:", profile)
+	fmt.Println("Region:", region)
+	fmt.Println("Public IPs:", ec2PublicIps)
 }
