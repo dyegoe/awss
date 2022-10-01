@@ -53,15 +53,20 @@ var ec2Cmd = &cobra.Command{
 			s.Print(output)
 			return
 		}
+		if len(ec2Tags) > 0 {
+			s.Search("tags", ec2Tags)
+			s.Print(output)
+			return
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(ec2Cmd)
 
-	ec2Cmd.Flags().StringSliceVarP(&ec2Ids, "ids", "i", []string{}, "Provide a list of comma-separated ids. e.g. --ids `i-00000000000000001,i-00000000000000002`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2Ids, "ids", "i", []string{}, "Provide a list of comma-separated ids. e.g. --ids `i-1230456078901,i-1230456078902`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2Names, "names", "n", []string{}, "Provide a list of comma-separated names. It searchs using the 'tag:Name'. e.g. --names `instance-1,instance-2`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2Tags, "tags", "t", []string{}, "Provide a list of comma-separated tags. e.g. --tags `tag1:value1,tag2:value2`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2Tags, "tags", "t", []string{}, "Provide a list of comma-separated tags. e.g. --tags `tag1=value1:value2,tag2=value3`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2PrivateIps, "private-ips", "p", []string{}, "Provide a list of comma-separated private IPs. e.g. --private-ips `172.16.0.1,172.17.1.254`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2PublicIps, "public-ips", "P", []string{}, "Provide a list of comma-separated public IPs. e.g. --public-ips `52.28.19.20,52.30.31.32`")
 }

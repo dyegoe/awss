@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -108,13 +109,15 @@ func (instances *Instances) printJSON() {
 func (instances *Instances) Search(by string, value []string) {
 	switch by {
 	case "ids":
-		instances.instancesByIds(value)
+		instances.searchByIds(value)
 	case "names":
-		instances.instancesByNames(value)
+		instances.searchByNames(value)
 	case "private-ips":
-		instances.instancesByPrivateIps(value)
+		instances.searchByPrivateIps(value)
 	case "public-ips":
-		instances.instancesByPublicIps(value)
+		instances.searchByPublicIps(value)
+	case "tags":
+		instances.searchByTags(value)
 	}
 }
 
@@ -130,8 +133,8 @@ func (instances *Instances) Print(output string) {
 	}
 }
 
-// instancesByIds returns the instances by id
-func (instances *Instances) instancesByIds(ids []string) {
+// searchByIds returns the instances by id
+func (instances *Instances) searchByIds(ids []string) {
 	input := &ec2.DescribeInstancesInput{
 		InstanceIds: ids,
 	}
@@ -141,24 +144,13 @@ func (instances *Instances) instancesByIds(ids []string) {
 	instances.parseInstances(result)
 }
 
-// instancesByNames returns the instances by name
-func (instances *Instances) instancesByNames(names []string) {
-	input := &ec2.DescribeInstancesInput{
-		Filters: []types.Filter{
-			{
-				Name:   aws.String("tag:Name"),
-				Values: names,
-			},
-		},
-	}
-	ctx := context.TODO()
-
-	result := instances.getInstances(ctx, input)
-	instances.parseInstances(result)
+// searchByNames returns the instances by name
+func (instances *Instances) searchByNames(names []string) {
+	instances.searchByTags([]string{fmt.Sprintf("Name=%s", strings.Join(names, ":"))})
 }
 
-// instancesByPrivateIps returns the instances by private ip
-func (instances *Instances) instancesByPrivateIps(privateIps []string) {
+// searchByPrivateIps returns the instances by private ip
+func (instances *Instances) searchByPrivateIps(privateIps []string) {
 	input := &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			{
@@ -173,8 +165,8 @@ func (instances *Instances) instancesByPrivateIps(privateIps []string) {
 	instances.parseInstances(result)
 }
 
-// instancesByPublicIps returns the instances by public ip
-func (instances *Instances) instancesByPublicIps(publicIps []string) {
+// searchByPublicIps returns the instances by public ip
+func (instances *Instances) searchByPublicIps(publicIps []string) {
 	input := &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			{
@@ -182,6 +174,26 @@ func (instances *Instances) instancesByPublicIps(publicIps []string) {
 				Values: publicIps,
 			},
 		},
+	}
+	ctx := context.TODO()
+
+	result := instances.getInstances(ctx, input)
+	instances.parseInstances(result)
+}
+
+// searchByTags returns the instances by tag
+func (instances *Instances) searchByTags(tags []string) {
+	filters := []types.Filter{}
+	for _, tag := range tags {
+		st := strings.Split(tag, "=")
+		sv := strings.Split(st[1], ":")
+		filters = append(filters, types.Filter{
+			Name:   aws.String("tag:" + st[0]),
+			Values: sv,
+		})
+	}
+	input := &ec2.DescribeInstancesInput{
+		Filters: filters,
 	}
 	ctx := context.TODO()
 
