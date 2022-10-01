@@ -23,6 +23,7 @@ import (
 
 var profile string
 var region string
+var output string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -41,4 +42,5 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&profile, "profile", "default", "Select the profile from ~/.aws/config")
 	rootCmd.PersistentFlags().StringVar(&region, "region", "eu-central-1", "Select a region to perform your API calls")
+	rootCmd.PersistentFlags().StringVar(&output, "output", "json", "Select the output format. Options: table, json, yaml")
 }
