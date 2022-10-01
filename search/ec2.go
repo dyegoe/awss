@@ -20,11 +20,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/markkurossi/tabulate"
 )
 
 // Instances is a struct to hold the instances
@@ -36,11 +38,11 @@ type Instances struct {
 
 // instances is a struct to hold the instance
 type instance struct {
-	InstanceState    string `json:"instance_state"`
-	InstanceName     string `json:"instance_name"`
 	InstanceID       string `json:"instance_id"`
+	InstanceName     string `json:"instance_name"`
 	InstanceType     string `json:"instance_type"`
 	AvailabilityZone string `json:"availability_zone"`
+	InstanceState    string `json:"instance_state"`
 	PrivateIpAddress string `json:"private_ip_address"`
 	PublicIpAddress  string `json:"public_ip_address"`
 }
@@ -84,11 +86,11 @@ func (instances *Instances) parseInstances(result *ec2.DescribeInstancesOutput) 
 	for _, r := range result.Reservations {
 		for _, i := range r.Instances {
 			instances.Instances = append(instances.Instances, instance{
-				InstanceState:    string(i.State.Name),
-				InstanceName:     getTagName(i.Tags),
 				InstanceID:       *i.InstanceId,
+				InstanceName:     getTagName(i.Tags),
 				InstanceType:     string(i.InstanceType),
 				AvailabilityZone: *i.Placement.AvailabilityZone,
+				InstanceState:    string(i.State.Name),
 				PrivateIpAddress: *i.PrivateIpAddress,
 				PublicIpAddress:  *i.PublicIpAddress,
 			})
@@ -103,6 +105,27 @@ func (instances *Instances) printJSON() {
 		log.Default().Printf("[ERROR] marshalling instances: %v", err)
 	}
 	fmt.Println(string(json))
+}
+
+// printTable prints the instances as table
+func (instances *Instances) printTable() {
+	table := tabulate.New(tabulate.ASCII)
+	headers := []string{"InstanceID", "InstanceName", "InstanceType", "AvailabilityZone", "InstanceState", "PrivateIpAddress", "PublicIpAddress"}
+	for _, header := range headers {
+		table.Header(header).SetAlign(tabulate.TL)
+	}
+	for _, i := range instances.Instances {
+		r := table.Row()
+		r.Column(i.InstanceID)
+		r.Column(i.InstanceName)
+		r.Column(i.InstanceType)
+		r.Column(i.AvailabilityZone)
+		r.Column(i.InstanceState)
+		r.Column(i.PrivateIpAddress)
+		r.Column(i.PublicIpAddress)
+	}
+
+	table.Print(os.Stdout)
 }
 
 // Search returns the instances
@@ -127,7 +150,7 @@ func (instances *Instances) Print(output string) {
 	case "json":
 		instances.printJSON()
 	case "table":
-		fmt.Println("Not implemented yet")
+		instances.printTable()
 	case "yaml":
 		fmt.Println("Not implemented yet")
 	}

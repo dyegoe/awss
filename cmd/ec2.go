@@ -58,6 +58,7 @@ var ec2Cmd = &cobra.Command{
 			s.Print(output)
 			return
 		}
+		cmd.Help()
 	},
 }
 

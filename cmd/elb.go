@@ -43,6 +43,7 @@ var elbCmd = &cobra.Command{
 			fmt.Println("elbDnsNames:", elbDnsNames)
 			return
 		}
+		cmd.Help()
 	},
 }
 

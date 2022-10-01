@@ -39,6 +39,7 @@ var eniCmd = &cobra.Command{
 			fmt.Println(eniPublicIps)
 			return
 		}
+		cmd.Help()
 	},
 }
 
