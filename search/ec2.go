@@ -18,12 +18,21 @@ package search
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
+
+// getTagName returns the value of the tag Name
+func getTagName(tags []types.Tag) string {
+	for _, tag := range tags {
+		if *tag.Key == "Name" {
+			return *tag.Value
+		}
+	}
+	return ""
+}
 
 // Instances is a struct to hold the instances
 type Instances struct {
@@ -45,36 +54,26 @@ type instance struct {
 	PublicIpAddress  string `json:"public_ip_address"`
 }
 
-// getTagName returns the value of the tag Name
-func getTagName(tags []types.Tag) string {
-	for _, tag := range tags {
-		if *tag.Key == "Name" {
-			return *tag.Value
-		}
-	}
-	return ""
-}
-
 // getClient returns a new ec2 client
-func (instances *Instances) getClient() {
+func (instances *Instances) getClient() *ec2.Client {
 	instances.awsSearch = awsSearch{
 		profile: instances.Profile,
 		region:  instances.Region,
 	}
 	err := instances.awsSearch.getConfig()
 	if err != nil {
-		log.Default().Printf("[ERROR] getting AWS config: %v", err)
+		printLogError("getting AWS config", err)
 	}
 
-	instances.client = ec2.NewFromConfig(instances.awsSearch.cfg)
+	return ec2.NewFromConfig(instances.awsSearch.cfg)
 }
 
 // getInstances returns the instances
 func (instances *Instances) getInstances(input *ec2.DescribeInstancesInput) *ec2.DescribeInstancesOutput {
-	instances.getClient()
+	instances.client = instances.getClient()
 	response, err := instances.client.DescribeInstances(instances.awsSearch.ctx, input)
 	if err != nil {
-		log.Default().Printf("[ERROR] getting instances: %v", err)
+		printLogError("getting instances", err)
 		return nil
 	}
 	return response
@@ -124,7 +123,16 @@ func (instances *Instances) searchByIds(ids []string) {
 
 // searchByNames returns the instances by name
 func (instances *Instances) searchByNames(names []string) {
-	instances.searchByTags([]string{fmt.Sprintf("Name=%s", strings.Join(names, ":"))})
+	input := &ec2.DescribeInstancesInput{
+		Filters: []types.Filter{
+			{
+				Name:   getString("tag:Name"),
+				Values: names,
+			},
+		},
+	}
+	result := instances.getInstances(input)
+	instances.parseInstances(result)
 }
 
 // searchByPrivateIps returns the instances by private ip
@@ -177,17 +185,17 @@ func (instances *Instances) searchByTags(tags []string) {
 func (instances *Instances) Print(output string) {
 	switch output {
 	case "json":
-		instances.printJSON()
+		instances.printJson()
 	case "table":
 		instances.printTable()
 	}
 }
 
-// printJSON returns the instances as JSON
-func (instances *Instances) printJSON() {
+// printJson returns the instances as JSON
+func (instances *Instances) printJson() {
 	json, err := json.Marshal(instances)
 	if err != nil {
-		log.Default().Printf("[ERROR] marshalling instances: %v", err)
+		printLogError("marshalling instances", err)
 	}
 	fmt.Println(string(json))
 }

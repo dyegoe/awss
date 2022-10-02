@@ -17,6 +17,7 @@ package search
 
 import (
 	"context"
+	"log"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -27,6 +28,11 @@ import (
 // getString returns a pointer to a string
 func getString(s string) *string {
 	return aws.String(s)
+}
+
+// printLog prints the log
+func printLogError(message string, err error) {
+	log.Printf("[ERROR] %s: %v\n", message, err)
 }
 
 // awsSearch is a struct to hold the AWS search
