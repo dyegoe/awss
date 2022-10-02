@@ -24,9 +24,20 @@ import (
 	"github.com/markkurossi/tabulate"
 )
 
-// getConfig returns a new AWS config.
-func getConfig(profile, region string) (aws.Config, error) {
-	return config.LoadDefaultConfig(context.TODO(), config.WithSharedConfigProfile(profile), config.WithRegion(region))
+// awsSearch is a struct to hold the AWS search
+type awsSearch struct {
+	profile string
+	region  string
+	ctx     context.Context
+	cfg     aws.Config
+}
+
+// getConfig creates a new a new AWS config and returns error if something goes wrong.
+func (a *awsSearch) getConfig() error {
+	var err error
+	a.ctx = context.TODO()
+	a.cfg, err = config.LoadDefaultConfig(a.ctx, config.WithSharedConfigProfile(a.profile), config.WithRegion(a.region))
+	return err
 }
 
 // awsString returns a pointer to a string

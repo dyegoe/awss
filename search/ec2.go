@@ -16,7 +16,6 @@ limitations under the License.
 package search
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -28,9 +27,11 @@ import (
 
 // Instances is a struct to hold the instances
 type Instances struct {
-	Profile   string     `json:"profile"`
-	Region    string     `json:"region"`
-	Instances []instance `json:"instances"`
+	Profile   string      `json:"profile"`
+	Region    string      `json:"region"`
+	Instances []instance  `json:"instances"`
+	client    *ec2.Client `json:"-"`
+	awsSearch awsSearch   `json:"-"`
 }
 
 // instances is a struct to hold the instance
@@ -54,23 +55,24 @@ func getTagName(tags []types.Tag) string {
 	return ""
 }
 
-// getEC2Client returns a new ec2 client
-func getEC2Client(profile, region string) (*ec2.Client, error) {
-	cfg, err := getConfig(profile, region)
+// getClient returns a new ec2 client
+func (instances *Instances) getClient() {
+	instances.awsSearch = awsSearch{
+		profile: instances.Profile,
+		region:  instances.Region,
+	}
+	err := instances.awsSearch.getConfig()
 	if err != nil {
-		return nil, err
+		log.Default().Printf("[ERROR] getting AWS config: %v", err)
 	}
 
-	return ec2.NewFromConfig(cfg), nil
+	instances.client = ec2.NewFromConfig(instances.awsSearch.cfg)
 }
 
 // getInstances returns the instances
-func (instances *Instances) getInstances(c context.Context, input *ec2.DescribeInstancesInput) *ec2.DescribeInstancesOutput {
-	client, err := getEC2Client(instances.Profile, instances.Region)
-	if err != nil {
-		log.Default().Printf("[ERROR] getting ec2 client: %v", err)
-	}
-	response, err := client.DescribeInstances(c, input)
+func (instances *Instances) getInstances(input *ec2.DescribeInstancesInput) *ec2.DescribeInstancesOutput {
+	instances.getClient()
+	response, err := instances.client.DescribeInstances(instances.awsSearch.ctx, input)
 	if err != nil {
 		log.Default().Printf("[ERROR] getting instances: %v", err)
 		return nil
@@ -165,9 +167,7 @@ func (instances *Instances) searchByIds(ids []string) {
 	input := &ec2.DescribeInstancesInput{
 		InstanceIds: ids,
 	}
-	ctx := context.TODO()
-
-	result := instances.getInstances(ctx, input)
+	result := instances.getInstances(input)
 	instances.parseInstances(result)
 }
 
@@ -186,9 +186,7 @@ func (instances *Instances) searchByPrivateIps(privateIps []string) {
 			},
 		},
 	}
-	ctx := context.TODO()
-
-	result := instances.getInstances(ctx, input)
+	result := instances.getInstances(input)
 	instances.parseInstances(result)
 }
 
@@ -202,9 +200,7 @@ func (instances *Instances) searchByPublicIps(publicIps []string) {
 			},
 		},
 	}
-	ctx := context.TODO()
-
-	result := instances.getInstances(ctx, input)
+	result := instances.getInstances(input)
 	instances.parseInstances(result)
 }
 
@@ -222,8 +218,6 @@ func (instances *Instances) searchByTags(tags []string) {
 	input := &ec2.DescribeInstancesInput{
 		Filters: filters,
 	}
-	ctx := context.TODO()
-
-	result := instances.getInstances(ctx, input)
+	result := instances.getInstances(input)
 	instances.parseInstances(result)
 }
