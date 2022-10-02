@@ -24,6 +24,11 @@ import (
 	"github.com/markkurossi/tabulate"
 )
 
+// getString returns a pointer to a string
+func getString(s string) *string {
+	return aws.String(s)
+}
+
 // awsSearch is a struct to hold the AWS search
 type awsSearch struct {
 	profile string
@@ -38,11 +43,6 @@ func (a *awsSearch) getConfig() error {
 	a.ctx = context.TODO()
 	a.cfg, err = config.LoadDefaultConfig(a.ctx, config.WithSharedConfigProfile(a.profile), config.WithRegion(a.region))
 	return err
-}
-
-// awsString returns a pointer to a string
-func awsString(s string) *string {
-	return aws.String(s)
 }
 
 // table is a struct to hold the table
