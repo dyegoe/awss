@@ -32,7 +32,7 @@ type awsSearch struct {
 	cfg     aws.Config
 }
 
-// getConfig returns a new AWS config.
+// getConfig creates a new a new AWS config and returns error if something goes wrong.
 func (a *awsSearch) getConfig() error {
 	var err error
 	a.ctx = context.TODO()
