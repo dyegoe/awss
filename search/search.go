@@ -17,12 +17,51 @@ package search
 
 import (
 	"context"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/markkurossi/tabulate"
 )
 
 // getConfig returns a new AWS config.
 func getConfig(profile, region string) (aws.Config, error) {
 	return config.LoadDefaultConfig(context.TODO(), config.WithSharedConfigProfile(profile), config.WithRegion(region))
+}
+
+// awsString returns a pointer to a string
+func awsString(s string) *string {
+	return aws.String(s)
+}
+
+// table is a struct to hold the table
+type table struct {
+	table   *tabulate.Tabulate
+	headers []string
+	rows    [][]string
+}
+
+// addRow adds a row to the table
+func (t *table) addRow(row []string) {
+	t.rows = append(t.rows, row)
+}
+
+// newTable returns a new table
+func (t *table) newTable() {
+	t.table = tabulate.New(tabulate.Unicode)
+}
+
+// print creates and prints the table
+func (t *table) print() {
+	t.newTable()
+	for _, header := range t.headers {
+		t.table.Header(header).SetAlign(tabulate.TL)
+	}
+	for _, row := range t.rows {
+		r := t.table.Row()
+		for _, column := range row {
+			r.Column(column)
+		}
+	}
+	t.table.Print(os.Stdout)
 }

@@ -20,13 +20,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/markkurossi/tabulate"
 )
 
 // Instances is a struct to hold the instances
@@ -109,23 +106,30 @@ func (instances *Instances) printJSON() {
 
 // printTable prints the instances as table
 func (instances *Instances) printTable() {
-	table := tabulate.New(tabulate.ASCII)
-	headers := []string{"InstanceID", "InstanceName", "InstanceType", "AvailabilityZone", "InstanceState", "PrivateIpAddress", "PublicIpAddress"}
-	for _, header := range headers {
-		table.Header(header).SetAlign(tabulate.TL)
+	table := table{
+		headers: []string{
+			"InstanceID",
+			"InstanceName",
+			"InstanceType",
+			"AvailabilityZone",
+			"InstanceState",
+			"PrivateIpAddress",
+			"PublicIpAddress",
+		},
 	}
 	for _, i := range instances.Instances {
-		r := table.Row()
-		r.Column(i.InstanceID)
-		r.Column(i.InstanceName)
-		r.Column(i.InstanceType)
-		r.Column(i.AvailabilityZone)
-		r.Column(i.InstanceState)
-		r.Column(i.PrivateIpAddress)
-		r.Column(i.PublicIpAddress)
+		table.addRow([]string{
+			i.InstanceID,
+			i.InstanceName,
+			i.InstanceType,
+			i.AvailabilityZone,
+			i.InstanceState,
+			i.PrivateIpAddress,
+			i.PublicIpAddress,
+		})
 	}
 
-	table.Print(os.Stdout)
+	table.print()
 }
 
 // Search returns the instances
@@ -177,7 +181,7 @@ func (instances *Instances) searchByPrivateIps(privateIps []string) {
 	input := &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			{
-				Name:   aws.String("private-ip-address"),
+				Name:   awsString("private-ip-address"),
 				Values: privateIps,
 			},
 		},
@@ -193,7 +197,7 @@ func (instances *Instances) searchByPublicIps(publicIps []string) {
 	input := &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			{
-				Name:   aws.String("ip-address"),
+				Name:   awsString("ip-address"),
 				Values: publicIps,
 			},
 		},
@@ -211,7 +215,7 @@ func (instances *Instances) searchByTags(tags []string) {
 		st := strings.Split(tag, "=")
 		sv := strings.Split(st[1], ":")
 		filters = append(filters, types.Filter{
-			Name:   aws.String("tag:" + st[0]),
+			Name:   awsString("tag:" + st[0]),
 			Values: sv,
 		})
 	}
