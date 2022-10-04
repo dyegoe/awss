@@ -42,25 +42,71 @@ type instance struct {
 	PublicIpAddress  string `json:"public_ip_address"`
 }
 
-// Search is a method to search for instances
+// Search is a method to search for instances. It gets instances from API and update the struct with the data.
 func (i *Instances) Search(searchBy string, values []string, responseChan chan<- search) {
+	var input *ec2.DescribeInstancesInput
 	switch searchBy {
-	// case "ids":
-	// 	i.searchByIds(values)
-	// case "names":
-	// 	i.searchByNames(values)
-	// case "private-ips":
-	// 	i.searchByPrivateIps(values)
-	// case "public-ips":
-	// 	i.searchByPublicIps(values)
+	case "ids":
+		input = i.filterByIds(values)
+	case "names":
+		input = i.filterByNames(values)
+	case "private-ips":
+		input = i.filterByPrivateIps(values)
+	case "public-ips":
+		input = i.filterByPublicIps(values)
 	case "tags":
-		i.searchByTags(values)
+		input = i.filterByTags(values)
 	}
+	result := i.getInstances(input)
+	i.parseInstances(result)
 	responseChan <- i
 }
 
-// searchByTags returns the instances by tag
-func (i *Instances) searchByTags(tags []string) {
+// filterByIds returns filters by id
+func (i *Instances) filterByIds(ids []string) *ec2.DescribeInstancesInput {
+	return &ec2.DescribeInstancesInput{
+		InstanceIds: ids,
+	}
+}
+
+// filterByNames returns filters by name
+func (i *Instances) filterByNames(names []string) *ec2.DescribeInstancesInput {
+	return &ec2.DescribeInstancesInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("tag:Name"),
+				Values: names,
+			},
+		},
+	}
+}
+
+// filterByPrivateIps returns filters by private ip
+func (i *Instances) filterByPrivateIps(privateIps []string) *ec2.DescribeInstancesInput {
+	return &ec2.DescribeInstancesInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("private-ip-address"),
+				Values: privateIps,
+			},
+		},
+	}
+}
+
+// filterByPublicIps returns filters by public ip
+func (i *Instances) filterByPublicIps(publicIps []string) *ec2.DescribeInstancesInput {
+	return &ec2.DescribeInstancesInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("ip-address"),
+				Values: publicIps,
+			},
+		},
+	}
+}
+
+// filterByTags returns filters by tag
+func (i *Instances) filterByTags(tags []string) *ec2.DescribeInstancesInput {
 	filters := []types.Filter{}
 	for _, tag := range tags {
 		st := strings.Split(tag, "=")
@@ -70,12 +116,9 @@ func (i *Instances) searchByTags(tags []string) {
 			Values: sv,
 		})
 	}
-	input := &ec2.DescribeInstancesInput{
+	return &ec2.DescribeInstancesInput{
 		Filters: filters,
 	}
-	result := i.getInstances(input)
-	_ = result
-	i.parseInstances(result)
 }
 
 // getInstances returns the instances
@@ -90,17 +133,17 @@ func (i *Instances) getInstances(input *ec2.DescribeInstancesInput) *ec2.Describ
 }
 
 // parseInstances parses the instances
-func (instances *Instances) parseInstances(result *ec2.DescribeInstancesOutput) {
+func (i *Instances) parseInstances(result *ec2.DescribeInstancesOutput) {
 	for _, r := range result.Reservations {
-		for _, i := range r.Instances {
-			instances.Instances = append(instances.Instances, instance{
-				InstanceID:       *i.InstanceId,
-				InstanceName:     getTagName(i.Tags),
-				InstanceType:     string(i.InstanceType),
-				AvailabilityZone: *i.Placement.AvailabilityZone,
-				InstanceState:    string(i.State.Name),
-				PrivateIpAddress: *i.PrivateIpAddress,
-				PublicIpAddress:  *i.PublicIpAddress,
+		for _, inst := range r.Instances {
+			i.Instances = append(i.Instances, instance{
+				InstanceID:       *inst.InstanceId,
+				InstanceName:     getTagName(inst.Tags),
+				InstanceType:     string(inst.InstanceType),
+				AvailabilityZone: *inst.Placement.AvailabilityZone,
+				InstanceState:    string(inst.State.Name),
+				PrivateIpAddress: *inst.PrivateIpAddress,
+				PublicIpAddress:  *inst.PublicIpAddress,
 			})
 		}
 	}
