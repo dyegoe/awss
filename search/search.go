@@ -16,69 +16,102 @@ limitations under the License.
 package search
 
 import (
+	"awss/logger"
 	"context"
-	"log"
-	"os"
+	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/markkurossi/tabulate"
 )
 
-// getString returns a pointer to a string
-func getString(s string) *string {
-	return aws.String(s)
+var l = logger.NewLog()
+
+// search is an interface to search for AWS resources.
+type search interface {
+	Search(searchBy string, values []string, responseChan chan<- search)
 }
 
-// printLog prints the log
-func printLogError(message string, err error) {
-	log.Printf("[ERROR] %s: %v\n", message, err)
-}
+// Run is the main function to run the search
+func Run(cmd, searchBy, profile, region string, values []string) bool {
+	profiles := getProfiles(profile)
+	regions := getRegions(region)
 
-// awsSearch is a struct to hold the AWS search
-type awsSearch struct {
-	profile string
-	region  string
-	ctx     context.Context
-	cfg     aws.Config
-}
+	responseChan := make(chan search)
 
-// getConfig creates a new a new AWS config and returns error if something goes wrong.
-func (a *awsSearch) getConfig() error {
-	var err error
-	a.ctx = context.TODO()
-	a.cfg, err = config.LoadDefaultConfig(a.ctx, config.WithSharedConfigProfile(a.profile), config.WithRegion(a.region))
-	return err
-}
-
-// table is a struct to hold the table
-type table struct {
-	table   *tabulate.Tabulate
-	headers []string
-	rows    [][]string
-}
-
-// addRow adds a row to the table
-func (t *table) addRow(row []string) {
-	t.rows = append(t.rows, row)
-}
-
-// newTable returns a new table
-func (t *table) newTable() {
-	t.table = tabulate.New(tabulate.Unicode)
-}
-
-// print creates and prints the table
-func (t *table) print() {
-	t.newTable()
-	for _, header := range t.headers {
-		t.table.Header(header).SetAlign(tabulate.TL)
-	}
-	for _, row := range t.rows {
-		r := t.table.Row()
-		for _, column := range row {
-			r.Column(column)
+	for _, p := range profiles {
+		for _, r := range regions {
+			s := getFunction(cmd, p, r)
+			if s == nil {
+				l.Errorf("no function found for %s", cmd)
+				return false
+			}
+			go s.Search(searchBy, values, responseChan)
 		}
 	}
-	t.table.Print(os.Stdout)
+	for i := 0; i < len(profiles)*len(regions); i++ {
+		response := <-responseChan
+		printJson(response)
+	}
+	return true
+}
+
+// getProfiles returns the profiles
+func getProfiles(p string) []string {
+	if p == "" {
+		l.Errorf("no profile provided")
+	}
+	parsed := strings.Split(p, ",")
+	if parsed[0] == "all" {
+		return []string{"default", "dyego"}
+	}
+	return parsed
+}
+
+// getRegions returns the regions
+func getRegions(p string) []string {
+	if p == "" {
+		l.Errorf("no region provided")
+	}
+	parsed := strings.Split(p, ",")
+	if parsed[0] == "all" {
+		return []string{"eu-central-1", "sa-east-1"}
+	}
+	return parsed
+}
+
+// getConfig returns a AWS config for the specific profile and region
+func getConfig(profile, region string) aws.Config {
+	cfg, err := config.LoadDefaultConfig(
+		context.TODO(),
+		config.WithSharedConfigProfile(profile),
+		config.WithRegion(region),
+	)
+	if err != nil {
+		l.Errorf("unable to load SDK config, %v", err)
+	}
+	return cfg
+}
+
+// getFunction returns the function to search for the specific resource
+func getFunction(cmd, profile, region string) search {
+	switch cmd {
+	case "ec2":
+		return &Instances{
+			Profile: profile,
+			Region:  region,
+		}
+	default:
+		return nil
+	}
+}
+
+// printJson returns the instances as JSON
+func printJson(s search) {
+	json, err := json.Marshal(s)
+	if err != nil {
+		l.Errorf("marshalling instances", err)
+	}
+	fmt.Println(string(json))
 }
