@@ -24,7 +24,7 @@ import (
 
 var l = logger.NewLog()
 
-var profile, region string
+var profile, region []string
 
 // parentCmd represents the base command when called without any subcommands
 var parentCmd = &cobra.Command{
@@ -50,8 +50,8 @@ https://github.com/dyegoe/awss`,
 // init is called before the command is executed and is used to set flags
 func init() {
 	// Set flags for parentCmd
-	parentCmd.PersistentFlags().StringVar(&profile, "profile", "default", "Select the profile from ~/.aws/config")
-	parentCmd.PersistentFlags().StringVar(&region, "region", "eu-central-1", "Select a region to perform your API calls")
+	parentCmd.PersistentFlags().StringSliceVar(&profile, "profile", []string{"default"}, "Select the profile from ~/.aws/config")
+	parentCmd.PersistentFlags().StringSliceVar(&region, "region", []string{"eu-central-1"}, "Select a region to perform your API calls")
 
 	// Add subcommands
 	parentCmd.AddCommand(ec2Cmd)

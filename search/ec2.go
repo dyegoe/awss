@@ -123,7 +123,8 @@ func (i *Instances) filterByTags(tags []string) *ec2.DescribeInstancesInput {
 
 // getInstances returns the instances
 func (i *Instances) getInstances(input *ec2.DescribeInstancesInput) *ec2.DescribeInstancesOutput {
-	client := ec2.NewFromConfig(getConfig(i.Profile, i.Region))
+	cfg := getConfig(i.Profile, i.Region)
+	client := ec2.NewFromConfig(cfg)
 	response, err := client.DescribeInstances(context.TODO(), input)
 	if err != nil {
 		l.Errorf("error getting instances: %v", err)
@@ -142,8 +143,8 @@ func (i *Instances) parseInstances(result *ec2.DescribeInstancesOutput) {
 				InstanceType:     string(inst.InstanceType),
 				AvailabilityZone: *inst.Placement.AvailabilityZone,
 				InstanceState:    string(inst.State.Name),
-				PrivateIpAddress: *inst.PrivateIpAddress,
-				PublicIpAddress:  *inst.PublicIpAddress,
+				PrivateIpAddress: getValue(inst.PrivateIpAddress),
+				PublicIpAddress:  getValue(inst.PublicIpAddress),
 			})
 		}
 	}
@@ -157,4 +158,35 @@ func getTagName(tags []types.Tag) string {
 		}
 	}
 	return ""
+}
+
+// getValue returns the string value if not nil
+func getValue(s *string) string {
+	if s != nil {
+		return *s
+	}
+	return ""
+}
+
+// getOptedInRegions returns the opted-in regions
+func getOptedInRegions(p string) []string {
+	cfg := getConfig(p, "us-east-1")
+	client := ec2.NewFromConfig(cfg)
+	response, err := client.DescribeRegions(context.TODO(), &ec2.DescribeRegionsInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("opt-in-status"),
+				Values: []string{"opt-in-not-required", "opted-in"},
+			},
+		},
+	})
+	if err != nil {
+		l.Errorf("error getting regions: %v", err)
+		return nil
+	}
+	regions := []string{}
+	for _, r := range response.Regions {
+		regions = append(regions, *r.RegionName)
+	}
+	return regions
 }

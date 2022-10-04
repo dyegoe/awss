@@ -20,10 +20,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"gopkg.in/ini.v1"
 )
 
 var l = logger.NewLog()
@@ -34,13 +34,14 @@ type search interface {
 }
 
 // Run is the main function to run the search
-func Run(cmd, searchBy, profile, region string, values []string) bool {
+func Run(cmd, searchBy string, profile, region, values []string) bool {
 	profiles := getProfiles(profile)
-	regions := getRegions(region)
+	regions := []string{}
 
 	responseChan := make(chan search)
 
 	for _, p := range profiles {
+		regions = getRegions(region, p)
 		for _, r := range regions {
 			s := getFunction(cmd, p, r)
 			if s == nil {
@@ -58,27 +59,41 @@ func Run(cmd, searchBy, profile, region string, values []string) bool {
 }
 
 // getProfiles returns the profiles
-func getProfiles(p string) []string {
-	if p == "" {
-		l.Errorf("no profile provided")
+func getProfiles(p []string) []string {
+	if len(p) == 0 {
+		l.Fatalf("no profile provided")
 	}
-	parsed := strings.Split(p, ",")
-	if parsed[0] == "all" {
-		return []string{"default", "dyego"}
+	if p[0] == "all" {
+		return getProfilesFromConfig()
 	}
-	return parsed
+	return p
+}
+
+func getProfilesFromConfig() []string {
+	fname := config.DefaultSharedCredentialsFilename()
+	f, err := ini.Load(fname)
+	arr := []string{}
+	if err != nil {
+		l.Fatalf("Fail to read file: %v", err)
+	} else {
+		for _, v := range f.Sections() {
+			if len(v.Keys()) != 0 {
+				arr = append(arr, v.Name())
+			}
+		}
+	}
+	return arr
 }
 
 // getRegions returns the regions
-func getRegions(p string) []string {
-	if p == "" {
-		l.Errorf("no region provided")
+func getRegions(r []string, p string) []string {
+	if len(r) == 0 {
+		l.Fatalf("no region provided")
 	}
-	parsed := strings.Split(p, ",")
-	if parsed[0] == "all" {
-		return []string{"eu-central-1", "sa-east-1"}
+	if r[0] == "all" {
+		return getOptedInRegions(p)
 	}
-	return parsed
+	return r
 }
 
 // getConfig returns a AWS config for the specific profile and region
