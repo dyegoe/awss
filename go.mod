@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.17.8
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.62.0
 	github.com/spf13/cobra v1.5.0
+	gopkg.in/ini.v1 v1.67.0
 )
 
 require (
@@ -23,5 +24,5 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	gopkg.in/ini.v1 v1.67.0 // indirect
+	github.com/stretchr/testify v1.8.0 // indirect
 )
