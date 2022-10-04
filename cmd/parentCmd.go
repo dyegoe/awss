@@ -35,7 +35,7 @@ It is a wrapper written in Go using AWS SDK Go v2. The work is still in progress
 
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
-	Version: "0.1",
+	Version: "0.2.0",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
 			l.Errorf("no command provided")
