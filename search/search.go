@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -43,10 +42,7 @@ type search interface {
 
 // Run is the main function to run the search
 func Run(cmd, searchBy, output string, profile, region, values []string) bool {
-	var wg sync.WaitGroup
-
 	profiles := getProfiles(profile)
-	responseChan := make(chan search)
 
 	for _, p := range profiles {
 		regions := getRegions(region, p)
@@ -59,28 +55,17 @@ func Run(cmd, searchBy, output string, profile, region, values []string) bool {
 				return false
 			}
 
-			wg.Add(2)
-			go func(s search, sb string, v []string, rc chan<- search) {
-				defer wg.Done()
+			response := s.Search(searchBy, values)
 
-				response := s.Search(sb, v)
-				rc <- response
-			}(s, searchBy, values, responseChan)
-
-			go func(o string, rc <-chan search, profile, region string) {
-				defer wg.Done()
-
-				response := <-rc
-				switch o {
-				case "json":
-					printJson(response)
-				case "table":
-					printTable(s, profile, region)
-				}
-			}(output, responseChan, p, r)
+			switch output {
+			case "json":
+				printJson(response)
+			case "table":
+				printTable(s, p, r)
+			}
 		}
 	}
-	wg.Wait()
+
 	return true
 }
 
