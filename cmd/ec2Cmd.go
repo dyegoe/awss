@@ -60,7 +60,7 @@ var ec2Cmd = &cobra.Command{
 			return
 		}
 
-		if !search.Run(cmd.Name(), searchBy, profile, region, values) {
+		if !search.Run(cmd.Name(), searchBy, output, profile, region, values) {
 			l.Errorf("something went wrong while running %s", cmd.Name())
 		}
 	},

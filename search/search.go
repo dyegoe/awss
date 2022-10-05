@@ -20,10 +20,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/markkurossi/tabulate"
 	"gopkg.in/ini.v1"
 )
 
@@ -33,22 +37,32 @@ var l = logger.NewLog()
 type search interface {
 	Search(searchBy string, values []string) search
 	GetHeaders() []string
+	GetRows() [][]string
 }
 
 // Run is the main function to run the search
-func Run(cmd, searchBy string, profile, region, values []string) bool {
+func Run(cmd, searchBy, output string, profile, region, values []string) bool {
 	profiles := getProfiles(profile)
 
 	for _, p := range profiles {
 		regions := getRegions(region, p)
+
 		for _, r := range regions {
 			s := getFunction(cmd, p, r)
 			if s == nil {
 				l.Errorf("no function found for %s", cmd)
 				return false
 			}
+
 			response := s.Search(searchBy, values)
-			printJson(response)
+
+			// Print the response
+			switch output {
+			case "json":
+				printJson(response)
+			case "table":
+				printTable(s, p, r)
+			}
 		}
 	}
 	return true
@@ -126,4 +140,68 @@ func printJson(s search) {
 		l.Fatalf("marshalling instances", err)
 	}
 	fmt.Println(string(json))
+}
+
+func printTable(s search, profile, region string) {
+	table := tabulate.New(tabulate.Unicode)
+	headers := s.GetHeaders()
+	rows := s.GetRows()
+
+	fmt.Println("[Profile]:", profile, "[Region]:", region)
+	if len(rows) == 0 {
+		fmt.Println("No results found")
+		return
+	}
+
+	for _, header := range headers {
+		table.Header(header).SetAlign(tabulate.TL)
+	}
+	for _, r := range rows {
+		row := table.Row()
+		for _, column := range r {
+			row.Column(column)
+		}
+	}
+	table.Print(os.Stdout)
+}
+
+// getTagName returns the value of the tag Name
+func getTagName(tags []types.Tag) string {
+	for _, tag := range tags {
+		if *tag.Key == "Name" {
+			return *tag.Value
+		}
+	}
+	return ""
+}
+
+// getValue returns the string value if not nil
+func getValue(s *string) string {
+	if s != nil {
+		return *s
+	}
+	return ""
+}
+
+// getOptedInRegions returns the opted-in regions
+func getOptedInRegions(p string) []string {
+	cfg := getConfig(p, "us-east-1")
+	client := ec2.NewFromConfig(cfg)
+	response, err := client.DescribeRegions(context.TODO(), &ec2.DescribeRegionsInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("opt-in-status"),
+				Values: []string{"opt-in-not-required", "opted-in"},
+			},
+		},
+	})
+	if err != nil {
+		l.Errorf("error getting regions: %v", err)
+		return nil
+	}
+	regions := []string{}
+	for _, r := range response.Regions {
+		regions = append(regions, *r.RegionName)
+	}
+	return regions
 }

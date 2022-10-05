@@ -24,6 +24,7 @@ import (
 
 var l = logger.NewLog()
 
+var output string
 var profile, region []string
 
 // parentCmd represents the base command when called without any subcommands
@@ -52,6 +53,7 @@ func init() {
 	// Set flags for parentCmd
 	parentCmd.PersistentFlags().StringSliceVar(&profile, "profile", []string{"default"}, "Select the profile from ~/.aws/config")
 	parentCmd.PersistentFlags().StringSliceVar(&region, "region", []string{"eu-central-1"}, "Select a region to perform your API calls")
+	parentCmd.PersistentFlags().StringVar(&output, "output", "json", "Select the output format. Options: table, json")
 
 	// Add subcommands
 	parentCmd.AddCommand(ec2Cmd)

@@ -45,16 +45,6 @@ type instance struct {
 	PublicIpAddress  string `json:"public_ip_address"`
 }
 
-// getHeaders returns the headers
-func (i *Instances) GetHeaders() []string {
-	headers := []string{}
-	val := reflect.ValueOf(i.instance)
-	for i := 0; i < val.Type().NumField(); i++ {
-		headers = append(headers, val.Type().Field(i).Name)
-	}
-	return headers
-}
-
 // Search is a method to search for instances. It gets instances from API and update the struct with the data.
 func (i *Instances) Search(searchBy string, values []string) search {
 	var input *ec2.DescribeInstancesInput
@@ -163,43 +153,26 @@ func (i *Instances) parseInstances(result *ec2.DescribeInstancesOutput) {
 	}
 }
 
-// getTagName returns the value of the tag Name
-func getTagName(tags []types.Tag) string {
-	for _, tag := range tags {
-		if *tag.Key == "Name" {
-			return *tag.Value
+// GetHeaders returns the headers
+func (i *Instances) GetHeaders() []string {
+	headers := []string{}
+	val := reflect.ValueOf(i.instance)
+	for i := 0; i < val.Type().NumField(); i++ {
+		headers = append(headers, val.Type().Field(i).Name)
+	}
+	return headers
+}
+
+// GetRows returns the rows
+func (i *Instances) GetRows() [][]string {
+	rows := [][]string{}
+	for _, v := range i.Data {
+		row := []string{}
+		val := reflect.ValueOf(v)
+		for i := 0; i < val.Type().NumField(); i++ {
+			row = append(row, val.Field(i).String())
 		}
+		rows = append(rows, row)
 	}
-	return ""
-}
-
-// getValue returns the string value if not nil
-func getValue(s *string) string {
-	if s != nil {
-		return *s
-	}
-	return ""
-}
-
-// getOptedInRegions returns the opted-in regions
-func getOptedInRegions(p string) []string {
-	cfg := getConfig(p, "us-east-1")
-	client := ec2.NewFromConfig(cfg)
-	response, err := client.DescribeRegions(context.TODO(), &ec2.DescribeRegionsInput{
-		Filters: []types.Filter{
-			{
-				Name:   aws.String("opt-in-status"),
-				Values: []string{"opt-in-not-required", "opted-in"},
-			},
-		},
-	})
-	if err != nil {
-		l.Errorf("error getting regions: %v", err)
-		return nil
-	}
-	regions := []string{}
-	for _, r := range response.Regions {
-		regions = append(regions, *r.RegionName)
-	}
-	return regions
+	return rows
 }
