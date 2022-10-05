@@ -16,31 +16,22 @@ limitations under the License.
 package search
 
 import (
-	"encoding/json"
-	"fmt"
+	"context"
+	"reflect"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
-// getTagName returns the value of the tag Name
-func getTagName(tags []types.Tag) string {
-	for _, tag := range tags {
-		if *tag.Key == "Name" {
-			return *tag.Value
-		}
-	}
-	return ""
-}
-
 // Instances is a struct to hold the instances
 type Instances struct {
-	Profile   string      `json:"profile"`
-	Region    string      `json:"region"`
-	Instances []instance  `json:"instances"`
-	client    *ec2.Client `json:"-"`
-	awsSearch awsSearch   `json:"-"`
+	Profile  string     `json:"profile"`
+	Region   string     `json:"region"`
+	Errors   []string   `json:"errors"`
+	Data     []instance `json:"data"`
+	instance `json:"-"`
 }
 
 // instances is a struct to hold the instance
@@ -54,176 +45,134 @@ type instance struct {
 	PublicIpAddress  string `json:"public_ip_address"`
 }
 
-// getClient returns a new ec2 client
-func (instances *Instances) getClient() *ec2.Client {
-	instances.awsSearch = awsSearch{
-		profile: instances.Profile,
-		region:  instances.Region,
+// Search is a method to search for instances. It gets instances from API and update the struct with the data.
+func (i *Instances) Search(searchBy string, values []string) search {
+	var input *ec2.DescribeInstancesInput
+	switch searchBy {
+	case "ids":
+		input = i.filterByIds(values)
+	case "names":
+		input = i.filterByNames(values)
+	case "private-ips":
+		input = i.filterByPrivateIps(values)
+	case "public-ips":
+		input = i.filterByPublicIps(values)
+	case "tags":
+		input = i.filterByTags(values)
 	}
-	err := instances.awsSearch.getConfig()
-	if err != nil {
-		printLogError("getting AWS config", err)
-	}
+	result := i.getInstances(input)
+	i.parseInstances(result)
+	return i
+}
 
-	return ec2.NewFromConfig(instances.awsSearch.cfg)
+// filterByIds returns filters by id
+func (i *Instances) filterByIds(ids []string) *ec2.DescribeInstancesInput {
+	return &ec2.DescribeInstancesInput{
+		InstanceIds: ids,
+	}
+}
+
+// filterByNames returns filters by name
+func (i *Instances) filterByNames(names []string) *ec2.DescribeInstancesInput {
+	return &ec2.DescribeInstancesInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("tag:Name"),
+				Values: names,
+			},
+		},
+	}
+}
+
+// filterByPrivateIps returns filters by private ip
+func (i *Instances) filterByPrivateIps(privateIps []string) *ec2.DescribeInstancesInput {
+	return &ec2.DescribeInstancesInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("private-ip-address"),
+				Values: privateIps,
+			},
+		},
+	}
+}
+
+// filterByPublicIps returns filters by public ip
+func (i *Instances) filterByPublicIps(publicIps []string) *ec2.DescribeInstancesInput {
+	return &ec2.DescribeInstancesInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("ip-address"),
+				Values: publicIps,
+			},
+		},
+	}
+}
+
+// filterByTags returns filters by tag
+func (i *Instances) filterByTags(tags []string) *ec2.DescribeInstancesInput {
+	filters := []types.Filter{}
+	for _, tag := range tags {
+		st := strings.Split(tag, "=")
+		sv := strings.Split(st[1], ":")
+		filters = append(filters, types.Filter{
+			Name:   aws.String("tag:" + st[0]),
+			Values: sv,
+		})
+	}
+	return &ec2.DescribeInstancesInput{
+		Filters: filters,
+	}
 }
 
 // getInstances returns the instances
-func (instances *Instances) getInstances(input *ec2.DescribeInstancesInput) *ec2.DescribeInstancesOutput {
-	instances.client = instances.getClient()
-	response, err := instances.client.DescribeInstances(instances.awsSearch.ctx, input)
+func (i *Instances) getInstances(input *ec2.DescribeInstancesInput) *ec2.DescribeInstancesOutput {
+	cfg := getConfig(i.Profile, i.Region)
+	client := ec2.NewFromConfig(cfg)
+	response, err := client.DescribeInstances(context.TODO(), input)
 	if err != nil {
-		printLogError("getting instances", err)
+		i.Errors = append(i.Errors, "error getting instances")
 		return nil
 	}
 	return response
 }
 
 // parseInstances parses the instances
-func (instances *Instances) parseInstances(result *ec2.DescribeInstancesOutput) {
+func (i *Instances) parseInstances(result *ec2.DescribeInstancesOutput) {
 	for _, r := range result.Reservations {
-		for _, i := range r.Instances {
-			instances.Instances = append(instances.Instances, instance{
-				InstanceID:       *i.InstanceId,
-				InstanceName:     getTagName(i.Tags),
-				InstanceType:     string(i.InstanceType),
-				AvailabilityZone: *i.Placement.AvailabilityZone,
-				InstanceState:    string(i.State.Name),
-				PrivateIpAddress: *i.PrivateIpAddress,
-				PublicIpAddress:  *i.PublicIpAddress,
+		for _, inst := range r.Instances {
+			i.Data = append(i.Data, instance{
+				InstanceID:       *inst.InstanceId,
+				InstanceName:     getTagName(inst.Tags),
+				InstanceType:     string(inst.InstanceType),
+				AvailabilityZone: *inst.Placement.AvailabilityZone,
+				InstanceState:    string(inst.State.Name),
+				PrivateIpAddress: getValue(inst.PrivateIpAddress),
+				PublicIpAddress:  getValue(inst.PublicIpAddress),
 			})
 		}
 	}
 }
 
-// Search returns the instances
-func (instances *Instances) Search(by string, value []string) {
-	switch by {
-	case "ids":
-		instances.searchByIds(value)
-	case "names":
-		instances.searchByNames(value)
-	case "private-ips":
-		instances.searchByPrivateIps(value)
-	case "public-ips":
-		instances.searchByPublicIps(value)
-	case "tags":
-		instances.searchByTags(value)
+// GetHeaders returns the headers
+func (i *Instances) GetHeaders() []string {
+	headers := []string{}
+	val := reflect.ValueOf(i.instance)
+	for i := 0; i < val.Type().NumField(); i++ {
+		headers = append(headers, val.Type().Field(i).Name)
 	}
+	return headers
 }
 
-// searchByIds returns the instances by id
-func (instances *Instances) searchByIds(ids []string) {
-	input := &ec2.DescribeInstancesInput{
-		InstanceIds: ids,
+// GetRows returns the rows
+func (i *Instances) GetRows() [][]string {
+	rows := [][]string{}
+	for _, v := range i.Data {
+		row := []string{}
+		val := reflect.ValueOf(v)
+		for i := 0; i < val.Type().NumField(); i++ {
+			row = append(row, val.Field(i).String())
+		}
+		rows = append(rows, row)
 	}
-	result := instances.getInstances(input)
-	instances.parseInstances(result)
-}
-
-// searchByNames returns the instances by name
-func (instances *Instances) searchByNames(names []string) {
-	input := &ec2.DescribeInstancesInput{
-		Filters: []types.Filter{
-			{
-				Name:   getString("tag:Name"),
-				Values: names,
-			},
-		},
-	}
-	result := instances.getInstances(input)
-	instances.parseInstances(result)
-}
-
-// searchByPrivateIps returns the instances by private ip
-func (instances *Instances) searchByPrivateIps(privateIps []string) {
-	input := &ec2.DescribeInstancesInput{
-		Filters: []types.Filter{
-			{
-				Name:   getString("private-ip-address"),
-				Values: privateIps,
-			},
-		},
-	}
-	result := instances.getInstances(input)
-	instances.parseInstances(result)
-}
-
-// searchByPublicIps returns the instances by public ip
-func (instances *Instances) searchByPublicIps(publicIps []string) {
-	input := &ec2.DescribeInstancesInput{
-		Filters: []types.Filter{
-			{
-				Name:   getString("ip-address"),
-				Values: publicIps,
-			},
-		},
-	}
-	result := instances.getInstances(input)
-	instances.parseInstances(result)
-}
-
-// searchByTags returns the instances by tag
-func (instances *Instances) searchByTags(tags []string) {
-	filters := []types.Filter{}
-	for _, tag := range tags {
-		st := strings.Split(tag, "=")
-		sv := strings.Split(st[1], ":")
-		filters = append(filters, types.Filter{
-			Name:   getString("tag:" + st[0]),
-			Values: sv,
-		})
-	}
-	input := &ec2.DescribeInstancesInput{
-		Filters: filters,
-	}
-	result := instances.getInstances(input)
-	instances.parseInstances(result)
-}
-
-// Print prints the instances
-func (instances *Instances) Print(output string) {
-	switch output {
-	case "json":
-		instances.printJson()
-	case "table":
-		instances.printTable()
-	}
-}
-
-// printJson returns the instances as JSON
-func (instances *Instances) printJson() {
-	json, err := json.Marshal(instances)
-	if err != nil {
-		printLogError("marshalling instances", err)
-	}
-	fmt.Println(string(json))
-}
-
-// printTable prints the instances as table
-func (instances *Instances) printTable() {
-	table := table{
-		headers: []string{
-			"InstanceID",
-			"InstanceName",
-			"InstanceType",
-			"AvailabilityZone",
-			"InstanceState",
-			"PrivateIpAddress",
-			"PublicIpAddress",
-		},
-	}
-	for _, i := range instances.Instances {
-		table.addRow([]string{
-			i.InstanceID,
-			i.InstanceName,
-			i.InstanceType,
-			i.AvailabilityZone,
-			i.InstanceState,
-			i.PrivateIpAddress,
-			i.PublicIpAddress,
-		})
-	}
-
-	table.print()
+	return rows
 }

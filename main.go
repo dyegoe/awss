@@ -15,9 +15,7 @@ limitations under the License.
 */
 package main
 
-import (
-	"github.com/dyegoe/awss/cmd"
-)
+import "awss/cmd"
 
 func main() {
 	cmd.Execute()
