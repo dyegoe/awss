@@ -143,12 +143,13 @@ func printJson(s search) {
 	fmt.Println(string(json))
 }
 
+// printTable prints the instances as a table
 func printTable(s search, profile, region string) {
 	table := tabulate.New(tabulate.Unicode)
 	headers := s.GetHeaders()
 	rows := s.GetRows()
 
-	fmt.Println("[Profile]:", profile, "[Region]:", region)
+	fmt.Println("[+] [profile]:", profile, "[region]:", region)
 	if len(rows) == 0 {
 		fmt.Println("No results found")
 		return
