@@ -65,6 +65,7 @@ func getProfiles(p []string) []string {
 	return p
 }
 
+// getProfilesFromConfig returns the profiles from the config file
 func getProfilesFromConfig() []string {
 	fname := config.DefaultSharedConfigFilename()
 	f, err := ini.Load(fname)
