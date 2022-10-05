@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -30,30 +31,25 @@ var l = logger.NewLog()
 
 // search is an interface to search for AWS resources.
 type search interface {
-	Search(searchBy string, values []string, responseChan chan<- search)
+	Search(searchBy string, values []string) search
+	GetHeaders() []string
 }
 
 // Run is the main function to run the search
 func Run(cmd, searchBy string, profile, region, values []string) bool {
 	profiles := getProfiles(profile)
-	regions := []string{}
-
-	responseChan := make(chan search)
 
 	for _, p := range profiles {
-		regions = getRegions(region, p)
+		regions := getRegions(region, p)
 		for _, r := range regions {
 			s := getFunction(cmd, p, r)
 			if s == nil {
 				l.Errorf("no function found for %s", cmd)
 				return false
 			}
-			go s.Search(searchBy, values, responseChan)
+			response := s.Search(searchBy, values)
+			printJson(response)
 		}
-	}
-	for i := 0; i < len(profiles)*len(regions); i++ {
-		response := <-responseChan
-		printJson(response)
 	}
 	return true
 }
@@ -70,15 +66,15 @@ func getProfiles(p []string) []string {
 }
 
 func getProfilesFromConfig() []string {
-	fname := config.DefaultSharedCredentialsFilename()
+	fname := config.DefaultSharedConfigFilename()
 	f, err := ini.Load(fname)
 	arr := []string{}
 	if err != nil {
 		l.Fatalf("Fail to read file: %v", err)
 	} else {
 		for _, v := range f.Sections() {
-			if len(v.Keys()) != 0 {
-				arr = append(arr, v.Name())
+			if strings.HasPrefix(v.Name(), "profile ") {
+				arr = append(arr, strings.TrimPrefix(v.Name(), "profile "))
 			}
 		}
 	}
@@ -104,7 +100,7 @@ func getConfig(profile, region string) aws.Config {
 		config.WithRegion(region),
 	)
 	if err != nil {
-		l.Errorf("unable to load SDK config, %v", err)
+		l.Fatalf("unable to load SDK config, %v", err)
 	}
 	return cfg
 }
@@ -126,7 +122,7 @@ func getFunction(cmd, profile, region string) search {
 func printJson(s search) {
 	json, err := json.Marshal(s)
 	if err != nil {
-		l.Errorf("marshalling instances", err)
+		l.Fatalf("marshalling instances", err)
 	}
 	fmt.Println(string(json))
 }

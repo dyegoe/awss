@@ -17,6 +17,7 @@ package search
 
 import (
 	"context"
+	"reflect"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -26,9 +27,11 @@ import (
 
 // Instances is a struct to hold the instances
 type Instances struct {
-	Profile   string     `json:"profile"`
-	Region    string     `json:"region"`
-	Instances []instance `json:"instances"`
+	Profile  string     `json:"profile"`
+	Region   string     `json:"region"`
+	Errors   []string   `json:"errors"`
+	Data     []instance `json:"data"`
+	instance `json:"-"`
 }
 
 // instances is a struct to hold the instance
@@ -42,8 +45,18 @@ type instance struct {
 	PublicIpAddress  string `json:"public_ip_address"`
 }
 
+// getHeaders returns the headers
+func (i *Instances) GetHeaders() []string {
+	headers := []string{}
+	val := reflect.ValueOf(i.instance)
+	for i := 0; i < val.Type().NumField(); i++ {
+		headers = append(headers, val.Type().Field(i).Name)
+	}
+	return headers
+}
+
 // Search is a method to search for instances. It gets instances from API and update the struct with the data.
-func (i *Instances) Search(searchBy string, values []string, responseChan chan<- search) {
+func (i *Instances) Search(searchBy string, values []string) search {
 	var input *ec2.DescribeInstancesInput
 	switch searchBy {
 	case "ids":
@@ -59,7 +72,7 @@ func (i *Instances) Search(searchBy string, values []string, responseChan chan<-
 	}
 	result := i.getInstances(input)
 	i.parseInstances(result)
-	responseChan <- i
+	return i
 }
 
 // filterByIds returns filters by id
@@ -127,7 +140,7 @@ func (i *Instances) getInstances(input *ec2.DescribeInstancesInput) *ec2.Describ
 	client := ec2.NewFromConfig(cfg)
 	response, err := client.DescribeInstances(context.TODO(), input)
 	if err != nil {
-		l.Errorf("error getting instances: %v", err)
+		i.Errors = append(i.Errors, "error getting instances")
 		return nil
 	}
 	return response
@@ -137,7 +150,7 @@ func (i *Instances) getInstances(input *ec2.DescribeInstancesInput) *ec2.Describ
 func (i *Instances) parseInstances(result *ec2.DescribeInstancesOutput) {
 	for _, r := range result.Reservations {
 		for _, inst := range r.Instances {
-			i.Instances = append(i.Instances, instance{
+			i.Data = append(i.Data, instance{
 				InstanceID:       *inst.InstanceId,
 				InstanceName:     getTagName(inst.Tags),
 				InstanceType:     string(inst.InstanceType),
