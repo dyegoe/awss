@@ -27,14 +27,26 @@ var ec2Ids, ec2Names, ec2PrivateIps, ec2PublicIps, ec2Tags []string
 var ec2Cmd = &cobra.Command{
 	Use:   "ec2",
 	Short: "Search for EC2 instances.",
-	Long:  `Search for EC2 instances.`,
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) > 0 {
-			return fmt.Errorf("no arguments allowed")
-		}
-		return nil
-	},
-	Run: func(cmd *cobra.Command, args []string) {
+	Long: `Search for EC2 instances.
+You can search EC2 instances using the following filters: ids, names, private-ips, public-ips and tags.
+You can use multiple values for each filter, separated by comma, but you can specify just one filter at time.
+
+For example, if you want to search for EC2 instances with the ids i-1230456078901 and i-1230456078902, you can use:
+	awss ec2 -i i-1230456078901,i-1230456078902
+If you want to search for EC2 instances with the names instance-1 and instance-2, you can use:
+	awss ec2 -n instance-1,instance-2
+If you want to search for EC2 instances with the private IPs 172.16.0.1 and 172.17.1.254, you can use:
+	awss ec2 -p 172.16.0.1,172.17.1.254
+If you want to search for EC2 instances with the public IPs 52.28.19.20 and 52.30.31.32, you can use:
+	awss ec2 -P 52.28.19.20,52.30.31.32
+If you want to search for EC2 instances with the tag Key and the values Value1 and Value2, you can use:
+	awss ec2 -t 'Key=Value1:Value2'
+If you want to search for EC2 instances with the tag Environment and the value Production, you can use:
+	awss ec2 -t 'Environment=Production'
+If you want to search for EC2 instances with the tags Key=Value1:Value2 and Environment=Production, you can use:
+	awss ec2 -t 'Key=Value1:Value2,Environment=Production'`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		var values []string
 		var searchBy string
 
@@ -55,22 +67,24 @@ var ec2Cmd = &cobra.Command{
 			values = ec2Tags
 			searchBy = "tags"
 		default:
-			l.Errorf("no flags provided. You must provide one flag.")
-			cmd.Help()
-			return
+			return fmt.Errorf("no flags provided. You must provide one of flags listed below")
 		}
 
-		if !search.Run(cmd.Name(), searchBy, output, profile, region, values) {
-			l.Errorf("something went wrong while running %s", cmd.Name())
+		err := search.Run(profile, region, output, cmd.Name(), searchBy, values)
+		if err != nil {
+			return fmt.Errorf("something went wrong while running %s. error: %s", cmd.Name(), err)
 		}
+		return nil
 	},
 }
 
 func init() {
 	// Set flags for ec2Cmd
-	ec2Cmd.Flags().StringSliceVarP(&ec2Ids, "ids", "i", []string{}, "Provide a list of comma-separated ids. e.g. --ids `i-1230456078901,i-1230456078902`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2Names, "names", "n", []string{}, "Provide a list of comma-separated names. It searchs using the 'tag:Name'. e.g. --names `instance-1,instance-2`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2PrivateIps, "private-ips", "p", []string{}, "Provide a list of comma-separated private IPs. e.g. --private-ips `172.16.0.1,172.17.1.254`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2PublicIps, "public-ips", "P", []string{}, "Provide a list of comma-separated public IPs. e.g. --public-ips `52.28.19.20,52.30.31.32`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2Tags, "tags", "t", []string{}, "Filter EC2 instances by tags. Example: -t `'Key=Value1:Value2'` -t 'Environment=Production'")
+	ec2Cmd.Flags().StringSliceVarP(&ec2Ids, "ids", "i", []string{}, "Filter EC2 instances by ids. `i-1230456078901,i-1230456078902`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2Names, "names", "n", []string{}, "Filter EC2 instances by names. It searchs using the 'tag:Name'. `instance-1,instance-2`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2PrivateIps, "private-ips", "p", []string{}, "Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2PublicIps, "public-ips", "P", []string{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2Tags, "tags", "t", []string{}, "Filter EC2 instances by tags. `'Key=Value1:Value2,Environment=Production'`")
+	// Mark set of flags that can't be used together
+	ec2Cmd.MarkFlagsMutuallyExclusive("ids", "names", "private-ips", "public-ips", "tags")
 }

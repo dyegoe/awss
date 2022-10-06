@@ -41,84 +41,124 @@ type search interface {
 }
 
 // Run is the main function to run the search
-func Run(cmd, searchBy, output string, profile, region, values []string) bool {
-	profiles := getProfiles(profile)
+func Run(profile, region []string, output, cmd, searchBy string, values []string) error {
+	profiles, err := getProfiles(profile)
+	if err != nil {
+		return err
+	}
 
 	for _, p := range profiles {
-		regions := getRegions(region, p)
+		regions, err := getRegions(region, p)
+		if err != nil {
+			return err
+		}
 
 		for _, r := range regions {
 
 			s := getFunction(cmd, p, r)
 			if s == nil {
-				l.Errorf("no function found for %s", cmd)
-				return false
+				return fmt.Errorf("no function found for %s", cmd)
 			}
 
 			response := s.Search(searchBy, values)
 
 			switch output {
-			case "json":
-				printJson(response)
 			case "table":
 				printTable(s, p, r)
+			case "json":
+				printJson(response)
 			}
 		}
 	}
 
-	return true
+	return nil
 }
 
 // getProfiles returns the profiles
-func getProfiles(p []string) []string {
-	if len(p) == 0 {
-		l.Fatalf("no profile provided")
+func getProfiles(p []string) ([]string, error) {
+	profiles, err := getProfilesFromConfig()
+	if err != nil {
+		return nil, err
 	}
 	if p[0] == "all" {
-		return getProfilesFromConfig()
+		return profiles, nil
 	}
-	return p
+	for _, profile := range p {
+		if !stringInSlice(profile, profiles) {
+			return nil, fmt.Errorf("profile %s not found", profile)
+		}
+	}
+	return p, nil
 }
 
 // getProfilesFromConfig returns the profiles from the config file
-func getProfilesFromConfig() []string {
-	fname := config.DefaultSharedConfigFilename()
-	f, err := ini.Load(fname)
-	arr := []string{}
+func getProfilesFromConfig() ([]string, error) {
+	f, err := ini.Load(config.DefaultSharedConfigFilename())
 	if err != nil {
-		l.Fatalf("Fail to read file: %v", err)
-	} else {
-		for _, v := range f.Sections() {
-			if strings.HasPrefix(v.Name(), "profile ") {
-				arr = append(arr, strings.TrimPrefix(v.Name(), "profile "))
-			}
+		return nil, fmt.Errorf("fail to read file: %v", err)
+	}
+	arr := []string{}
+	for _, v := range f.Sections() {
+		if strings.HasPrefix(v.Name(), "profile ") {
+			arr = append(arr, strings.TrimPrefix(v.Name(), "profile "))
 		}
 	}
-	return arr
+	return arr, nil
 }
 
 // getRegions returns the regions
-func getRegions(r []string, p string) []string {
-	if len(r) == 0 {
-		l.Fatalf("no region provided")
+func getRegions(r []string, p string) ([]string, error) {
+	regions, err := getOptedInRegions(p)
+	if err != nil {
+		return nil, err
 	}
 	if r[0] == "all" {
-		return getOptedInRegions(p)
+		return regions, nil
 	}
-	return r
+	for _, region := range r {
+		if !stringInSlice(region, regions) {
+			return nil, fmt.Errorf("region %s not found", region)
+		}
+	}
+	return r, nil
+}
+
+// getOptedInRegions returns the opted-in regions
+func getOptedInRegions(p string) ([]string, error) {
+	cfg, err := getConfig(p, "us-east-1")
+	if err != nil {
+		return nil, err
+	}
+	client := ec2.NewFromConfig(cfg)
+	response, err := client.DescribeRegions(context.TODO(), &ec2.DescribeRegionsInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("opt-in-status"),
+				Values: []string{"opt-in-not-required", "opted-in"},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error getting regions: %v", err)
+	}
+	regions := []string{}
+	for _, r := range response.Regions {
+		regions = append(regions, *r.RegionName)
+	}
+	return regions, nil
 }
 
 // getConfig returns a AWS config for the specific profile and region
-func getConfig(profile, region string) aws.Config {
+func getConfig(profile, region string) (aws.Config, error) {
 	cfg, err := config.LoadDefaultConfig(
 		context.TODO(),
 		config.WithSharedConfigProfile(profile),
 		config.WithRegion(region),
 	)
 	if err != nil {
-		l.Fatalf("unable to load SDK config, %v", err)
+		return cfg, fmt.Errorf("unable to load SDK config, %v", err)
 	}
-	return cfg
+	return cfg, nil
 }
 
 // getFunction returns the function to search for the specific resource
@@ -132,39 +172,6 @@ func getFunction(cmd, profile, region string) search {
 	default:
 		return nil
 	}
-}
-
-// printJson returns the instances as JSON
-func printJson(s search) {
-	json, err := json.Marshal(s)
-	if err != nil {
-		l.Fatalf("marshalling instances", err)
-	}
-	fmt.Println(string(json))
-}
-
-// printTable prints the instances as a table
-func printTable(s search, profile, region string) {
-	table := tabulate.New(tabulate.Unicode)
-	headers := s.GetHeaders()
-	rows := s.GetRows()
-
-	fmt.Println("[+] [profile]:", profile, "[region]:", region)
-	if len(rows) == 0 {
-		fmt.Println("No results found")
-		return
-	}
-
-	for _, header := range headers {
-		table.Header(header).SetAlign(tabulate.TL)
-	}
-	for _, r := range rows {
-		row := table.Row()
-		for _, column := range r {
-			row.Column(column)
-		}
-	}
-	table.Print(os.Stdout)
 }
 
 // getTagName returns the value of the tag Name
@@ -185,25 +192,45 @@ func getValue(s *string) string {
 	return ""
 }
 
-// getOptedInRegions returns the opted-in regions
-func getOptedInRegions(p string) []string {
-	cfg := getConfig(p, "us-east-1")
-	client := ec2.NewFromConfig(cfg)
-	response, err := client.DescribeRegions(context.TODO(), &ec2.DescribeRegionsInput{
-		Filters: []types.Filter{
-			{
-				Name:   aws.String("opt-in-status"),
-				Values: []string{"opt-in-not-required", "opted-in"},
-			},
-		},
-	})
+// stringInSlice returns true if the string is in the slice
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}
+
+// printTable prints the instances as a table
+func printTable(s search, profile, region string) {
+	table := tabulate.New(tabulate.Unicode)
+	headers := s.GetHeaders()
+	rows := s.GetRows()
+
+	fmt.Println("[+] [profile]", profile, "[region]", region)
+	if len(rows) == 0 {
+		fmt.Println("No results found")
+		return
+	}
+
+	for _, header := range headers {
+		table.Header(header).SetAlign(tabulate.TL)
+	}
+	for _, r := range rows {
+		row := table.Row()
+		for _, column := range r {
+			row.Column(column)
+		}
+	}
+	table.Print(os.Stdout)
+}
+
+// printJson returns the instances as JSON
+func printJson(s search) {
+	json, err := json.Marshal(s)
 	if err != nil {
-		l.Errorf("error getting regions: %v", err)
-		return nil
+		l.Fatalf("marshalling instances", err)
 	}
-	regions := []string{}
-	for _, r := range response.Regions {
-		regions = append(regions, *r.RegionName)
-	}
-	return regions
+	fmt.Println(string(json))
 }

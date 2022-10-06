@@ -16,13 +16,11 @@ limitations under the License.
 package cmd
 
 import (
-	"awss/logger"
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 )
-
-var l = logger.NewLog()
 
 var output string
 var profile, region []string
@@ -34,34 +32,56 @@ var parentCmd = &cobra.Command{
 	Long: `AWSS (stands for AWS Search) is a CLI tool to make your life easier when searching AWS resources.
 It is a wrapper written in Go using AWS SDK Go v2. The work is still in progress and will be updated regularly.
 
+This command uses the credentials stored in ~/.aws/credentials and ~/.aws/config files.
+
+The 'default' profile is used if no profile is provided.
+The provided profile must be present in ~/.aws/credentials and ~/.aws/config files.
+If you would like to iterate over multiple profiles, you can pass them separated by comma. Example: --profile profile1,profile2.
+You can also pass 'all' to iterate over all profiles.
+
+The default region is 'eu-central-1'.
+If you would like to iterate over multiple regions, you can pass them separated by comma. Example: --region region1,region2.
+You can also pass 'all' to iterate over all regions.
+
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
-	Version: "0.2.0",
-	PreRun: func(cmd *cobra.Command, args []string) {
-		if len(args) == 0 {
-			l.Errorf("no command provided")
-			cmd.Help()
+	Version:   "0.2.1",
+	ValidArgs: []string{"ec2"},
+	Args:      cobra.ExactValidArgs(1),
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if err := checkOutput(); err != nil {
+			return err
 		}
+		return nil
 	},
-	Run: func(cmd *cobra.Command, args []string) {
-		// Do Stuff Here
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.Help()
+		return nil
 	},
 }
 
 // init is called before the command is executed and is used to set flags
 func init() {
 	// Set flags for parentCmd
-	parentCmd.PersistentFlags().StringSliceVar(&profile, "profile", []string{"default"}, "Select the profile from ~/.aws/config")
-	parentCmd.PersistentFlags().StringSliceVar(&region, "region", []string{"eu-central-1"}, "Select a region to perform your API calls")
-	parentCmd.PersistentFlags().StringVar(&output, "output", "json", "Select the output format. Options: table, json")
+	parentCmd.PersistentFlags().StringSliceVar(&profile, "profile", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. `profile1,profile2`")
+	parentCmd.PersistentFlags().StringSliceVar(&region, "region", []string{"eu-central-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. `region1,region2`")
+	parentCmd.PersistentFlags().StringVar(&output, "output", "table", "Select the output format. `table` or json")
 
 	// Add subcommands
 	parentCmd.AddCommand(ec2Cmd)
 }
 
+// checkOutput checks if the output is valid
+func checkOutput() error {
+	if output != "table" && output != "json" {
+		return fmt.Errorf("invalid output format. Please use 'table' or 'json'")
+	}
+	return nil
+}
+
 // Execute calls *cobra.Command.Execute() to start the CLI
 func Execute() {
 	if err := parentCmd.Execute(); err != nil {
-		os.Exit(0)
+		os.Exit(1)
 	}
 }

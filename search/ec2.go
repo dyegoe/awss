@@ -126,7 +126,8 @@ func (i *Instances) filterByTags(tags []string) *ec2.DescribeInstancesInput {
 
 // getInstances returns the instances
 func (i *Instances) getInstances(input *ec2.DescribeInstancesInput) *ec2.DescribeInstancesOutput {
-	cfg := getConfig(i.Profile, i.Region)
+	cfg, err := getConfig(i.Profile, i.Region)
+	_ = err
 	client := ec2.NewFromConfig(cfg)
 	response, err := client.DescribeInstances(context.TODO(), input)
 	if err != nil {
