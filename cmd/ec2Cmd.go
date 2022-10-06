@@ -18,11 +18,13 @@ package cmd
 import (
 	"awss/search"
 	"fmt"
+	"net"
 
 	"github.com/spf13/cobra"
 )
 
-var ec2Ids, ec2Names, ec2PrivateIps, ec2PublicIps, ec2Tags []string
+var ec2Ids, ec2Names, ec2Tags []string
+var ec2PrivateIps, ec2PublicIps []net.IP
 
 var ec2Cmd = &cobra.Command{
 	Use:   "ec2",
@@ -58,10 +60,10 @@ If you want to search for EC2 instances with the tags Key=Value1:Value2 and Envi
 			values = ec2Names
 			searchBy = "names"
 		case len(ec2PrivateIps) > 0:
-			values = ec2PrivateIps
+			values = ipToString(ec2PrivateIps)
 			searchBy = "private-ips"
 		case len(ec2PublicIps) > 0:
-			values = ec2PublicIps
+			values = ipToString(ec2PublicIps)
 			searchBy = "public-ips"
 		case len(ec2Tags) > 0:
 			values = ec2Tags
@@ -82,9 +84,9 @@ func init() {
 	// Set flags for ec2Cmd
 	ec2Cmd.Flags().StringSliceVarP(&ec2Ids, "ids", "i", []string{}, "Filter EC2 instances by ids. `i-1230456078901,i-1230456078902`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2Names, "names", "n", []string{}, "Filter EC2 instances by names. It searchs using the 'tag:Name'. `instance-1,instance-2`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2PrivateIps, "private-ips", "p", []string{}, "Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2PublicIps, "public-ips", "P", []string{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2Tags, "tags", "t", []string{}, "Filter EC2 instances by tags. `'Key=Value1:Value2,Environment=Production'`")
+	ec2Cmd.Flags().IPSliceVarP(&ec2PrivateIps, "private-ips", "p", []net.IP{}, "Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
+	ec2Cmd.Flags().IPSliceVarP(&ec2PublicIps, "public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
 	// Mark set of flags that can't be used together
 	ec2Cmd.MarkFlagsMutuallyExclusive("ids", "names", "private-ips", "public-ips", "tags")
 }

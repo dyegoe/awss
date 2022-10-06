@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -65,7 +66,7 @@ func init() {
 	// Set flags for parentCmd
 	parentCmd.PersistentFlags().StringSliceVar(&profile, "profile", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. `profile1,profile2`")
 	parentCmd.PersistentFlags().StringSliceVar(&region, "region", []string{"eu-central-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. `region1,region2`")
-	parentCmd.PersistentFlags().StringVar(&output, "output", "table", "Select the output format. `table` or json")
+	parentCmd.PersistentFlags().StringVar(&output, "output", "table", "Select the output format. `table`, json or json-pretty")
 
 	// Add subcommands
 	parentCmd.AddCommand(ec2Cmd)
@@ -73,10 +74,19 @@ func init() {
 
 // checkOutput checks if the output is valid
 func checkOutput() error {
-	if output != "table" && output != "json" {
-		return fmt.Errorf("invalid output format. Please use 'table' or 'json'")
+	if output != "table" && output != "json" && output != "json-pretty" {
+		return fmt.Errorf("invalid output format. Please use 'table', 'json' or 'json-pretty'")
 	}
 	return nil
+}
+
+// ipToString converts a slice of net.IP to a slice of string
+func ipToString(ip []net.IP) []string {
+	var ips []string
+	for _, i := range ip {
+		ips = append(ips, i.String())
+	}
+	return ips
 }
 
 // Execute calls *cobra.Command.Execute() to start the CLI

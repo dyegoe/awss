@@ -67,6 +67,8 @@ func Run(profile, region []string, output, cmd, searchBy string, values []string
 				printTable(s, p, r)
 			case "json":
 				printJson(response)
+			case "json-pretty":
+				printJsonPretty(response)
 			}
 		}
 	}
@@ -229,6 +231,15 @@ func printTable(s search, profile, region string) {
 // printJson returns the instances as JSON
 func printJson(s search) {
 	json, err := json.Marshal(s)
+	if err != nil {
+		l.Fatalf("marshalling instances", err)
+	}
+	fmt.Println(string(json))
+}
+
+// printJsonPretty returns the instances as pretty JSON
+func printJsonPretty(s search) {
+	json, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		l.Fatalf("marshalling instances", err)
 	}
