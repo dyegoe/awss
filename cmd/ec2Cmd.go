@@ -48,6 +48,15 @@ If you want to search for EC2 instances with the tag Environment and the value P
 If you want to search for EC2 instances with the tags Key=Value1:Value2 and Environment=Production, you can use:
 	awss ec2 -t 'Key=Value1:Value2,Environment=Production'`,
 	Args: cobra.NoArgs,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if len(ec2Ids) == 0 && len(ec2Names) == 0 && len(ec2PrivateIps) == 0 && len(ec2PublicIps) == 0 && len(ec2Tags) == 0 {
+			return fmt.Errorf("you must specify at least one filter. Use -h to see the available filters")
+		}
+		if _, err := search.ParseTags(ec2Tags); err != nil {
+			return err
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var values []string
 		var searchBy string
@@ -74,7 +83,7 @@ If you want to search for EC2 instances with the tags Key=Value1:Value2 and Envi
 
 		err := search.Run(profile, region, output, cmd.Name(), searchBy, values)
 		if err != nil {
-			return fmt.Errorf("something went wrong while running %s. error: %s", cmd.Name(), err)
+			return fmt.Errorf("something went wrong while running %s. error: %v", cmd.Name(), err)
 		}
 		return nil
 	},

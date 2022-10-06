@@ -158,7 +158,7 @@ func getConfig(profile, region string) (aws.Config, error) {
 		config.WithRegion(region),
 	)
 	if err != nil {
-		return cfg, fmt.Errorf("unable to load SDK config, %v", err)
+		return cfg, fmt.Errorf("unable to load SDK config: %v", err)
 	}
 	return cfg, nil
 }
@@ -202,6 +202,21 @@ func stringInSlice(a string, list []string) bool {
 		}
 	}
 	return false
+}
+
+// ParseTags parses the tags to a map
+func ParseTags(tags []string) (map[string][]string, error) {
+	m := make(map[string][]string)
+	for _, tag := range tags {
+		splited := strings.Split(tag, "=")
+		if len(splited) != 2 {
+			return nil, fmt.Errorf("invalid tag: %s", tag)
+		}
+		key := splited[0]
+		values := strings.Split(splited[1], ":")
+		m[key] = values
+	}
+	return m, nil
 }
 
 // printTable prints the instances as a table

@@ -17,8 +17,8 @@ package search
 
 import (
 	"context"
+	"fmt"
 	"reflect"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -29,7 +29,7 @@ import (
 type Instances struct {
 	Profile  string     `json:"profile"`
 	Region   string     `json:"region"`
-	Errors   []string   `json:"errors"`
+	Errors   []error    `json:"errors"`
 	Data     []instance `json:"data"`
 	instance `json:"-"`
 }
@@ -60,8 +60,11 @@ func (i *Instances) Search(searchBy string, values []string) search {
 	case "tags":
 		input = i.filterByTags(values)
 	}
-	result := i.getInstances(input)
-	i.parseInstances(result)
+	result, err := i.getInstances(input)
+	if err != nil {
+		i.Errors = append(i.Errors, err)
+	}
+	i.Data = i.parseInstances(result)
 	return i
 }
 
@@ -111,12 +114,11 @@ func (i *Instances) filterByPublicIps(publicIps []string) *ec2.DescribeInstances
 // filterByTags returns filters by tag
 func (i *Instances) filterByTags(tags []string) *ec2.DescribeInstancesInput {
 	filters := []types.Filter{}
-	for _, tag := range tags {
-		st := strings.Split(tag, "=")
-		sv := strings.Split(st[1], ":")
+	parsed, _ := ParseTags(tags)
+	for key, values := range parsed {
 		filters = append(filters, types.Filter{
-			Name:   aws.String("tag:" + st[0]),
-			Values: sv,
+			Name:   aws.String(fmt.Sprintf("tag:%s", key)),
+			Values: values,
 		})
 	}
 	return &ec2.DescribeInstancesInput{
@@ -125,23 +127,25 @@ func (i *Instances) filterByTags(tags []string) *ec2.DescribeInstancesInput {
 }
 
 // getInstances returns the instances
-func (i *Instances) getInstances(input *ec2.DescribeInstancesInput) *ec2.DescribeInstancesOutput {
+func (i *Instances) getInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
 	cfg, err := getConfig(i.Profile, i.Region)
-	_ = err
+	if err != nil {
+		return &ec2.DescribeInstancesOutput{}, fmt.Errorf("error getting config: %v", err)
+	}
 	client := ec2.NewFromConfig(cfg)
 	response, err := client.DescribeInstances(context.TODO(), input)
 	if err != nil {
-		i.Errors = append(i.Errors, "error getting instances")
-		return nil
+		return &ec2.DescribeInstancesOutput{}, fmt.Errorf("error getting instances: %v", err)
 	}
-	return response
+	return response, nil
 }
 
 // parseInstances parses the instances
-func (i *Instances) parseInstances(result *ec2.DescribeInstancesOutput) {
+func (i *Instances) parseInstances(result *ec2.DescribeInstancesOutput) []instance {
+	data := []instance{}
 	for _, r := range result.Reservations {
 		for _, inst := range r.Instances {
-			i.Data = append(i.Data, instance{
+			data = append(data, instance{
 				InstanceID:       *inst.InstanceId,
 				InstanceName:     getTagName(inst.Tags),
 				InstanceType:     string(inst.InstanceType),
@@ -152,6 +156,7 @@ func (i *Instances) parseInstances(result *ec2.DescribeInstancesOutput) {
 			})
 		}
 	}
+	return data
 }
 
 // GetHeaders returns the headers
