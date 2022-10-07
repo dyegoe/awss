@@ -57,8 +57,8 @@ https://github.com/dyegoe/awss`,
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.Help()
-		return nil
+		err := cmd.Help()
+		return err
 	},
 }
 
