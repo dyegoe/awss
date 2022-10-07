@@ -12,9 +12,10 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version-file: "go.mod"
+      - name: Install Go tools
+        run: |
+          go install golang.org/x/lint/golint@latest
       - name: Run vet
         run: go vet ./...
       - name: Run lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: latest
+        run: golint ./...
