@@ -56,7 +56,7 @@ func Run(profile, region []string, output, cmd, searchBy string, values []string
 
 		for _, r := range regions {
 
-			s := getFunction(cmd, p, r)
+			s := getStruct(cmd, p, r)
 			if s == nil {
 				return fmt.Errorf("no function found for %s", cmd)
 			}
@@ -164,8 +164,8 @@ func getAwsConfig(profile, region string) (aws.Config, error) {
 	return cfg, nil
 }
 
-// getFunction returns the function to search for the specific resource
-func getFunction(cmd, profile, region string) search {
+// getStruct returns the struct for the specific command
+func getStruct(cmd, profile, region string) search {
 	switch cmd {
 	case "ec2":
 		return &Instances{
