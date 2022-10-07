@@ -1,26 +1,9 @@
-/*
-Copyright © 2022 Dyego Alexandre Eugenio dyegoe@gmail.com
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package search
 
 import (
 	"context"
 	"fmt"
 	"strings"
-
-	"github.com/dyegoe/awss/logger"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -30,15 +13,13 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-var l = logger.NewLog()
-
 // search is an interface to search for AWS resources.
 type search interface {
-	Search(searchBy string, values []string) search
-	GetProfile() string
-	GetRegion() string
-	GetHeaders() []string
-	GetRows() [][]string
+	search(searchBy string, values []string) search
+	getProfile() string
+	getRegion() string
+	getHeaders() []string
+	getRows() [][]string
 }
 
 // Run is the main function to run the search
@@ -61,15 +42,15 @@ func Run(profile, region []string, output, cmd, searchBy string, values []string
 				return fmt.Errorf("no function found for %s", cmd)
 			}
 
-			response := s.Search(searchBy, values)
+			response := s.search(searchBy, values)
 
 			switch output {
 			case "table":
 				printTable(s)
 			case "json":
-				printJson(response)
+				printJSON(response)
 			case "json-pretty":
-				printJsonPretty(response)
+				printJSONPretty(response)
 			}
 		}
 	}
@@ -168,7 +149,7 @@ func getAwsConfig(profile, region string) (aws.Config, error) {
 func getStruct(cmd, profile, region string) search {
 	switch cmd {
 	case "ec2":
-		return &Instances{
+		return &instances{
 			Profile: profile,
 			Region:  region,
 		}

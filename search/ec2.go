@@ -1,18 +1,3 @@
-/*
-Copyright © 2022 Dyego Alexandre Eugenio dyegoe@gmail.com
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package search
 
 import (
@@ -25,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
-// Instances is a struct to hold the instances
-type Instances struct {
+// instances is a struct to hold the instances
+type instances struct {
 	Profile string     `json:"profile"`
 	Region  string     `json:"region"`
 	Errors  []error    `json:"errors"`
@@ -40,12 +25,12 @@ type instance struct {
 	InstanceType     string `json:"instance_type"`
 	AvailabilityZone string `json:"availability_zone"`
 	InstanceState    string `json:"instance_state"`
-	PrivateIpAddress string `json:"private_ip_address"`
-	PublicIpAddress  string `json:"public_ip_address"`
+	PrivateIPAddress string `json:"private_ip_address"`
+	PublicIPAddress  string `json:"public_ip_address"`
 }
 
-// Search is a method to search for instances. It gets instances from API and update the struct with the data.
-func (i *Instances) Search(searchBy string, values []string) search {
+// search is a method to search for instances. It gets instances from API and update the struct with the data.
+func (i *instances) search(searchBy string, values []string) search {
 	var input *ec2.DescribeInstancesInput
 	switch searchBy {
 	case "ids":
@@ -68,14 +53,14 @@ func (i *Instances) Search(searchBy string, values []string) search {
 }
 
 // filterByIds returns filters by id
-func (i *Instances) filterByIds(ids []string) *ec2.DescribeInstancesInput {
+func (i *instances) filterByIds(ids []string) *ec2.DescribeInstancesInput {
 	return &ec2.DescribeInstancesInput{
 		InstanceIds: ids,
 	}
 }
 
 // filterByNames returns filters by name
-func (i *Instances) filterByNames(names []string) *ec2.DescribeInstancesInput {
+func (i *instances) filterByNames(names []string) *ec2.DescribeInstancesInput {
 	return &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			{
@@ -87,7 +72,7 @@ func (i *Instances) filterByNames(names []string) *ec2.DescribeInstancesInput {
 }
 
 // filterByPrivateIps returns filters by private ip
-func (i *Instances) filterByPrivateIps(privateIps []string) *ec2.DescribeInstancesInput {
+func (i *instances) filterByPrivateIps(privateIps []string) *ec2.DescribeInstancesInput {
 	return &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			{
@@ -99,7 +84,7 @@ func (i *Instances) filterByPrivateIps(privateIps []string) *ec2.DescribeInstanc
 }
 
 // filterByPublicIps returns filters by public ip
-func (i *Instances) filterByPublicIps(publicIps []string) *ec2.DescribeInstancesInput {
+func (i *instances) filterByPublicIps(publicIps []string) *ec2.DescribeInstancesInput {
 	return &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			{
@@ -111,7 +96,7 @@ func (i *Instances) filterByPublicIps(publicIps []string) *ec2.DescribeInstances
 }
 
 // filterByTags returns filters by tag
-func (i *Instances) filterByTags(tags []string) *ec2.DescribeInstancesInput {
+func (i *instances) filterByTags(tags []string) *ec2.DescribeInstancesInput {
 	filters := []types.Filter{}
 	parsed, _ := ParseTags(tags)
 	for key, values := range parsed {
@@ -126,7 +111,7 @@ func (i *Instances) filterByTags(tags []string) *ec2.DescribeInstancesInput {
 }
 
 // getInstances returns the instances
-func (i *Instances) getInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
+func (i *instances) getInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
 	cfg, err := getAwsConfig(i.Profile, i.Region)
 	if err != nil {
 		return &ec2.DescribeInstancesOutput{}, fmt.Errorf("error getting config: %v", err)
@@ -140,7 +125,7 @@ func (i *Instances) getInstances(input *ec2.DescribeInstancesInput) (*ec2.Descri
 }
 
 // parseInstances parses the instances
-func (i *Instances) parseInstances(result *ec2.DescribeInstancesOutput) []instance {
+func (i *instances) parseInstances(result *ec2.DescribeInstancesOutput) []instance {
 	data := []instance{}
 	for _, r := range result.Reservations {
 		for _, inst := range r.Instances {
@@ -150,8 +135,8 @@ func (i *Instances) parseInstances(result *ec2.DescribeInstancesOutput) []instan
 				InstanceType:     string(inst.InstanceType),
 				AvailabilityZone: *inst.Placement.AvailabilityZone,
 				InstanceState:    string(inst.State.Name),
-				PrivateIpAddress: getValue(inst.PrivateIpAddress),
-				PublicIpAddress:  getValue(inst.PublicIpAddress),
+				PrivateIPAddress: getValue(inst.PrivateIpAddress),
+				PublicIPAddress:  getValue(inst.PublicIpAddress),
 			})
 		}
 	}
@@ -159,7 +144,7 @@ func (i *Instances) parseInstances(result *ec2.DescribeInstancesOutput) []instan
 }
 
 // GetHeaders returns the headers
-func (i *Instances) GetHeaders() []string {
+func (i *instances) getHeaders() []string {
 	headers := []string{}
 	val := reflect.ValueOf(instance{})
 	for i := 0; i < val.Type().NumField(); i++ {
@@ -169,7 +154,7 @@ func (i *Instances) GetHeaders() []string {
 }
 
 // GetRows returns the rows
-func (i *Instances) GetRows() [][]string {
+func (i *instances) getRows() [][]string {
 	rows := [][]string{}
 	for _, v := range i.Data {
 		row := []string{}
@@ -183,11 +168,11 @@ func (i *Instances) GetRows() [][]string {
 }
 
 // GetProfile returns the profile
-func (i *Instances) GetProfile() string {
+func (i *instances) getProfile() string {
 	return i.Profile
 }
 
 // GetRegion returns the region
-func (i *Instances) GetRegion() string {
+func (i *instances) getRegion() string {
 	return i.Region
 }
