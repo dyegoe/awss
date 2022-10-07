@@ -248,7 +248,7 @@ func printTable(s search, profile, region string) {
 func printJson(s search) {
 	json, err := json.Marshal(s)
 	if err != nil {
-		l.Fatalf("marshalling instances", err)
+		l.Errorf("marshalling instances", err)
 	}
 	fmt.Println(string(json))
 }
@@ -257,7 +257,7 @@ func printJson(s search) {
 func printJsonPretty(s search) {
 	json, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
-		l.Fatalf("marshalling instances", err)
+		l.Errorf("marshalling instances", err)
 	}
 	fmt.Println(string(json))
 }
