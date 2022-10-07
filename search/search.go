@@ -17,9 +17,7 @@ package search
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/dyegoe/awss/logger"
@@ -28,7 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/markkurossi/tabulate"
+
 	"gopkg.in/ini.v1"
 )
 
@@ -220,46 +218,4 @@ func ParseTags(tags []string) (map[string][]string, error) {
 		m[key] = values
 	}
 	return m, nil
-}
-
-// printTable prints the instances as a table
-func printTable(s search) {
-	table := tabulate.New(tabulate.Unicode)
-	headers := s.GetHeaders()
-	rows := s.GetRows()
-
-	fmt.Println("[+] [profile]", s.GetProfile(), "[region]", s.GetRegion())
-	if len(rows) == 0 {
-		fmt.Println("No results found")
-		return
-	}
-
-	for _, header := range headers {
-		table.Header(header).SetAlign(tabulate.TL)
-	}
-	for _, r := range rows {
-		row := table.Row()
-		for _, column := range r {
-			row.Column(column)
-		}
-	}
-	table.Print(os.Stdout)
-}
-
-// printJson returns the instances as JSON
-func printJson(s search) {
-	json, err := json.Marshal(s)
-	if err != nil {
-		l.Errorf("marshalling instances", err)
-	}
-	fmt.Println(string(json))
-}
-
-// printJsonPretty returns the instances as pretty JSON
-func printJsonPretty(s search) {
-	json, err := json.MarshalIndent(s, "", "  ")
-	if err != nil {
-		l.Errorf("marshalling instances", err)
-	}
-	fmt.Println(string(json))
 }
