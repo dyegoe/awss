@@ -1,17 +1,17 @@
-name: Check each push
-run-name: ${{ github.actor }} pushed to ${{ github.ref_name }}
+name: Common actions
+run-name: General actions
 on:
   push:
 jobs:
   Check-Commit:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout commit
+        uses: actions/checkout@v3
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
           go-version-file: "go.mod"
-      - name: Checkout commit
-        uses: actions/checkout@v3
       - name: Run vet
         run: go vet ./...
       - name: Run lint
