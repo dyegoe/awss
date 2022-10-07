@@ -1,0 +1,25 @@
+name: Check each push
+run-name: ${{ github.actor }} pushed to ${{ github.github.ref_name }}
+on:
+  push:
+jobs:
+  Check-Commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check commit
+        uses: actions/checkout@v3
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: "go.mod"
+
+      - name: Install dependencies
+        run: |
+          go version
+          go get -u golang.org/x/lint/golint
+
+      - name: Run vet & lint
+        run: |
+          go vet .
+          golint .
