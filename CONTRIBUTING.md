@@ -54,7 +54,7 @@ Ready to contribute? Here's how to set up `awss` for local development.
       git checkout -b name-of-your-bugfix-or-feature
       ```
 
-    Now you can make your changes locally.
+    Now you can make your changes locally. Remember to change the version in `cmd/rootCmd.go` and `README.md` files.
 
 4. Commit your changes and push your branch to GitHub::
 

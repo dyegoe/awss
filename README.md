@@ -3,6 +3,10 @@
 AWSS (stands for AWS Search) is a CLI tool to make your life easier when searching AWS resources.
 It is a wrapper written in Go using AWS SDK Go v2. The work is still in progress and will be updated regularly.
 
+## Version
+
+The current version is 0.2.1.
+
 ## Features
 
 - Search AWS ec2 instances
