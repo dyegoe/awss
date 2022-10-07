@@ -1,5 +1,5 @@
 name: Check each push
-run-name: ${{ github.actor }} pushed to ${{ github.github.ref_name }}
+run-name: ${{ github.actor }} pushed to ${{ github.ref_name }}
 on:
   push:
 jobs:
