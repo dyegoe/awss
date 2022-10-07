@@ -27,14 +27,13 @@ import (
 
 // Instances is a struct to hold the instances
 type Instances struct {
-	Profile  string     `json:"profile"`
-	Region   string     `json:"region"`
-	Errors   []error    `json:"errors"`
-	Data     []instance `json:"data"`
-	instance `json:"-"`
+	Profile string     `json:"profile"`
+	Region  string     `json:"region"`
+	Errors  []error    `json:"errors"`
+	Data    []instance `json:"data"`
 }
 
-// instances is a struct to hold the instance
+// instances is a struct to hold the instance data
 type instance struct {
 	InstanceID       string `json:"instance_id"`
 	InstanceName     string `json:"instance_name"`
@@ -162,7 +161,7 @@ func (i *Instances) parseInstances(result *ec2.DescribeInstancesOutput) []instan
 // GetHeaders returns the headers
 func (i *Instances) GetHeaders() []string {
 	headers := []string{}
-	val := reflect.ValueOf(i.instance)
+	val := reflect.ValueOf(instance{})
 	for i := 0; i < val.Type().NumField(); i++ {
 		headers = append(headers, val.Type().Field(i).Name)
 	}
