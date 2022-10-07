@@ -16,12 +16,13 @@ limitations under the License.
 package search
 
 import (
-	"awss/logger"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/dyegoe/awss/logger"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"

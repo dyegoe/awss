@@ -16,9 +16,10 @@ limitations under the License.
 package cmd
 
 import (
-	"awss/search"
 	"fmt"
 	"net"
+
+	"github.com/dyegoe/awss/search"
 
 	"github.com/spf13/cobra"
 )
