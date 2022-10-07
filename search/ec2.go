@@ -128,7 +128,7 @@ func (i *Instances) filterByTags(tags []string) *ec2.DescribeInstancesInput {
 
 // getInstances returns the instances
 func (i *Instances) getInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
-	cfg, err := getConfig(i.Profile, i.Region)
+	cfg, err := getAwsConfig(i.Profile, i.Region)
 	if err != nil {
 		return &ec2.DescribeInstancesOutput{}, fmt.Errorf("error getting config: %v", err)
 	}

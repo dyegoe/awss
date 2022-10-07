@@ -128,7 +128,7 @@ func getRegions(r []string, p string) ([]string, error) {
 
 // getOptedInRegions returns the opted-in regions
 func getOptedInRegions(p string) ([]string, error) {
-	cfg, err := getConfig(p, "us-east-1")
+	cfg, err := getAwsConfig(p, "us-east-1")
 	if err != nil {
 		return nil, err
 	}
@@ -151,8 +151,8 @@ func getOptedInRegions(p string) ([]string, error) {
 	return regions, nil
 }
 
-// getConfig returns a AWS config for the specific profile and region
-func getConfig(profile, region string) (aws.Config, error) {
+// getAwsConfig returns a AWS config for the specific profile and region
+func getAwsConfig(profile, region string) (aws.Config, error) {
 	cfg, err := config.LoadDefaultConfig(
 		context.TODO(),
 		config.WithSharedConfigProfile(profile),
