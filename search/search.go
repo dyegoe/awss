@@ -37,6 +37,8 @@ var l = logger.NewLog()
 // search is an interface to search for AWS resources.
 type search interface {
 	Search(searchBy string, values []string) search
+	GetProfile() string
+	GetRegion() string
 	GetHeaders() []string
 	GetRows() [][]string
 }
@@ -65,7 +67,7 @@ func Run(profile, region []string, output, cmd, searchBy string, values []string
 
 			switch output {
 			case "table":
-				printTable(s, p, r)
+				printTable(s)
 			case "json":
 				printJson(response)
 			case "json-pretty":
@@ -221,12 +223,12 @@ func ParseTags(tags []string) (map[string][]string, error) {
 }
 
 // printTable prints the instances as a table
-func printTable(s search, profile, region string) {
+func printTable(s search) {
 	table := tabulate.New(tabulate.Unicode)
 	headers := s.GetHeaders()
 	rows := s.GetRows()
 
-	fmt.Println("[+] [profile]", profile, "[region]", region)
+	fmt.Println("[+] [profile]", s.GetProfile(), "[region]", s.GetRegion())
 	if len(rows) == 0 {
 		fmt.Println("No results found")
 		return

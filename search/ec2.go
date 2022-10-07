@@ -182,3 +182,13 @@ func (i *Instances) GetRows() [][]string {
 	}
 	return rows
 }
+
+// GetProfile returns the profile
+func (i *Instances) GetProfile() string {
+	return i.Profile
+}
+
+// GetRegion returns the region
+func (i *Instances) GetRegion() string {
+	return i.Region
+}
