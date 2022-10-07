@@ -1,4 +1,4 @@
-module awss
+module github.com/dyegoe/awss
 
 go 1.19
 

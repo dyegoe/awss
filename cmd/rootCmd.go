@@ -26,8 +26,8 @@ import (
 var output string
 var profile, region []string
 
-// parentCmd represents the base command when called without any subcommands
-var parentCmd = &cobra.Command{
+// rootCmd represents the base command when called without any subcommands
+var rootCmd = &cobra.Command{
 	Use:   "awss",
 	Short: "AWSS is a CLI tool to make your life easier when searching AWS resources.",
 	Long: `AWSS (stands for AWS Search) is a CLI tool to make your life easier when searching AWS resources.
@@ -46,7 +46,8 @@ You can also pass 'all' to iterate over all regions.
 
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
-	Version:   "0.2.1",
+	// Remember to update this version when releasing a new version
+	Version:   "0.2.2",
 	ValidArgs: []string{"ec2"},
 	Args:      cobra.ExactValidArgs(1),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -63,13 +64,11 @@ https://github.com/dyegoe/awss`,
 
 // init is called before the command is executed and is used to set flags
 func init() {
-	// Set flags for parentCmd
-	parentCmd.PersistentFlags().StringSliceVar(&profile, "profile", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. `profile1,profile2`")
-	parentCmd.PersistentFlags().StringSliceVar(&region, "region", []string{"eu-central-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. `region1,region2`")
-	parentCmd.PersistentFlags().StringVar(&output, "output", "table", "Select the output format. `table`, json or json-pretty")
+	// Set flags for rootCmd
+	rootCmd.PersistentFlags().StringSliceVar(&profile, "profile", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. `profile1,profile2`")
+	rootCmd.PersistentFlags().StringSliceVar(&region, "region", []string{"eu-central-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. `region1,region2`")
+	rootCmd.PersistentFlags().StringVar(&output, "output", "table", "Select the output format. `table`, json or json-pretty")
 
-	// Add subcommands
-	parentCmd.AddCommand(ec2Cmd)
 }
 
 // checkOutput checks if the output is valid
@@ -91,7 +90,7 @@ func ipToString(ip []net.IP) []string {
 
 // Execute calls *cobra.Command.Execute() to start the CLI
 func Execute() {
-	if err := parentCmd.Execute(); err != nil {
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }

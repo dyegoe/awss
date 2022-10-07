@@ -16,9 +16,10 @@ limitations under the License.
 package cmd
 
 import (
-	"awss/search"
 	"fmt"
 	"net"
+
+	"github.com/dyegoe/awss/search"
 
 	"github.com/spf13/cobra"
 )
@@ -98,4 +99,6 @@ func init() {
 	ec2Cmd.Flags().IPSliceVarP(&ec2PublicIps, "public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
 	// Mark set of flags that can't be used together
 	ec2Cmd.MarkFlagsMutuallyExclusive("ids", "names", "private-ips", "public-ips", "tags")
+	// Add ec2Cmd to rootCmd
+	rootCmd.AddCommand(ec2Cmd)
 }

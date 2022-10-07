@@ -16,18 +16,17 @@ limitations under the License.
 package search
 
 import (
-	"awss/logger"
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
+
+	"github.com/dyegoe/awss/logger"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/markkurossi/tabulate"
+
 	"gopkg.in/ini.v1"
 )
 
@@ -36,6 +35,8 @@ var l = logger.NewLog()
 // search is an interface to search for AWS resources.
 type search interface {
 	Search(searchBy string, values []string) search
+	GetProfile() string
+	GetRegion() string
 	GetHeaders() []string
 	GetRows() [][]string
 }
@@ -55,7 +56,7 @@ func Run(profile, region []string, output, cmd, searchBy string, values []string
 
 		for _, r := range regions {
 
-			s := getFunction(cmd, p, r)
+			s := getStruct(cmd, p, r)
 			if s == nil {
 				return fmt.Errorf("no function found for %s", cmd)
 			}
@@ -64,7 +65,7 @@ func Run(profile, region []string, output, cmd, searchBy string, values []string
 
 			switch output {
 			case "table":
-				printTable(s, p, r)
+				printTable(s)
 			case "json":
 				printJson(response)
 			case "json-pretty":
@@ -127,7 +128,7 @@ func getRegions(r []string, p string) ([]string, error) {
 
 // getOptedInRegions returns the opted-in regions
 func getOptedInRegions(p string) ([]string, error) {
-	cfg, err := getConfig(p, "us-east-1")
+	cfg, err := getAwsConfig(p, "us-east-1")
 	if err != nil {
 		return nil, err
 	}
@@ -150,8 +151,8 @@ func getOptedInRegions(p string) ([]string, error) {
 	return regions, nil
 }
 
-// getConfig returns a AWS config for the specific profile and region
-func getConfig(profile, region string) (aws.Config, error) {
+// getAwsConfig returns a AWS config for the specific profile and region
+func getAwsConfig(profile, region string) (aws.Config, error) {
 	cfg, err := config.LoadDefaultConfig(
 		context.TODO(),
 		config.WithSharedConfigProfile(profile),
@@ -163,8 +164,8 @@ func getConfig(profile, region string) (aws.Config, error) {
 	return cfg, nil
 }
 
-// getFunction returns the function to search for the specific resource
-func getFunction(cmd, profile, region string) search {
+// getStruct returns the struct for the specific command
+func getStruct(cmd, profile, region string) search {
 	switch cmd {
 	case "ec2":
 		return &Instances{
@@ -217,46 +218,4 @@ func ParseTags(tags []string) (map[string][]string, error) {
 		m[key] = values
 	}
 	return m, nil
-}
-
-// printTable prints the instances as a table
-func printTable(s search, profile, region string) {
-	table := tabulate.New(tabulate.Unicode)
-	headers := s.GetHeaders()
-	rows := s.GetRows()
-
-	fmt.Println("[+] [profile]", profile, "[region]", region)
-	if len(rows) == 0 {
-		fmt.Println("No results found")
-		return
-	}
-
-	for _, header := range headers {
-		table.Header(header).SetAlign(tabulate.TL)
-	}
-	for _, r := range rows {
-		row := table.Row()
-		for _, column := range r {
-			row.Column(column)
-		}
-	}
-	table.Print(os.Stdout)
-}
-
-// printJson returns the instances as JSON
-func printJson(s search) {
-	json, err := json.Marshal(s)
-	if err != nil {
-		l.Fatalf("marshalling instances", err)
-	}
-	fmt.Println(string(json))
-}
-
-// printJsonPretty returns the instances as pretty JSON
-func printJsonPretty(s search) {
-	json, err := json.MarshalIndent(s, "", "  ")
-	if err != nil {
-		l.Fatalf("marshalling instances", err)
-	}
-	fmt.Println(string(json))
 }
