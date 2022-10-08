@@ -42,3 +42,9 @@ More details in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 Apache 2.0
+
+## Thanks
+
+- [AWS SDK Go v2](https://github.com/aws/aws-sdk-go-v2)
+- [Cobra](https://github.com/spf13/cobra)
+- [Go release binaries](https://github.com/marketplace/actions/go-release-binaries)
