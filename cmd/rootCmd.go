@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"net"
-	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -56,6 +55,11 @@ func init() {
 
 }
 
+// Execute calls *cobra.Command.Execute() to start the CLI
+func Execute() error {
+	return rootCmd.Execute()
+}
+
 // checkOutput checks if the output is valid
 func checkOutput() error {
 	if output != "table" && output != "json" && output != "json-pretty" {
@@ -71,11 +75,4 @@ func ipToString(ip []net.IP) []string {
 		ips = append(ips, i.String())
 	}
 	return ips
-}
-
-// Execute calls *cobra.Command.Execute() to start the CLI
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
-	}
 }
