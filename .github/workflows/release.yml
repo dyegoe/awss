@@ -1,6 +1,8 @@
+name: Go release
 on:
   release:
-    types: [created]
+    types:
+      - published
 
 jobs:
   releases-matrix:
