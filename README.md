@@ -5,7 +5,7 @@ It is a wrapper written in Go using AWS SDK Go v2. The work is still in progress
 
 ## Version
 
-The current version is 0.2.2.
+The current version is 0.2.3.
 
 ## Features
 
