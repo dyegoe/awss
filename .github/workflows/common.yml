@@ -2,6 +2,8 @@ name: Common actions
 run-name: General actions
 on:
   push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
