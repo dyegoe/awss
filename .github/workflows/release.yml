@@ -1,4 +1,4 @@
-name: Go release
+name: Release
 on:
   release:
     types:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   releases-matrix:
-    name: Release Go Binary
+    name: Release binaries
     runs-on: ubuntu-latest
     strategy:
       matrix:
