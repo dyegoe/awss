@@ -1,5 +1,4 @@
 name: Common
-run-name: Run lint and vet
 on:
   pull_request:
     branches:
