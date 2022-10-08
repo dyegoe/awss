@@ -22,4 +22,3 @@ jobs:
           goversion: "go.mod"
           project_path: "."
           binary_name: "awss"
-          extra_files: LICENSE README.md

@@ -31,7 +31,7 @@ You can also pass 'all' to iterate over all regions.
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
 	// Remember to update this version when releasing a new version
-	Version:   "0.2.3",
+	Version:   "0.2.4",
 	ValidArgs: []string{"ec2"},
 	Args:      cobra.ExactValidArgs(1),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
