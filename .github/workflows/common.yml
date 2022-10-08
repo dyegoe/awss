@@ -1,14 +1,11 @@
-name: Common actions
-run-name: General actions
+name: Common
+run-name: Run lint and vet
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
 jobs:
-  Check-Commit:
+  check-pull-request:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout commit
