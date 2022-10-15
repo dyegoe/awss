@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -24,6 +25,8 @@ type search interface {
 
 // Run is the main function to run the search
 func Run(profile, region []string, output, cmd, searchBy string, values []string) error {
+	var wg sync.WaitGroup
+
 	profiles, err := getProfiles(profile)
 	if err != nil {
 		return err
@@ -41,11 +44,16 @@ func Run(profile, region []string, output, cmd, searchBy string, values []string
 			if s == nil {
 				return fmt.Errorf("no function found for %s", cmd)
 			}
-			_ = s.search(searchBy, values)
-			printResult(s, output)
+
+			wg.Add(1)
+			go func(s search, searchBy string, values []string) {
+				err = s.search(searchBy, values)
+				printResult(s, output, err)
+				defer wg.Done()
+			}(s, searchBy, values)
 		}
 	}
-
+	wg.Wait()
 	return nil
 }
 

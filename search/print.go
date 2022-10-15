@@ -9,7 +9,10 @@ import (
 )
 
 // print prints theh search results
-func printResult(s search, output string) {
+func printResult(s search, output string, err error) {
+	if err != nil {
+		fmt.Println(fmt.Errorf("searching instances: %v", err))
+	}
 	switch output {
 	case "table":
 		printTable(s)
