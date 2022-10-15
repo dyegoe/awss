@@ -29,33 +29,37 @@ func Run(profile, region []string, output, cmd, searchBy string, values []string
 		return err
 	}
 
+	// iterate over profiles
 	for _, p := range profiles {
 		regions, err := getRegions(region, p)
 		if err != nil {
 			return err
 		}
-
+		// iterate over regions for each profile
 		for _, r := range regions {
-
 			s := getStruct(cmd, p, r)
 			if s == nil {
 				return fmt.Errorf("no function found for %s", cmd)
 			}
-
 			response := s.search(searchBy, values)
-
-			switch output {
-			case "table":
-				printTable(s)
-			case "json":
-				printJSON(response)
-			case "json-pretty":
-				printJSONPretty(response)
-			}
+			printResult(response, output)
 		}
 	}
 
 	return nil
+}
+
+// getStruct returns the struct for the specific command
+func getStruct(cmd, profile, region string) search {
+	switch cmd {
+	case "ec2":
+		return &instances{
+			Profile: profile,
+			Region:  region,
+		}
+	default:
+		return nil
+	}
 }
 
 // getProfiles returns the profiles
@@ -143,19 +147,6 @@ func getAwsConfig(profile, region string) (aws.Config, error) {
 		return cfg, fmt.Errorf("unable to load SDK config: %v", err)
 	}
 	return cfg, nil
-}
-
-// getStruct returns the struct for the specific command
-func getStruct(cmd, profile, region string) search {
-	switch cmd {
-	case "ec2":
-		return &instances{
-			Profile: profile,
-			Region:  region,
-		}
-	default:
-		return nil
-	}
 }
 
 // getTagName returns the value of the tag Name

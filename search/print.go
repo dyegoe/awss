@@ -8,7 +8,19 @@ import (
 	"github.com/markkurossi/tabulate"
 )
 
-// printTable prints the instances as a table
+// print prints theh search results
+func printResult(s search, output string) {
+	switch output {
+	case "table":
+		printTable(s)
+	case "json":
+		printJSON(s)
+	case "json-pretty":
+		printJSONPretty(s)
+	}
+}
+
+// printTable prints search result as a table
 func printTable(s search) {
 	table := tabulate.New(tabulate.Unicode)
 	headers := s.getHeaders()
@@ -32,7 +44,7 @@ func printTable(s search) {
 	table.Print(os.Stdout)
 }
 
-// printJSON returns the instances as JSON
+// printJSON prints search result as JSON
 func printJSON(s search) {
 	json, err := json.Marshal(s)
 	if err != nil {
@@ -41,7 +53,7 @@ func printJSON(s search) {
 	fmt.Println(string(json))
 }
 
-// printJSONPretty returns the instances as pretty JSON
+// printJSONPretty prints search result as pretty JSON
 func printJSONPretty(s search) {
 	json, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
