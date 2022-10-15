@@ -5,9 +5,11 @@ It is a wrapper written in Go using AWS SDK Go v2. The work is still in progress
 
 ## Version
 
-The current version is 0.2.4.
+The current version is 0.3.0.
 
 ## Features
+
+The search runs in parallel using goroutines.
 
 - Search AWS ec2 instances
   - by name
@@ -18,7 +20,7 @@ The current version is 0.2.4.
 
 ## Installation
 
-```bash
+```txt
 git clone http://github.com/dyegoe/awss
 cd awss
 go build
@@ -27,7 +29,7 @@ cp awss /usr/local/bin
 
 ## Usage
 
-```bash
+```txt
 awss --help
 awss ec2 --help
 awss --profile <profile> --region <region> ec2 --name <name>

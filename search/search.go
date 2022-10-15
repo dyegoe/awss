@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -15,7 +16,7 @@ import (
 
 // search is an interface to search for AWS resources.
 type search interface {
-	search(searchBy string, values []string) search
+	search(searchBy string, values []string) error
 	getProfile() string
 	getRegion() string
 	getHeaders() []string
@@ -23,39 +24,50 @@ type search interface {
 }
 
 // Run is the main function to run the search
-func Run(profile, region []string, output, cmd, searchBy string, values []string) error {
+func Run(profile, region []string, output string, verbose bool, cmd, searchBy string, values []string) error {
+	var wg sync.WaitGroup
+
 	profiles, err := getProfiles(profile)
 	if err != nil {
 		return err
 	}
 
+	// iterate over profiles
 	for _, p := range profiles {
 		regions, err := getRegions(region, p)
 		if err != nil {
 			return err
 		}
-
+		// iterate over regions for each profile
 		for _, r := range regions {
-
 			s := getStruct(cmd, p, r)
 			if s == nil {
 				return fmt.Errorf("no function found for %s", cmd)
 			}
 
-			response := s.search(searchBy, values)
-
-			switch output {
-			case "table":
-				printTable(s)
-			case "json":
-				printJSON(response)
-			case "json-pretty":
-				printJSONPretty(response)
-			}
+			wg.Add(1)
+			go func() {
+				err = s.search(searchBy, values)
+				printResult(s, output, verbose, err)
+				defer wg.Done()
+			}()
 		}
 	}
-
+	wg.Wait()
 	return nil
+}
+
+// getStruct returns the struct for the specific command
+func getStruct(cmd, profile, region string) search {
+	switch cmd {
+	case "ec2":
+		return &instances{
+			Profile: profile,
+			Region:  region,
+		}
+	default:
+		return nil
+	}
 }
 
 // getProfiles returns the profiles
@@ -143,19 +155,6 @@ func getAwsConfig(profile, region string) (aws.Config, error) {
 		return cfg, fmt.Errorf("unable to load SDK config: %v", err)
 	}
 	return cfg, nil
-}
-
-// getStruct returns the struct for the specific command
-func getStruct(cmd, profile, region string) search {
-	switch cmd {
-	case "ec2":
-		return &instances{
-			Profile: profile,
-			Region:  region,
-		}
-	default:
-		return nil
-	}
 }
 
 // getTagName returns the value of the tag Name

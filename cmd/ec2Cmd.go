@@ -67,7 +67,7 @@ If you want to search for EC2 instances with the tags Key=Value1:Value2 and Envi
 			return fmt.Errorf("no flags provided. You must provide one of flags listed below")
 		}
 
-		err := search.Run(profile, region, output, cmd.Name(), searchBy, values)
+		err := search.Run(profile, region, output, showEmptyResults, cmd.Name(), searchBy, values)
 		if err != nil {
 			return fmt.Errorf("something went wrong while running %s. error: %v", cmd.Name(), err)
 		}
