@@ -24,7 +24,7 @@ type search interface {
 }
 
 // Run is the main function to run the search
-func Run(profile, region []string, output, cmd, searchBy string, values []string) error {
+func Run(profile, region []string, output string, verbose bool, cmd, searchBy string, values []string) error {
 	var wg sync.WaitGroup
 
 	profiles, err := getProfiles(profile)
@@ -46,11 +46,11 @@ func Run(profile, region []string, output, cmd, searchBy string, values []string
 			}
 
 			wg.Add(1)
-			go func(s search, searchBy string, values []string) {
+			go func() {
 				err = s.search(searchBy, values)
-				printResult(s, output, err)
+				printResult(s, output, verbose, err)
 				defer wg.Done()
-			}(s, searchBy, values)
+			}()
 		}
 	}
 	wg.Wait()

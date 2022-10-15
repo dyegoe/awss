@@ -9,6 +9,7 @@ import (
 
 var output string
 var profile, region []string
+var showEmptyResults bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -31,7 +32,7 @@ You can also pass 'all' to iterate over all regions.
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
 	// Remember to update this version when releasing a new version
-	Version:   "0.2.4",
+	Version:   "0.3.0",
 	ValidArgs: []string{"ec2"},
 	Args:      cobra.ExactValidArgs(1),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -52,6 +53,7 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceVar(&profile, "profile", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. `profile1,profile2`")
 	rootCmd.PersistentFlags().StringSliceVar(&region, "region", []string{"eu-central-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. `region1,region2`")
 	rootCmd.PersistentFlags().StringVar(&output, "output", "table", "Select the output format. `table`, json or json-pretty")
+	rootCmd.PersistentFlags().BoolVar(&showEmptyResults, "show-empty-results", false, "Show empty result. Default is false")
 
 }
 
