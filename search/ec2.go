@@ -14,7 +14,6 @@ import (
 type instances struct {
 	Profile string     `json:"profile"`
 	Region  string     `json:"region"`
-	Errors  []error    `json:"errors"`
 	Data    []instance `json:"data"`
 }
 
@@ -30,7 +29,7 @@ type instance struct {
 }
 
 // search is a method to search for instances. It gets instances from API and update the struct with the data.
-func (i *instances) search(searchBy string, values []string) search {
+func (i *instances) search(searchBy string, values []string) error {
 	var input *ec2.DescribeInstancesInput
 	switch searchBy {
 	case "ids":
@@ -45,11 +44,8 @@ func (i *instances) search(searchBy string, values []string) search {
 		input = i.filterByTags(values)
 	}
 	result, err := i.getInstances(input)
-	if err != nil {
-		i.Errors = append(i.Errors, err)
-	}
 	i.Data = i.parseInstances(result)
-	return i
+	return err
 }
 
 // filterByIds returns filters by id

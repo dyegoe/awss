@@ -15,7 +15,7 @@ import (
 
 // search is an interface to search for AWS resources.
 type search interface {
-	search(searchBy string, values []string) search
+	search(searchBy string, values []string) error
 	getProfile() string
 	getRegion() string
 	getHeaders() []string
@@ -41,8 +41,8 @@ func Run(profile, region []string, output, cmd, searchBy string, values []string
 			if s == nil {
 				return fmt.Errorf("no function found for %s", cmd)
 			}
-			response := s.search(searchBy, values)
-			printResult(response, output)
+			_ = s.search(searchBy, values)
+			printResult(s, output)
 		}
 	}
 

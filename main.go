@@ -1,9 +1,13 @@
 package main
 
-import "github.com/dyegoe/awss/cmd"
+import (
+	"os"
+
+	"github.com/dyegoe/awss/cmd"
+)
 
 func main() {
 	if err := cmd.Execute(); err != nil {
-		panic(err)
+		os.Exit(1)
 	}
 }
