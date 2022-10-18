@@ -23,16 +23,23 @@ For example, if you want to search for EC2 instances with the ids i-123045607890
 	awss ec2 -i i-1230456078901,i-1230456078902
 If you want to search for EC2 instances with the names instance-1 and instance-2, you can use:
 	awss ec2 -n instance-1,instance-2
-If you want to search for EC2 instances with the private IPs 172.16.0.1 and 172.17.1.254, you can use:
-	awss ec2 -p 172.16.0.1,172.17.1.254
-If you want to search for EC2 instances with the public IPs 52.28.19.20 and 52.30.31.32, you can use:
-	awss ec2 -P 52.28.19.20,52.30.31.32
 If you want to search for EC2 instances with the tag Key and the values Value1 and Value2, you can use:
 	awss ec2 -t 'Key=Value1:Value2'
 If you want to search for EC2 instances with the tag Environment and the value Production, you can use:
 	awss ec2 -t 'Environment=Production'
 If you want to search for EC2 instances with the tags Key=Value1:Value2 and Environment=Production, you can use:
-	awss ec2 -t 'Key=Value1:Value2,Environment=Production'`,
+	awss ec2 -t 'Key=Value1:Value2,Environment=Production'
+If you want to search for EC2 instances with the instance type t2.micro and t2.small, you can use:
+	awss ec2 -T t2.micro,t2.small
+If you want to search for EC2 instances with the availability zone us-east-1a and us-east-1b, you can use:
+	awss ec2 -z us-east-1a,us-east-1b
+If you want to search for EC2 instances with the instance state running and stopped, you can use:
+	awss ec2 -s running,stopped
+If you want to search for EC2 instances with the private IPs 172.16.0.1 and 172.17.1.254, you can use:
+	awss ec2 -p 172.16.0.1,172.17.1.254
+If you want to search for EC2 instances with the public IPs 52.28.19.20 and 52.30.31.32, you can use:
+	awss ec2 -P 52.28.19.20,52.30.31.32
+`,
 	Args: cobra.NoArgs,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		if len(ec2Ids) == 0 && len(ec2Names) == 0 && len(ec2PrivateIps) == 0 && len(ec2PublicIps) == 0 && len(ec2Tags) == 0 && len(ec2InstanceTypes) == 0 && len(ec2AvailabilityZones) == 0 && len(ec2InstanceStates) == 0 {
