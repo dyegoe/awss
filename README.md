@@ -5,18 +5,23 @@ It is a wrapper written in Go using AWS SDK Go v2. The work is still in progress
 
 ## Version
 
-The current version is 0.3.0.
+The current version is 0.4.0.
 
 ## Features
 
 The search runs in parallel using goroutines.
 
 - Search AWS ec2 instances
-  - by name
-  - by tag
-  - by instance id
-  - by private ip
-  - by public ip
+  - by instance ids
+  - by names
+  - by tags
+  - by private ips
+  - by instance types
+  - by availability zones
+  - by instance states
+  - by public ips
+
+And you can combine these filters together.
 
 ## Installation
 
