@@ -29,70 +29,53 @@ type instance struct {
 }
 
 // search is a method to search for instances. It gets instances from API and update the struct with the data.
-func (i *instances) search(searchBy string, values []string) error {
-	var input *ec2.DescribeInstancesInput
-	switch searchBy {
-	case "ids":
-		input = i.filterByIds(values)
-	case "names":
-		input = i.filterByNames(values)
-	case "private-ips":
-		input = i.filterByPrivateIps(values)
-	case "public-ips":
-		input = i.filterByPublicIps(values)
-	case "tags":
-		input = i.filterByTags(values)
-	}
+func (i *instances) search(searchBy map[string][]string) error {
+	input := i.getFilters(searchBy)
 	result, err := i.getInstances(input)
 	i.Data = i.parseInstances(result)
 	return err
 }
 
-// filterByIds returns filters by id
-func (i *instances) filterByIds(ids []string) *ec2.DescribeInstancesInput {
-	return &ec2.DescribeInstancesInput{
-		InstanceIds: ids,
+// getFilters returns the filters
+func (i *instances) getFilters(searchBy map[string][]string) *ec2.DescribeInstancesInput {
+	var input = ec2.DescribeInstancesInput{}
+	// filters := []types.Filter{}
+
+	for key, values := range searchBy {
+		switch key {
+		case "ids":
+			input.InstanceIds = values
+		case "names":
+			input.Filters = append(input.Filters, i.filterByNames(values)...)
+		case "tags":
+			input.Filters = append(input.Filters, i.filterByTags(values)...)
+		case "instance-types":
+			input.Filters = append(input.Filters, i.filterByInstanceTypes(values)...)
+		case "availability-zones":
+			input.Filters = append(input.Filters, i.filterByAvailabilityZones(values)...)
+		case "instance-states":
+			input.Filters = append(input.Filters, i.filterByInstanceStates(values)...)
+		case "private-ips":
+			input.Filters = append(input.Filters, i.filterByPrivateIps(values)...)
+		case "public-ips":
+			input.Filters = append(input.Filters, i.filterByPublicIps(values)...)
+		}
 	}
+	return &input
 }
 
 // filterByNames returns filters by name
-func (i *instances) filterByNames(names []string) *ec2.DescribeInstancesInput {
-	return &ec2.DescribeInstancesInput{
-		Filters: []types.Filter{
-			{
-				Name:   aws.String("tag:Name"),
-				Values: names,
-			},
-		},
-	}
-}
-
-// filterByPrivateIps returns filters by private ip
-func (i *instances) filterByPrivateIps(privateIps []string) *ec2.DescribeInstancesInput {
-	return &ec2.DescribeInstancesInput{
-		Filters: []types.Filter{
-			{
-				Name:   aws.String("private-ip-address"),
-				Values: privateIps,
-			},
-		},
-	}
-}
-
-// filterByPublicIps returns filters by public ip
-func (i *instances) filterByPublicIps(publicIps []string) *ec2.DescribeInstancesInput {
-	return &ec2.DescribeInstancesInput{
-		Filters: []types.Filter{
-			{
-				Name:   aws.String("ip-address"),
-				Values: publicIps,
-			},
+func (i *instances) filterByNames(names []string) []types.Filter {
+	return []types.Filter{
+		{
+			Name:   aws.String("tag:Name"),
+			Values: names,
 		},
 	}
 }
 
 // filterByTags returns filters by tag
-func (i *instances) filterByTags(tags []string) *ec2.DescribeInstancesInput {
+func (i *instances) filterByTags(tags []string) []types.Filter {
 	filters := []types.Filter{}
 	parsed, _ := ParseTags(tags)
 	for key, values := range parsed {
@@ -101,8 +84,56 @@ func (i *instances) filterByTags(tags []string) *ec2.DescribeInstancesInput {
 			Values: values,
 		})
 	}
-	return &ec2.DescribeInstancesInput{
-		Filters: filters,
+	return filters
+}
+
+// filterByInstanceTypes returns filters by instance type
+func (i *instances) filterByInstanceTypes(instanceTypes []string) []types.Filter {
+	return []types.Filter{
+		{
+			Name:   aws.String("instance-type"),
+			Values: instanceTypes,
+		},
+	}
+}
+
+// filterByAvailabilityZones returns filters by availability zone
+func (i *instances) filterByAvailabilityZones(availabilityZones []string) []types.Filter {
+	return []types.Filter{
+		{
+			Name:   aws.String("availability-zone"),
+			Values: availabilityZones,
+		},
+	}
+}
+
+// filterByInstanceStates returns filters by instance state
+func (i *instances) filterByInstanceStates(instanceStates []string) []types.Filter {
+	return []types.Filter{
+		{
+			Name:   aws.String("instance-state-name"),
+			Values: instanceStates,
+		},
+	}
+}
+
+// filterByPrivateIps returns filters by private ip
+func (i *instances) filterByPrivateIps(privateIps []string) []types.Filter {
+	return []types.Filter{
+		{
+			Name:   aws.String("private-ip-address"),
+			Values: privateIps,
+		},
+	}
+}
+
+// filterByPublicIps returns filters by public ip
+func (i *instances) filterByPublicIps(publicIps []string) []types.Filter {
+	return []types.Filter{
+		{
+			Name:   aws.String("ip-address"),
+			Values: publicIps,
+		},
 	}
 }
 
