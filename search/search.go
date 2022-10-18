@@ -16,7 +16,7 @@ import (
 
 // search is an interface to search for AWS resources.
 type search interface {
-	search(searchBy string, values []string) error
+	search(searchBy map[string][]string) error
 	getProfile() string
 	getRegion() string
 	getHeaders() []string
@@ -24,7 +24,7 @@ type search interface {
 }
 
 // Run is the main function to run the search
-func Run(profile, region []string, output string, verbose bool, cmd, searchBy string, values []string) error {
+func Run(profile, region []string, output string, verbose bool, cmd string, searchBy map[string][]string) error {
 	var wg sync.WaitGroup
 
 	profiles, err := getProfiles(profile)
@@ -47,7 +47,7 @@ func Run(profile, region []string, output string, verbose bool, cmd, searchBy st
 
 			wg.Add(1)
 			go func() {
-				err = s.search(searchBy, values)
+				err = s.search(searchBy)
 				printResult(s, output, verbose, err)
 				defer wg.Done()
 			}()

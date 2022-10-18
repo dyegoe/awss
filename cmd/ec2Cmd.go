@@ -16,8 +16,9 @@ var ec2Cmd = &cobra.Command{
 	Use:   "ec2",
 	Short: "Search for EC2 instances.",
 	Long: `Search for EC2 instances.
-You can search EC2 instances using the following filters: ids, names, private-ips, public-ips and tags.
-You can use multiple values for each filter, separated by comma, but you can specify just one filter at time.
+You can search EC2 instances using the following filters: ids, names, tags, instance-types, availability-zones, instance-states, private-ips and public-ips.
+You can use multiple values for each filter, separated by comma and multiple filter at same time.
+
 
 For example, if you want to search for EC2 instances with the ids i-1230456078901 and i-1230456078902, you can use:
 	awss ec2 -i i-1230456078901,i-1230456078902
@@ -42,48 +43,40 @@ If you want to search for EC2 instances with the public IPs 52.28.19.20 and 52.3
 `,
 	Args: cobra.NoArgs,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		if len(ec2Ids) == 0 && len(ec2Names) == 0 && len(ec2PrivateIps) == 0 && len(ec2PublicIps) == 0 && len(ec2Tags) == 0 && len(ec2InstanceTypes) == 0 && len(ec2AvailabilityZones) == 0 && len(ec2InstanceStates) == 0 {
-			return fmt.Errorf("you must specify at least one filter. Use -h to see the available filters")
-		}
 		if _, err := search.ParseTags(ec2Tags); err != nil {
 			return err
 		}
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var values []string
-		var searchBy string
+		var searchBy = make(map[string][]string)
 
-		switch {
-		case len(ec2Ids) > 0:
-			values = ec2Ids
-			searchBy = "ids"
-		case len(ec2Names) > 0:
-			values = ec2Names
-			searchBy = "names"
-		case len(ec2Tags) > 0:
-			values = ec2Tags
-			searchBy = "tags"
-		case len(ec2InstanceTypes) > 0:
-			values = ec2InstanceTypes
-			searchBy = "instance-types"
-		case len(ec2AvailabilityZones) > 0:
-			values = ec2AvailabilityZones
-			searchBy = "availability-zones"
-		case len(ec2InstanceStates) > 0:
-			values = ec2InstanceStates
-			searchBy = "instance-states"
-		case len(ec2PrivateIps) > 0:
-			values = ipToString(ec2PrivateIps)
-			searchBy = "private-ips"
-		case len(ec2PublicIps) > 0:
-			values = ipToString(ec2PublicIps)
-			searchBy = "public-ips"
-		default:
-			return fmt.Errorf("no flags provided. You must provide one of flags listed below")
+		if len(ec2Ids) > 0 {
+			searchBy["ids"] = ec2Ids
+		}
+		if len(ec2Names) > 0 {
+			searchBy["names"] = ec2Names
+		}
+		if len(ec2Tags) > 0 {
+			searchBy["tags"] = ec2Tags
+		}
+		if len(ec2InstanceTypes) > 0 {
+			searchBy["instance-types"] = ec2InstanceTypes
+		}
+		if len(ec2AvailabilityZones) > 0 {
+			searchBy["availability-zones"] = ec2AvailabilityZones
+		}
+		if len(ec2InstanceStates) > 0 {
+			searchBy["instance-states"] = ec2InstanceStates
+		}
+		if len(ec2PrivateIps) > 0 {
+			searchBy["private-ips"] = ipToString(ec2PrivateIps)
+		}
+		if len(ec2PublicIps) > 0 {
+			searchBy["public-ips"] = ipToString(ec2PublicIps)
 		}
 
-		err := search.Run(profile, region, output, showEmptyResults, cmd.Name(), searchBy, values)
+		err := search.Run(profile, region, output, showEmptyResults, cmd.Name(), searchBy)
 		if err != nil {
 			return fmt.Errorf("something went wrong while running %s. error: %v", cmd.Name(), err)
 		}
@@ -101,8 +94,6 @@ func init() {
 	ec2Cmd.Flags().StringSliceVarP(&ec2InstanceStates, "instance-states", "s", []string{}, "Filter EC2 instances by instance state. `running,stopped`")
 	ec2Cmd.Flags().IPSliceVarP(&ec2PrivateIps, "private-ips", "p", []net.IP{}, "Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
 	ec2Cmd.Flags().IPSliceVarP(&ec2PublicIps, "public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
-	// Mark set of flags that can't be used together
-	ec2Cmd.MarkFlagsMutuallyExclusive("ids", "names", "tags", "instance-types", "availability-zones", "instance-states", "private-ips", "public-ips")
 	// Add ec2Cmd to rootCmd
 	rootCmd.AddCommand(ec2Cmd)
 }
