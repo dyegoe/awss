@@ -1,4 +1,4 @@
-package cmd
+package commands
 
 import (
 	"fmt"
@@ -11,8 +11,8 @@ var output string
 var profile, region []string
 var showEmptyResults bool
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
+// awssCmd represents the base command when called without any subcommands
+var awssCmd = &cobra.Command{
 	Use:   "awss",
 	Short: "AWSS is a CLI tool to make your life easier when searching AWS resources.",
 	Long: `AWSS (stands for AWS Search) is a CLI tool to make your life easier when searching AWS resources.
@@ -49,17 +49,18 @@ https://github.com/dyegoe/awss`,
 
 // init is called before the command is executed and is used to set flags
 func init() {
-	// Set flags for rootCmd
-	rootCmd.PersistentFlags().StringSliceVar(&profile, "profile", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. `profile1,profile2`")
-	rootCmd.PersistentFlags().StringSliceVar(&region, "region", []string{"eu-central-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. `region1,region2`")
-	rootCmd.PersistentFlags().StringVar(&output, "output", "table", "Select the output format. `table`, json or json-pretty")
-	rootCmd.PersistentFlags().BoolVar(&showEmptyResults, "show-empty-results", false, "Show empty result. Default is false")
-
+	// Set flags for awssCmd
+	awssCmd.PersistentFlags().StringSliceVar(&profile, "profile", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. `profile1,profile2`")
+	awssCmd.PersistentFlags().StringSliceVar(&region, "region", []string{"eu-central-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. `region1,region2`")
+	awssCmd.PersistentFlags().StringVar(&output, "output", "table", "Select the output format. `table`, json or json-pretty")
+	awssCmd.PersistentFlags().BoolVar(&showEmptyResults, "show-empty-results", false, "Show empty result. Default is false")
+	// Add ec2Cmd to awssCmd
+	awssCmd.AddCommand(ec2Cmd)
 }
 
 // Execute calls *cobra.Command.Execute() to start the CLI
 func Execute() error {
-	return rootCmd.Execute()
+	return awssCmd.Execute()
 }
 
 // checkOutput checks if the output is valid

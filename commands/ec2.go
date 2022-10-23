@@ -1,4 +1,4 @@
-package cmd
+package commands
 
 import (
 	"fmt"
@@ -104,6 +104,4 @@ func init() {
 	ec2Cmd.Flags().StringSliceVarP(&ec2InstanceStates, "instance-states", "s", []string{}, "Filter EC2 instances by instance state. `running,stopped`")
 	ec2Cmd.Flags().IPSliceVarP(&ec2PrivateIps, "private-ips", "p", []net.IP{}, "Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
 	ec2Cmd.Flags().IPSliceVarP(&ec2PublicIps, "public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
-	// Add ec2Cmd to rootCmd
-	rootCmd.AddCommand(ec2Cmd)
 }

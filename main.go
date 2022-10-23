@@ -3,11 +3,11 @@ package main
 import (
 	"os"
 
-	"github.com/dyegoe/awss/cmd"
+	"github.com/dyegoe/awss/commands"
 )
 
 func main() {
-	if err := cmd.Execute(); err != nil {
+	if err := commands.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
