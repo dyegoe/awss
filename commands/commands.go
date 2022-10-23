@@ -2,14 +2,14 @@ package commands
 
 import (
 	"fmt"
-	"net"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-var output string
-var profile, region []string
-var showEmptyResults bool
+var config string
 
 // awssCmd represents the base command when called without any subcommands
 var awssCmd = &cobra.Command{
@@ -25,57 +25,89 @@ The provided profile must be present in ~/.aws/credentials and ~/.aws/config fil
 If you would like to iterate over multiple profiles, you can pass them separated by comma. Example: --profile profile1,profile2.
 You can also pass 'all' to iterate over all profiles.
 
-The default region is 'eu-central-1'.
+The default region is 'us-east-1'.
 If you would like to iterate over multiple regions, you can pass them separated by comma. Example: --region region1,region2.
 You can also pass 'all' to iterate over all regions.
 
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
 	// Remember to update this version when releasing a new version
-	Version:   "0.4.0",
-	ValidArgs: []string{"ec2"},
-	Args:      cobra.ExactValidArgs(1),
+	Version: "0.4.0",
+	// Args:    cobra.ExactValidArgs(1),
+	Args: cobra.ExactArgs(1),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if err := checkOutput(); err != nil {
+		err := initConfig()
+		if err != nil {
 			return err
 		}
+
 		return nil
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		err := cmd.Help()
-		return err
 	},
 }
 
 // init is called before the command is executed and is used to set flags
 func init() {
 	// Set flags for awssCmd
-	awssCmd.PersistentFlags().StringSliceVar(&profile, "profile", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. `profile1,profile2`")
-	awssCmd.PersistentFlags().StringSliceVar(&region, "region", []string{"eu-central-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. `region1,region2`")
-	awssCmd.PersistentFlags().StringVar(&output, "output", "table", "Select the output format. `table`, json or json-pretty")
-	awssCmd.PersistentFlags().BoolVar(&showEmptyResults, "show-empty-results", false, "Show empty result. Default is false")
+	awssCmd.PersistentFlags().StringVarP(&config, "config", "c", "", "config file (default is $HOME/.awss.yaml)")
+	// Flags that can be configured in the config file
+	awssCmd.PersistentFlags().StringSlice("profiles", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. `profile1,profile2`")
+	awssCmd.PersistentFlags().StringSlice("regions", []string{"us-east-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. `region1,region2`")
+	awssCmd.PersistentFlags().String("output", "table", "Select the output format. `table`, json or json-pretty")
+	awssCmd.PersistentFlags().Bool("show-empty", false, "Show empty results. Default is false")
 	// Add ec2Cmd to awssCmd
 	awssCmd.AddCommand(ec2Cmd)
+	// Bind flags to viper
+	viper.BindPFlag("profiles", awssCmd.PersistentFlags().Lookup("profiles"))
+	viper.BindPFlag("regions", awssCmd.PersistentFlags().Lookup("regions"))
+	viper.BindPFlag("output", awssCmd.PersistentFlags().Lookup("output"))
+	viper.BindPFlag("show-empty", awssCmd.PersistentFlags().Lookup("show-empty"))
+	// Set default values for configuration
+	viper.SetDefault("all_regions", []string{
+		"eu-central-1",
+		"eu-north-1",
+		"eu-west-1",
+		"eu-west-2",
+		"eu-west-3",
+		"us-east-1",
+		"us-east-2",
+		"us-west-1",
+		"us-west-2",
+		"ca-central-1",
+		"sa-east-1",
+		"ap-south-1",
+		"ap-southeast-1",
+		"ap-southeast-2",
+		"ap-northeast-3",
+		"ap-northeast-2",
+		"ap-northeast-1",
+	})
+}
+
+func initConfig() error {
+	if config != "" {
+		abs, err := filepath.Abs(config)
+		if err != nil {
+			return err
+		}
+		base := filepath.Base(abs)
+		path := filepath.Dir(abs)
+		viper.SetConfigName(strings.TrimSuffix(base, filepath.Ext(base)))
+		viper.AddConfigPath(path)
+	} else {
+		viper.SetConfigName(".awss")
+		viper.AddConfigPath(".")
+		viper.AddConfigPath("$HOME")
+	}
+	viper.SetConfigType("yaml")
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return fmt.Errorf("error reading config file: %s", err)
+		}
+	}
+	return nil
 }
 
 // Execute calls *cobra.Command.Execute() to start the CLI
 func Execute() error {
 	return awssCmd.Execute()
-}
-
-// checkOutput checks if the output is valid
-func checkOutput() error {
-	if output != "table" && output != "json" && output != "json-pretty" {
-		return fmt.Errorf("invalid output format. Please use 'table', 'json' or 'json-pretty'")
-	}
-	return nil
-}
-
-// ipToString converts a slice of net.IP to a slice of string
-func ipToString(ip []net.IP) []string {
-	var ips []string
-	for _, i := range ip {
-		ips = append(ips, i.String())
-	}
-	return ips
 }
