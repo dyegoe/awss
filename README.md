@@ -5,7 +5,8 @@ It is a wrapper written in Go using AWS SDK Go v2. The work is still in progress
 
 ## Version
 
-The current version is 0.4.0.
+<!-- Do not forget to update version on commands/commands.go Version -->
+The current version is 0.5.0.
 
 ## Features
 
@@ -32,12 +33,51 @@ go build
 cp awss /usr/local/bin
 ```
 
+## Configuration
+
+AWSS uses a configuration file to set the default:
+
+- profiles
+- regions
+- output format
+- show empty results
+- all regions to search
+
+You can create a configuration file on your home directory `~/.awss/config.yaml` or use the `--config` flag to specify a config file.
+
+```yaml
+profiles:
+  - default
+regions:
+  - us-east-1
+output: table
+show-empty: false
+all_regions:
+  - eu-central-1
+  - eu-north-1
+  - eu-west-1
+  - eu-west-2
+  - eu-west-3
+  - us-east-1
+  - us-east-2
+  - us-west-1
+  - us-west-2
+  - ca-central-1
+  - sa-east-1
+  - ap-south-1
+  - ap-southeast-1
+  - ap-southeast-2
+  - ap-northeast-3
+  - ap-northeast-2
+  - ap-northeast-1
+```
+
 ## Usage
 
 ```txt
 awss --help
 awss ec2 --help
-awss --profile <profile> --region <region> ec2 --name <name>
+awss --profiles <profile1,profile2> --regions <eu-central-1,us-east-1> ec2 --name <name>
 ```
 
 ## Contributing
