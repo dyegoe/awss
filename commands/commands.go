@@ -32,9 +32,7 @@ You can also pass 'all' to iterate over all regions.
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
 	// Remember to update this version when releasing a new version
-	Version: "0.4.0",
-	// Args:    cobra.ExactValidArgs(1),
-	Args: cobra.ExactArgs(1),
+	Version: "0.5.0",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		err := initConfig()
 		if err != nil {
@@ -94,9 +92,8 @@ func initConfig() error {
 		viper.SetConfigName(strings.TrimSuffix(base, filepath.Ext(base)))
 		viper.AddConfigPath(path)
 	} else {
-		viper.SetConfigName(".awss")
-		viper.AddConfigPath(".")
-		viper.AddConfigPath("$HOME")
+		viper.SetConfigName("config")
+		viper.AddConfigPath("$HOME/.awss/")
 	}
 	viper.SetConfigType("yaml")
 	if err := viper.ReadInConfig(); err != nil {
