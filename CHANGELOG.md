@@ -10,36 +10,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 - `CHANGELOG.md` file
-- Add `spf13/viper` dependency and enable configuration file support
-- Add `--config` flag to specify a config file
+- `spf13/viper` dependency and enable configuration file support
+- `--config` flag to specify a config file
 
 <!-- markdownlint-disable MD024 -->
 ### Changed
 
-- Rename `cmd` to `commands`
-- Rename `rootCmd` to `awssCmd`
+- package `cmd` to `commands`
+- main cobra `rootCmd` to `awssCmd`
 
 ## [v0.4.0] - 2022-10-18
 
 <!-- markdownlint-disable MD024 -->
 ### Added
 
-- Add support for new filters
+- Support for new filters
   - by instance types
   - by availability zones
   - by instance states
-
-<!-- markdownlint-disable MD024 -->
-### Changed
-
-- You can add more than one filter during the search
+- Support for search using more than one filter at a time
 
 ## [v0.3.0] - 2022-10-15
 
 <!-- markdownlint-disable MD024 -->
 ### Added
 
-- Add paralellism using goroutines
+- Paralellism using goroutines
 - `--show-empty-results` option to show empty results in the output
 - Function `printResults`
 
@@ -61,7 +57,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <!-- markdownlint-disable MD024 -->
 ### Removed
 
-- Removed `LICENSE` and `README.md` from the package.
+- `LICENSE` and `README.md` from the package.
 
 ## [v0.2.3] - 2022-10-08
 
