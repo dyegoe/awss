@@ -16,9 +16,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <!-- markdownlint-disable MD024 -->
 ### Changed
 
-- package `cmd` to `commands`
-- main cobra `rootCmd` to `awssCmd`
+- Package `cmd` to `commands`
+- Main cobra.Command `rootCmd` to `awssCmd`
 - Include configuration on `README.md`
+- Because of new configuration, `--profile` flag is now `--profiles`. Same for `--region` flag that is now `--regions`.
+- To simplify, `--show-empty-results` flag is now `--show-empty`
 
 ## [v0.4.0] - 2022-10-18
 
