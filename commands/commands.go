@@ -5,8 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dyegoe/awss/search"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/ini.v1"
 )
 
 var config string
@@ -38,6 +40,20 @@ https://github.com/dyegoe/awss`,
 		if err != nil {
 			return err
 		}
+
+		// Send current profiles to getProfiles which will check if they are valid or if 'all' was passed
+		profiles, err := getProfiles(viper.GetStringSlice("profiles"))
+		if err != nil {
+			return err
+		}
+		viper.Set("profiles", profiles)
+
+		// Send current regions to getRegions which will check if they are valid or if 'all' was passed
+		regions, err := getRegions(viper.GetStringSlice("regions"))
+		if err != nil {
+			return err
+		}
+		viper.Set("regions", regions)
 
 		return nil
 	},
@@ -102,6 +118,62 @@ func initConfig() error {
 		}
 	}
 	return nil
+}
+
+// getProfiles returns the profiles
+func getProfiles(p []string) ([]string, error) {
+	profiles, err := getProfilesFromConfig()
+	if err != nil {
+		return nil, err
+	}
+	if p[0] == "all" {
+		return profiles, nil
+	}
+	for _, profile := range p {
+		if !stringInSlice(profile, profiles) {
+			return nil, fmt.Errorf("profile %s not found", profile)
+		}
+	}
+	return p, nil
+}
+
+// getProfilesFromConfig returns the profiles from the config file
+func getProfilesFromConfig() ([]string, error) {
+	f, err := ini.Load(search.DefaultSharedConfigFilename())
+	if err != nil {
+		return nil, fmt.Errorf("fail to read file: %v", err)
+	}
+	arr := []string{}
+	for _, v := range f.Sections() {
+		if strings.HasPrefix(v.Name(), "profile ") {
+			arr = append(arr, strings.TrimPrefix(v.Name(), "profile "))
+		}
+	}
+	return arr, nil
+}
+
+// getRegions returns the regions
+func getRegions(r []string) ([]string, error) {
+	regions := viper.GetStringSlice("all_regions")
+	if r[0] == "all" {
+		return regions, nil
+	}
+	for _, region := range r {
+		if !stringInSlice(region, regions) {
+			return nil, fmt.Errorf("region %s not found", region)
+		}
+	}
+	return r, nil
+}
+
+// stringInSlice returns true if the string is in the slice
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
 
 // Execute calls *cobra.Command.Execute() to start the CLI
