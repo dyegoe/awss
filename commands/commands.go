@@ -34,7 +34,7 @@ You can also pass 'all' to iterate over all regions.
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
 	// Remember to update this version when releasing a new version
-	Version: "0.5.0",
+	Version: "0.5.1",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		err := initConfig()
 		if err != nil {

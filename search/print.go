@@ -9,18 +9,18 @@ import (
 )
 
 // print prints theh search results
-func printResult(s search, output string, showEmptyResults bool, err error) {
-	switch output {
-	case "table":
-		printTable(s, showEmptyResults)
-	case "json":
-		printJSON(s, showEmptyResults)
-	case "json-pretty":
-		printJSONPretty(s, showEmptyResults)
+func printResult(sChan <-chan search, output string, showEmptyResults bool, done chan<- bool) {
+	for s := range sChan {
+		switch output {
+		case "table":
+			printTable(s, showEmptyResults)
+		case "json":
+			printJSON(s, showEmptyResults)
+		case "json-pretty":
+			printJSONPretty(s, showEmptyResults)
+		}
 	}
-	if err != nil && showEmptyResults {
-		fmt.Println(fmt.Errorf("searching instances: %v", err))
-	}
+	done <- true
 }
 
 // printTable prints search result as a table
@@ -32,9 +32,13 @@ func printTable(s search, showEmptyResults bool) {
 	if len(rows) > 0 || showEmptyResults {
 		fmt.Println("[+] [profile]", s.getProfile(), "[region]", s.getRegion())
 	}
+	err := s.getError()
+	if len(err) > 0 && showEmptyResults {
+		fmt.Println(err)
+	}
 	if len(rows) == 0 {
 		if showEmptyResults {
-			fmt.Println("No results found")
+			fmt.Printf("No results found\n\n")
 		}
 		return
 	}
@@ -49,6 +53,7 @@ func printTable(s search, showEmptyResults bool) {
 		}
 	}
 	table.Print(os.Stdout)
+	fmt.Println()
 }
 
 // printJSON prints search result as JSON

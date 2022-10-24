@@ -13,20 +13,28 @@ import (
 
 // search is an interface to search for AWS resources.
 type search interface {
-	search(searchBy map[string][]string) error
+	search(searchBy map[string][]string)
 	getProfile() string
 	getRegion() string
 	getHeaders() []string
 	getRows() [][]string
+	getError() string
 }
 
 // Run is the main function to run the search
 func Run(profiles, regions []string, output string, verbose bool, cmd string, searchBy map[string][]string) error {
 	var wg sync.WaitGroup
 
-	// iterate over profiles
+	// Create a channel to receive the results
+	sChan := make(chan search, len(profiles)*len(regions))
+	// Create a channel to signal when the printing is done
+	done := make(chan bool)
+	// Launch the printer
+	go printResult(sChan, output, verbose, done)
+
+	// Iterate over profiles
 	for _, p := range profiles {
-		// iterate over regions for each profile
+		// Iterate over regions for each profile
 		for _, r := range regions {
 			s := getStruct(cmd, p, r)
 			if s == nil {
@@ -35,13 +43,20 @@ func Run(profiles, regions []string, output string, verbose bool, cmd string, se
 
 			wg.Add(1)
 			go func() {
-				err := s.search(searchBy)
-				printResult(s, output, verbose, err)
+				s.search(searchBy)
+				sChan <- s
 				defer wg.Done()
 			}()
 		}
 	}
+	// Wait for all searches to finish
 	wg.Wait()
+	// Close the channel to signal that no more results will be sent
+	close(sChan)
+	// Wait for the printResult goroutine to finish
+	<-done
+	close(done)
+
 	return nil
 }
 
