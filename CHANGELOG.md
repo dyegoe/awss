@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <!-- markdownlint-disable MD024 -->
 ### Changed
 
-- Move print function to a dedicated goroutine
+- Move print function to a dedicated goroutine and add communication from search to print function via a channel
 - Move error to struct field
 
 <!-- markdownlint-disable MD024 -->
