@@ -27,11 +27,14 @@ func Run(profiles, regions []string, output string, verbose bool, cmd string, se
 
 	// Create a channel to receive the results
 	sChan := make(chan search, len(profiles)*len(regions))
-	go printResult(sChan, output, verbose)
+	// Create a channel to signal when the printing is done
+	done := make(chan bool)
+	// Launch the printer
+	go printResult(sChan, output, verbose, done)
 
-	// iterate over profiles
+	// Iterate over profiles
 	for _, p := range profiles {
-		// iterate over regions for each profile
+		// Iterate over regions for each profile
 		for _, r := range regions {
 			s := getStruct(cmd, p, r)
 			if s == nil {
@@ -46,8 +49,14 @@ func Run(profiles, regions []string, output string, verbose bool, cmd string, se
 			}()
 		}
 	}
+	// Wait for all searches to finish
 	wg.Wait()
+	// Close the channel to signal that no more results will be sent
 	close(sChan)
+	// Wait for the printResult goroutine to finish
+	<-done
+	close(done)
+
 	return nil
 }
 

@@ -9,7 +9,7 @@ import (
 )
 
 // print prints theh search results
-func printResult(sChan <-chan search, output string, showEmptyResults bool) {
+func printResult(sChan <-chan search, output string, showEmptyResults bool, done chan<- bool) {
 	for s := range sChan {
 		switch output {
 		case "table":
@@ -20,6 +20,7 @@ func printResult(sChan <-chan search, output string, showEmptyResults bool) {
 			printJSONPretty(s, showEmptyResults)
 		}
 	}
+	done <- true
 }
 
 // printTable prints search result as a table
