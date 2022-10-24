@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [v0.5.0] - 2022-10-24
+
 <!-- markdownlint-disable MD024 -->
 ### Added
 
@@ -19,7 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Package `cmd` to `commands`
 - Main cobra.Command `rootCmd` to `awssCmd`
 - Include configuration on `README.md`
-- Because of new configuration, `--profile` flag is now `--profiles`. Same for `--region` flag that is now `--regions`.
+- `--profile` flag is deprecated, use `--profiles` instead.
+- `--region` flag is depracated, use `--regions` instead.
 - To simplify, `--show-empty-results` flag is now `--show-empty`
 
 ## [v0.4.0] - 2022-10-18
