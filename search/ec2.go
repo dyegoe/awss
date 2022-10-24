@@ -14,7 +14,7 @@ import (
 type instances struct {
 	Profile string     `json:"profile"`
 	Region  string     `json:"region"`
-	Error   error      `json:"error"`
+	Error   string     `json:"error,omitempty"`
 	Data    []instance `json:"data"`
 }
 
@@ -33,14 +33,15 @@ type instance struct {
 func (i *instances) search(searchBy map[string][]string) {
 	input := i.getFilters(searchBy)
 	result, err := i.getInstances(input)
+	if err != nil {
+		i.Error = err.Error()
+	}
 	i.Data = i.parseInstances(result)
-	i.Error = err
 }
 
 // getFilters returns the filters
 func (i *instances) getFilters(searchBy map[string][]string) *ec2.DescribeInstancesInput {
 	var input = ec2.DescribeInstancesInput{}
-	// filters := []types.Filter{}
 
 	for key, values := range searchBy {
 		switch key {
@@ -171,7 +172,7 @@ func (i *instances) parseInstances(result *ec2.DescribeInstancesOutput) []instan
 	return data
 }
 
-// GetHeaders returns the headers
+// getHeaders returns the headers
 func (i *instances) getHeaders() []string {
 	headers := []string{}
 	val := reflect.ValueOf(instance{})
@@ -181,7 +182,7 @@ func (i *instances) getHeaders() []string {
 	return headers
 }
 
-// GetRows returns the rows
+// getRows returns the rows
 func (i *instances) getRows() [][]string {
 	rows := [][]string{}
 	for _, v := range i.Data {
@@ -195,17 +196,17 @@ func (i *instances) getRows() [][]string {
 	return rows
 }
 
-// GetProfile returns the profile
+// getProfile returns the profile
 func (i *instances) getProfile() string {
 	return i.Profile
 }
 
-// GetRegion returns the region
+// getRegion returns the region
 func (i *instances) getRegion() string {
 	return i.Region
 }
 
-// GetError returns the error
-func (i *instances) getError() error {
+// getError returns the error
+func (i *instances) getError() string {
 	return i.Error
 }

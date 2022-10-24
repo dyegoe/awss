@@ -32,12 +32,12 @@ func printTable(s search, showEmptyResults bool) {
 		fmt.Println("[+] [profile]", s.getProfile(), "[region]", s.getRegion())
 	}
 	err := s.getError()
-	if err != nil && showEmptyResults {
+	if len(err) > 0 && showEmptyResults {
 		fmt.Println(err)
 	}
 	if len(rows) == 0 {
 		if showEmptyResults {
-			fmt.Println("No results found")
+			fmt.Printf("No results found\n\n")
 		}
 		return
 	}
@@ -52,6 +52,7 @@ func printTable(s search, showEmptyResults bool) {
 		}
 	}
 	table.Print(os.Stdout)
+	fmt.Println()
 }
 
 // printJSON prints search result as JSON

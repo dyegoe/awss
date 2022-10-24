@@ -18,7 +18,7 @@ type search interface {
 	getRegion() string
 	getHeaders() []string
 	getRows() [][]string
-	getError() error
+	getError() string
 }
 
 // Run is the main function to run the search
