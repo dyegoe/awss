@@ -1,4 +1,4 @@
-package cmd
+package commands
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"github.com/dyegoe/awss/search"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var ec2Ids, ec2Names, ec2Tags, ec2InstanceTypes, ec2InstanceStates, ec2AvailabilityZones []string
@@ -86,7 +87,7 @@ You can use multiple filters at same time, for example:
 			return fmt.Errorf("you must specify at least one filter")
 		}
 
-		err := search.Run(profile, region, output, showEmptyResults, cmd.Name(), searchBy)
+		err := search.Run(viper.GetStringSlice("profiles"), viper.GetStringSlice("regions"), viper.GetString("output"), viper.GetBool("show-empty"), cmd.Name(), searchBy)
 		if err != nil {
 			return fmt.Errorf("something went wrong while running %s. error: %v", cmd.Name(), err)
 		}
@@ -104,6 +105,13 @@ func init() {
 	ec2Cmd.Flags().StringSliceVarP(&ec2InstanceStates, "instance-states", "s", []string{}, "Filter EC2 instances by instance state. `running,stopped`")
 	ec2Cmd.Flags().IPSliceVarP(&ec2PrivateIps, "private-ips", "p", []net.IP{}, "Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
 	ec2Cmd.Flags().IPSliceVarP(&ec2PublicIps, "public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
-	// Add ec2Cmd to rootCmd
-	rootCmd.AddCommand(ec2Cmd)
+}
+
+// ipToString converts a slice of net.IP to a slice of string
+func ipToString(ip []net.IP) []string {
+	var ips []string
+	for _, i := range ip {
+		ips = append(ips, i.String())
+	}
+	return ips
 }
