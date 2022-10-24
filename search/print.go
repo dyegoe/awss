@@ -9,7 +9,7 @@ import (
 )
 
 // print prints theh search results
-func printResult(sChan <-chan search, output string, showEmptyResults bool, err <-chan error) {
+func printResult(sChan <-chan search, output string, showEmptyResults bool) {
 	for s := range sChan {
 		switch output {
 		case "table":
@@ -18,9 +18,6 @@ func printResult(sChan <-chan search, output string, showEmptyResults bool, err 
 			printJSON(s, showEmptyResults)
 		case "json-pretty":
 			printJSONPretty(s, showEmptyResults)
-		}
-		if <-err != nil && showEmptyResults {
-			fmt.Println(fmt.Errorf("searching instances: %v", err))
 		}
 	}
 }
@@ -33,6 +30,10 @@ func printTable(s search, showEmptyResults bool) {
 
 	if len(rows) > 0 || showEmptyResults {
 		fmt.Println("[+] [profile]", s.getProfile(), "[region]", s.getRegion())
+	}
+	err := s.getError()
+	if err != nil && showEmptyResults {
+		fmt.Println(err)
 	}
 	if len(rows) == 0 {
 		if showEmptyResults {

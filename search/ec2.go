@@ -14,6 +14,7 @@ import (
 type instances struct {
 	Profile string     `json:"profile"`
 	Region  string     `json:"region"`
+	Error   error      `json:"error"`
 	Data    []instance `json:"data"`
 }
 
@@ -29,11 +30,11 @@ type instance struct {
 }
 
 // search is a method to search for instances. It gets instances from API and update the struct with the data.
-func (i *instances) search(searchBy map[string][]string) error {
+func (i *instances) search(searchBy map[string][]string) {
 	input := i.getFilters(searchBy)
 	result, err := i.getInstances(input)
 	i.Data = i.parseInstances(result)
-	return err
+	i.Error = err
 }
 
 // getFilters returns the filters
@@ -202,4 +203,9 @@ func (i *instances) getProfile() string {
 // GetRegion returns the region
 func (i *instances) getRegion() string {
 	return i.Region
+}
+
+// GetError returns the error
+func (i *instances) getError() error {
+	return i.Error
 }

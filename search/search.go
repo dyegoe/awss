@@ -13,11 +13,12 @@ import (
 
 // search is an interface to search for AWS resources.
 type search interface {
-	search(searchBy map[string][]string) error
+	search(searchBy map[string][]string)
 	getProfile() string
 	getRegion() string
 	getHeaders() []string
 	getRows() [][]string
+	getError() error
 }
 
 // Run is the main function to run the search
@@ -26,8 +27,7 @@ func Run(profiles, regions []string, output string, verbose bool, cmd string, se
 
 	// Create a channel to receive the results
 	sChan := make(chan search, len(profiles)*len(regions))
-	errChan := make(chan error)
-	go printResult(sChan, output, verbose, errChan)
+	go printResult(sChan, output, verbose)
 
 	// iterate over profiles
 	for _, p := range profiles {
@@ -40,16 +40,14 @@ func Run(profiles, regions []string, output string, verbose bool, cmd string, se
 
 			wg.Add(1)
 			go func() {
-				err := s.search(searchBy)
+				s.search(searchBy)
 				sChan <- s
-				errChan <- err
 				defer wg.Done()
 			}()
 		}
 	}
 	wg.Wait()
 	close(sChan)
-	close(errChan)
 	return nil
 }
 
