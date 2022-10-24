@@ -9,17 +9,19 @@ import (
 )
 
 // print prints theh search results
-func printResult(s search, output string, showEmptyResults bool, err error) {
-	switch output {
-	case "table":
-		printTable(s, showEmptyResults)
-	case "json":
-		printJSON(s, showEmptyResults)
-	case "json-pretty":
-		printJSONPretty(s, showEmptyResults)
-	}
-	if err != nil && showEmptyResults {
-		fmt.Println(fmt.Errorf("searching instances: %v", err))
+func printResult(sChan <-chan search, output string, showEmptyResults bool, err <-chan error) {
+	for s := range sChan {
+		switch output {
+		case "table":
+			printTable(s, showEmptyResults)
+		case "json":
+			printJSON(s, showEmptyResults)
+		case "json-pretty":
+			printJSONPretty(s, showEmptyResults)
+		}
+		if <-err != nil && showEmptyResults {
+			fmt.Println(fmt.Errorf("searching instances: %v", err))
+		}
 	}
 }
 

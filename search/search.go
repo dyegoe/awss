@@ -24,6 +24,11 @@ type search interface {
 func Run(profiles, regions []string, output string, verbose bool, cmd string, searchBy map[string][]string) error {
 	var wg sync.WaitGroup
 
+	// Create a channel to receive the results
+	sChan := make(chan search, len(profiles)*len(regions))
+	errChan := make(chan error)
+	go printResult(sChan, output, verbose, errChan)
+
 	// iterate over profiles
 	for _, p := range profiles {
 		// iterate over regions for each profile
@@ -36,12 +41,15 @@ func Run(profiles, regions []string, output string, verbose bool, cmd string, se
 			wg.Add(1)
 			go func() {
 				err := s.search(searchBy)
-				printResult(s, output, verbose, err)
+				sChan <- s
+				errChan <- err
 				defer wg.Done()
 			}()
 		}
 	}
 	wg.Wait()
+	close(sChan)
+	close(errChan)
 	return nil
 }
 

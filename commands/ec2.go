@@ -5,7 +5,6 @@ import (
 	"net"
 
 	"github.com/dyegoe/awss/search"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
