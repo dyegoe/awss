@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [v0.5.2] - 2022-11-10
 
+<!-- markdownlint-disable MD024 -->
 ### Changed
 
 - `-z` or `--availability-zones` accepts **only** letters to represent the availability zone. It will be append to the current region. For example, if you are searching in `us-east-1` and you want to search in `us-east-1a` you can use `-z a`.
