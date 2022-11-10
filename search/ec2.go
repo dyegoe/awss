@@ -101,10 +101,14 @@ func (i *instances) filterByInstanceTypes(instanceTypes []string) []types.Filter
 
 // filterByAvailabilityZones returns filters by availability zone
 func (i *instances) filterByAvailabilityZones(availabilityZones []string) []types.Filter {
+	var azs []string
+	for _, value := range availabilityZones {
+		azs = append(azs, fmt.Sprintf("%s%s", i.Region, value))
+	}
 	return []types.Filter{
 		{
 			Name:   aws.String("availability-zone"),
-			Values: availabilityZones,
+			Values: azs,
 		},
 	}
 }
