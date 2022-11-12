@@ -4,32 +4,64 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/markkurossi/tabulate"
+	"github.com/spf13/viper"
 )
+
+// ValidateOutput validates the output options
+func ValidateOutput(output string) error {
+	o := strings.Split(output, ":")
+	switch o[0] {
+	case "table":
+		if len(o) == 1 {
+			return nil
+		} else if len(o) == 2 {
+			if _, ok := tabulate.Styles[o[1]]; ok {
+				return nil
+			}
+		}
+	case "json":
+		if len(o) == 1 {
+			return nil
+		} else if len(o) == 2 {
+			if o[1] == "pretty" {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("invalid output format: %s", output)
+}
 
 // print prints theh search results
 func printResult(sChan <-chan search, output string, showEmptyResults bool, done chan<- bool) {
+	o := strings.Split(output, ":")
 	for s := range sChan {
-		switch output {
+		switch o[0] {
 		case "table":
-			printTable(s, showEmptyResults)
+			if len(o) == 1 {
+				printTable(s, viper.GetString("table_style"), showEmptyResults)
+			} else if len(o) >= 2 {
+				printTable(s, o[1], showEmptyResults)
+			}
 		case "json":
 			printJSON(s, showEmptyResults)
-		case "json-pretty":
-			printJSONPretty(s, showEmptyResults)
+			if len(o) > 1 && o[1] == "pretty" {
+				printJSONPretty(s, showEmptyResults)
+			}
 		}
 	}
 	done <- true
 }
 
 // printTable prints search result as a table
-func printTable(s search, showEmptyResults bool) {
-	table := tabulate.New(tabulate.Unicode)
+func printTable(s search, tableType string, showEmptyResults bool) {
+	table := tabulate.New(tabulate.Styles[tableType])
 	headers := s.getHeaders()
 	rows := s.getRows()
 
-	if len(rows) > 0 || showEmptyResults {
+	if (len(rows) > 0 || showEmptyResults) && tableType != "json" && tableType != "csv" {
 		fmt.Println("[+] [profile]", s.getProfile(), "[region]", s.getRegion())
 	}
 	err := s.getError()

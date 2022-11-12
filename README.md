@@ -6,7 +6,7 @@ It is a wrapper written in Go using AWS SDK Go v2. The work is still in progress
 ## Version
 
 <!-- Do not forget to update version on commands/commands.go Version -->
-The current version is 0.5.2
+The current version is 0.5.3
 
 ## Features
 
@@ -16,10 +16,10 @@ The search runs in parallel using goroutines.
   - by instance ids
   - by names
   - by tags
-  - by private ips
   - by instance types
   - by availability zones
   - by instance states
+  - by private ips
   - by public ips
 
 And you can combine these filters together.
@@ -52,6 +52,7 @@ regions:
   - us-east-1
 output: table
 show-empty: false
+table_style: uc
 all_regions:
   - eu-central-1
   - eu-north-1
@@ -71,6 +72,25 @@ all_regions:
   - ap-northeast-2
   - ap-northeast-1
 ```
+
+### Table Style
+
+It implements the following table styles from `github.com/markkurossi/tabulate`:
+
+- plain
+- ascii
+- uc
+- uclight
+- ucbolt
+- compactuc
+- compactuclight
+- compactucbold
+- colon
+- simple
+- simpleuc
+- simpleucbold
+- github
+- csv
 
 ## Usage
 
@@ -94,4 +114,5 @@ Apache 2.0
 
 - [AWS SDK Go v2](https://github.com/aws/aws-sdk-go-v2)
 - [Cobra](https://github.com/spf13/cobra)
+- [Viper](https://github.com/spf13/viper)
 - [Go release binaries](https://github.com/marketplace/actions/go-release-binaries)

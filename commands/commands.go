@@ -34,9 +34,15 @@ You can also pass 'all' to iterate over all regions.
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
 	// Remember to update this version when releasing a new version
-	Version: "0.5.2",
+	Version: "0.5.3",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		err := initConfig()
+		if err != nil {
+			return err
+		}
+
+		// Check if the provided output is valid
+		err = search.ValidateOutput(viper.GetString("output"))
 		if err != nil {
 			return err
 		}
@@ -76,6 +82,7 @@ func init() {
 	viper.BindPFlag("output", awssCmd.PersistentFlags().Lookup("output"))
 	viper.BindPFlag("show-empty", awssCmd.PersistentFlags().Lookup("show-empty"))
 	// Set default values for configuration
+	viper.SetDefault("table_style", "uc")
 	viper.SetDefault("all_regions", []string{
 		"eu-central-1",
 		"eu-north-1",
