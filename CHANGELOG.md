@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [v0.5.3] - 2022-11-13
+
+<!-- markdownlint-disable MD024 -->
+### Added
+
+- Support for different table styles. `--output table:ascii` or `--output table:unicode` (default)
+- You can set default table style in the config file. `table_style: uc`
+
+<!-- markdownlint-disable MD024 -->
+### Changed
+
+- `--output json-pretty` is now `--output json:pretty`
+
 ## [v0.5.2] - 2022-11-10
 
 <!-- markdownlint-disable MD024 -->
