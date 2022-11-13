@@ -46,9 +46,10 @@ func printResult(sChan <-chan search, output string, showEmptyResults bool, done
 				printTable(s, o[1], showEmptyResults)
 			}
 		case "json":
-			printJSON(s, showEmptyResults)
 			if len(o) > 1 && o[1] == "pretty" {
 				printJSONPretty(s, showEmptyResults)
+			} else {
+				printJSON(s, showEmptyResults)
 			}
 		}
 	}
