@@ -76,8 +76,8 @@ all_regions:
   - ap-northeast-3
   - ap-northeast-2
   - ap-northeast-1
-sort_ec2_by: name
 ec2:
+  sort_by: name
   show_tags: false
 ```
 
