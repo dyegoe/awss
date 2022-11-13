@@ -6,7 +6,7 @@ It is a wrapper written in Go using AWS SDK Go v2. The work is still in progress
 ## Version
 
 <!-- Do not forget to update version on commands/commands.go Version -->
-The current version is 0.5.4
+The current version is 0.5.5
 
 ## Features
 
