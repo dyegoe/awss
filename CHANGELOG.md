@@ -10,8 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 - Add EC2 sorting. You can sort the results by instance id, name, type, state, az, private ip and public ip. `--sort` flag.
-- You can change the default sorting field in the configuration file. `ec2.sort_by` field.
-- Add EC2 `--show-tags` flag to show the tags in the output.
+  - You can change the default sorting field in the configuration file. `ec2.sort_by` field.
+- Add EC2 `--show-tags` flag to show the tags in the output. (default: false)
+  - You can change the default `--show-tags` value in the configuration file. `ec2.show_tags` field.
 
 <!-- markdownlint-disable MD024 -->
 ### Changed
