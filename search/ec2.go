@@ -21,13 +21,13 @@ type instances struct {
 
 // instances is a struct to hold the instance data
 type instance struct {
-	InstanceID       string `json:"instance_id" short:"id"`
-	InstanceName     string `json:"instance_name" short:"name"`
-	InstanceType     string `json:"instance_type" short:"type"`
-	AvailabilityZone string `json:"availability_zone" short:"az"`
-	InstanceState    string `json:"instance_state" short:"state"`
-	PrivateIPAddress string `json:"private_ip_address" short:"private-ip"`
-	PublicIPAddress  string `json:"public_ip_address" short:"public-ip"`
+	InstanceID       string `json:"instance_id" short:"id" header:"ID"`
+	InstanceName     string `json:"instance_name" short:"name" header:"Name"`
+	InstanceType     string `json:"instance_type" short:"type" header:"Type"`
+	AvailabilityZone string `json:"availability_zone" short:"az" header:"AZ"`
+	InstanceState    string `json:"instance_state" short:"state" header:"State"`
+	PrivateIPAddress string `json:"private_ip_address" short:"private-ip" header:"Private IP"`
+	PublicIPAddress  string `json:"public_ip_address" short:"public-ip" header:"Public IP"`
 }
 
 // search is a method to search for instances. It gets instances from API and update the struct with the data.
@@ -198,7 +198,13 @@ func (i *instances) getHeaders() []string {
 	headers := []string{}
 	val := reflect.ValueOf(instance{})
 	for i := 0; i < val.Type().NumField(); i++ {
-		headers = append(headers, val.Type().Field(i).Name)
+		field := val.Type().Field(i)
+		header := field.Tag.Get("header")
+		if header == "" {
+			headers = append(headers, field.Name)
+		} else {
+			headers = append(headers, header)
+		}
 	}
 	return headers
 }

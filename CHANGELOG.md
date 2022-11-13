@@ -12,6 +12,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Add EC2 sorting. You can sort the results by instance id, name, type, state, az, private ip and public ip. `--sort` or `-S` flag.
 - You can change the default sorting field in the configuration file. `sort_ec2_by` field.
 
+<!-- markdownlint-disable MD024 -->
+### Changed
+
+- Added `header` tag to the struct fields to be able to change the header name in the output table.
+
 ## [v0.5.3] - 2022-11-13
 
 <!-- markdownlint-disable MD024 -->
