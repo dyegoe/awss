@@ -77,6 +77,8 @@ all_regions:
   - ap-northeast-2
   - ap-northeast-1
 sort_ec2_by: name
+ec2:
+  show_tags: false
 ```
 
 ### Table Style
@@ -104,6 +106,14 @@ It implements the following table styles from `github.com/markkurossi/tabulate`:
 awss --help
 awss ec2 --help
 awss --profiles <profile1,profile2> --regions <eu-central-1,us-east-1> ec2 --name <name>
+```
+
+### EC2
+
+- `--show-tags` to show tags in the output. Default is `false`. It works only with `--output table`. For other outputs, it is ignored and it will shows anyway.
+  
+```txt
+awss ec2 --help
 ```
 
 ## Contributing

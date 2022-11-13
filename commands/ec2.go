@@ -105,8 +105,10 @@ func init() {
 	ec2Cmd.Flags().IPSliceVarP(&ec2PrivateIps, "private-ips", "p", []net.IP{}, "Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
 	ec2Cmd.Flags().IPSliceVarP(&ec2PublicIps, "public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
 	ec2Cmd.Flags().StringP("sort", "S", "name", "Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
+	ec2Cmd.Flags().Bool("show-tags", false, "Show EC2 instances tags. `false`")
 	// Bind flags to viper
 	viper.BindPFlag("sort_ec2_by", ec2Cmd.Flags().Lookup("sort"))
+	viper.BindPFlag("ec2.show_tags", ec2Cmd.Flags().Lookup("show-tags"))
 }
 
 // ipToString converts a slice of net.IP to a slice of string

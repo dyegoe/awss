@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/spf13/viper"
 )
 
 // instances is a struct to hold the instances
@@ -21,13 +22,14 @@ type instances struct {
 
 // instances is a struct to hold the instance data
 type instance struct {
-	InstanceID       string `json:"instance_id" short:"id" header:"ID"`
-	InstanceName     string `json:"instance_name" short:"name" header:"Name"`
-	InstanceType     string `json:"instance_type" short:"type" header:"Type"`
-	AvailabilityZone string `json:"availability_zone" short:"az" header:"AZ"`
-	InstanceState    string `json:"instance_state" short:"state" header:"State"`
-	PrivateIPAddress string `json:"private_ip_address" short:"private-ip" header:"Private IP"`
-	PublicIPAddress  string `json:"public_ip_address" short:"public-ip" header:"Public IP"`
+	InstanceID       string            `json:"instance_id" short:"id" header:"ID"`
+	InstanceName     string            `json:"instance_name" short:"name" header:"Name"`
+	InstanceType     string            `json:"instance_type" short:"type" header:"Type"`
+	AvailabilityZone string            `json:"availability_zone" short:"az" header:"AZ"`
+	InstanceState    string            `json:"instance_state" short:"state" header:"State"`
+	PrivateIPAddress string            `json:"private_ip_address" short:"private-ip" header:"Private IP"`
+	PublicIPAddress  string            `json:"public_ip_address" short:"public-ip" header:"Public IP"`
+	Tags             map[string]string `json:"tags,omitempty" short:"tags" header:"Tags"`
 }
 
 // search is a method to search for instances. It gets instances from API and update the struct with the data.
@@ -175,6 +177,7 @@ func (i *instances) parseInstances(result *ec2.DescribeInstancesOutput) []instan
 				InstanceState:    string(inst.State.Name),
 				PrivateIPAddress: getValue(inst.PrivateIpAddress),
 				PublicIPAddress:  getValue(inst.PublicIpAddress),
+				Tags:             getTags(inst.Tags),
 			})
 		}
 	}
@@ -199,6 +202,9 @@ func (i *instances) getHeaders() []string {
 	val := reflect.ValueOf(instance{})
 	for i := 0; i < val.Type().NumField(); i++ {
 		field := val.Type().Field(i)
+		if field.Name == "Tags" && !viper.GetBool("ec2.show_tags") {
+			continue
+		}
 		header := field.Tag.Get("header")
 		if header == "" {
 			headers = append(headers, field.Name)
@@ -212,11 +218,20 @@ func (i *instances) getHeaders() []string {
 // getRows returns the rows
 func (i *instances) getRows() [][]string {
 	rows := [][]string{}
-	for _, v := range i.Data {
+	for _, data := range i.Data {
 		row := []string{}
-		val := reflect.ValueOf(v)
-		for i := 0; i < val.Type().NumField(); i++ {
-			row = append(row, val.Field(i).String())
+		val := reflect.ValueOf(data)
+		for i := 0; i < val.NumField(); i++ {
+			if val.Type().Field(i).Name == "Tags" && !viper.GetBool("ec2.show_tags") {
+				continue
+			}
+			field := val.Field(i)
+			switch field.Kind() {
+			case reflect.String:
+				row = append(row, field.String())
+			case reflect.Map:
+				row = append(row, mapToString(field.Interface().(map[string]string)))
+			}
 		}
 		rows = append(rows, row)
 	}
