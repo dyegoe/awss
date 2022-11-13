@@ -109,12 +109,30 @@ func getTagName(tags []types.Tag) string {
 	return ""
 }
 
+// getTags returns the tags
+func getTags(tags []types.Tag) map[string]string {
+	data := map[string]string{}
+	for _, t := range tags {
+		data[*t.Key] = *t.Value
+	}
+	return data
+}
+
 // getValue returns the string value if not nil
 func getValue(s *string) string {
 	if s != nil {
 		return *s
 	}
 	return ""
+}
+
+// mapToString converts a map[string]string to a string
+func mapToString(m map[string]string) string {
+	var tags []string
+	for k, v := range m {
+		tags = append(tags, fmt.Sprintf("[%s=%s]", k, v))
+	}
+	return strings.Join(tags, " ")
 }
 
 // ParseTags parses the tags to a map
