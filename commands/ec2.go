@@ -86,7 +86,7 @@ You can use multiple filters at same time, for example:
 			return fmt.Errorf("you must specify at least one filter")
 		}
 
-		err := search.Run(viper.GetStringSlice("profiles"), viper.GetStringSlice("regions"), viper.GetString("output"), viper.GetBool("show-empty"), cmd.Name(), searchBy)
+		err := search.Run(viper.GetStringSlice("profiles"), viper.GetStringSlice("regions"), viper.GetString("output"), viper.GetBool("show-empty"), cmd.Name(), searchBy, viper.GetString("sort_ec2_by"))
 		if err != nil {
 			return fmt.Errorf("something went wrong while running %s. error: %v", cmd.Name(), err)
 		}
@@ -104,6 +104,9 @@ func init() {
 	ec2Cmd.Flags().StringSliceVarP(&ec2InstanceStates, "instance-states", "s", []string{}, "Filter EC2 instances by instance state. `running,stopped`")
 	ec2Cmd.Flags().IPSliceVarP(&ec2PrivateIps, "private-ips", "p", []net.IP{}, "Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
 	ec2Cmd.Flags().IPSliceVarP(&ec2PublicIps, "public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
+	ec2Cmd.Flags().StringP("sort", "S", "name", "Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
+	// Bind flags to viper
+	viper.BindPFlag("sort_ec2_by", ec2Cmd.Flags().Lookup("sort"))
 }
 
 // ipToString converts a slice of net.IP to a slice of string

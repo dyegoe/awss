@@ -3,6 +3,7 @@ package search
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -13,7 +14,7 @@ import (
 
 // search is an interface to search for AWS resources.
 type search interface {
-	search(searchBy map[string][]string)
+	search(searchBy map[string][]string, sortBy string)
 	getProfile() string
 	getRegion() string
 	getHeaders() []string
@@ -22,7 +23,7 @@ type search interface {
 }
 
 // Run is the main function to run the search
-func Run(profiles, regions []string, output string, verbose bool, cmd string, searchBy map[string][]string) error {
+func Run(profiles, regions []string, output string, verbose bool, cmd string, searchBy map[string][]string, sortBy string) error {
 	var wg sync.WaitGroup
 
 	// Create a channel to receive the results
@@ -43,7 +44,7 @@ func Run(profiles, regions []string, output string, verbose bool, cmd string, se
 
 			wg.Add(1)
 			go func() {
-				s.search(searchBy)
+				s.search(searchBy, sortBy)
 				sChan <- s
 				defer wg.Done()
 			}()
@@ -71,6 +72,18 @@ func getStruct(cmd, profile, region string) search {
 	default:
 		return nil
 	}
+}
+
+// getStructFieldByTag lookups for a field by json tag in a struct
+func getStructFieldByTag(tag, value string, s interface{}) (string, error) {
+	r := reflect.ValueOf(s)
+	for i := 0; i < r.NumField(); i++ {
+		field := r.Type().Field(i)
+		if field.Tag.Get(tag) == value {
+			return field.Name, nil
+		}
+	}
+	return "", fmt.Errorf("field not found")
 }
 
 // getAwsConfig returns a AWS config for the specific profile and region

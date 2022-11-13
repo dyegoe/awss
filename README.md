@@ -24,6 +24,11 @@ The search runs in parallel using goroutines.
 
 And you can combine these filters together.
 
+For each search command, you can use:
+
+- `--show-empty` to show empty results in the output
+- `--sort` or `-S` to sort the results by a specific field.
+
 ## Installation
 
 ```txt
@@ -71,6 +76,7 @@ all_regions:
   - ap-northeast-3
   - ap-northeast-2
   - ap-northeast-1
+sort_ec2_by: name
 ```
 
 ### Table Style

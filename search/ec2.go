@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -20,23 +21,27 @@ type instances struct {
 
 // instances is a struct to hold the instance data
 type instance struct {
-	InstanceID       string `json:"instance_id"`
-	InstanceName     string `json:"instance_name"`
-	InstanceType     string `json:"instance_type"`
-	AvailabilityZone string `json:"availability_zone"`
-	InstanceState    string `json:"instance_state"`
-	PrivateIPAddress string `json:"private_ip_address"`
-	PublicIPAddress  string `json:"public_ip_address"`
+	InstanceID       string `json:"instance_id" short:"id"`
+	InstanceName     string `json:"instance_name" short:"name"`
+	InstanceType     string `json:"instance_type" short:"type"`
+	AvailabilityZone string `json:"availability_zone" short:"az"`
+	InstanceState    string `json:"instance_state" short:"state"`
+	PrivateIPAddress string `json:"private_ip_address" short:"private-ip"`
+	PublicIPAddress  string `json:"public_ip_address" short:"public-ip"`
 }
 
 // search is a method to search for instances. It gets instances from API and update the struct with the data.
-func (i *instances) search(searchBy map[string][]string) {
+func (i *instances) search(searchBy map[string][]string, sortBy string) {
 	input := i.getFilters(searchBy)
 	result, err := i.getInstances(input)
 	if err != nil {
 		i.Error = err.Error()
 	}
 	i.Data = i.parseInstances(result)
+	err = i.sortInstances(sortBy)
+	if err != nil {
+		i.Error = fmt.Sprintf("%s %s", i.Error, err.Error())
+	}
 }
 
 // getFilters returns the filters
@@ -174,6 +179,18 @@ func (i *instances) parseInstances(result *ec2.DescribeInstancesOutput) []instan
 		}
 	}
 	return data
+}
+
+// sortInstances sorts the instances
+func (i *instances) sortInstances(sortBy string) error {
+	name, err := getStructFieldByTag("short", sortBy, instance{})
+	if err != nil {
+		return err
+	}
+	sort.Slice(i.Data, func(p, q int) bool {
+		return reflect.ValueOf(i.Data[p]).FieldByName(name).String() < reflect.ValueOf(i.Data[q]).FieldByName(name).String()
+	})
+	return nil
 }
 
 // getHeaders returns the headers
