@@ -202,7 +202,7 @@ func (i *instances) getHeaders() []string {
 	val := reflect.ValueOf(instance{})
 	for i := 0; i < val.Type().NumField(); i++ {
 		field := val.Type().Field(i)
-		if field.Name == "Tags" && !viper.GetBool("ec2.show_tags") {
+		if field.Name == "Tags" && !viper.GetBool("ec2.show-tags") {
 			continue
 		}
 		header := field.Tag.Get("header")
@@ -222,7 +222,7 @@ func (i *instances) getRows() [][]string {
 		row := []string{}
 		val := reflect.ValueOf(data)
 		for i := 0; i < val.NumField(); i++ {
-			if val.Type().Field(i).Name == "Tags" && !viper.GetBool("ec2.show_tags") {
+			if val.Type().Field(i).Name == "Tags" && !viper.GetBool("ec2.show-tags") {
 				continue
 			}
 			field := val.Field(i)

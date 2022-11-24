@@ -82,8 +82,8 @@ func init() {
 	viper.BindPFlag("output", awssCmd.PersistentFlags().Lookup("output"))
 	viper.BindPFlag("show-empty", awssCmd.PersistentFlags().Lookup("show-empty"))
 	// Set default values for configuration
-	viper.SetDefault("table_style", "uc")
-	viper.SetDefault("all_regions", []string{
+	viper.SetDefault("table.style", "uc")
+	viper.SetDefault("all-regions", []string{
 		"eu-central-1",
 		"eu-north-1",
 		"eu-west-1",
@@ -163,7 +163,7 @@ func getProfilesFromConfig() ([]string, error) {
 
 // getRegions returns the regions
 func getRegions(r []string) ([]string, error) {
-	regions := viper.GetStringSlice("all_regions")
+	regions := viper.GetStringSlice("all-regions")
 	if r[0] == "all" {
 		return regions, nil
 	}

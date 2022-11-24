@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - Change function `mapToString` to accept 2 additional parameters: `kvSep` and `listSep` to allow customizing the separator between key and value and the separator between key-value pairs.
+- Rename config file option from `sort_by` to `sort` to be consistent with the command line option.
+- Rename config file option from `show_empty` to `show-empty` to be consistent with the command line option.
+- Rename config file option from `all_regions` to `all-regions` to be consistent with the other options.
+- Move config file option from `table_style` to `table.style`.
 
 <!-- markdownlint-disable MD024 -->
 ### Added
