@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+<!-- markdownlint-disable MD024 -->
+### Changed
+
+- Change function `mapToString` to accept 2 additional parameters: `kvSep` and `listSep` to allow customizing the separator between key and value and the separator between key-value pairs.
+
+<!-- markdownlint-disable MD024 -->
+### Added
+
+- Add viper config for the `mapToString` parameters. You may add `separators.kv` and `separators.list` to the config file.
+
 ## [v0.5.5] - 2022-11-13
 
 <!-- markdownlint-disable MD024 -->

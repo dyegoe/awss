@@ -127,12 +127,12 @@ func getValue(s *string) string {
 }
 
 // mapToString converts a map[string]string to a string
-func mapToString(m map[string]string) string {
+func mapToString(m map[string]string, kvSep, listSep string) string {
 	var tags []string
 	for k, v := range m {
-		tags = append(tags, fmt.Sprintf("[%s=%s]", k, v))
+		tags = append(tags, fmt.Sprintf("%s%s%s", k, kvSep, v))
 	}
-	return strings.Join(tags, " ")
+	return strings.Join(tags, listSep)
 }
 
 // ParseTags parses the tags to a map

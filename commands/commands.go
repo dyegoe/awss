@@ -102,6 +102,8 @@ func init() {
 		"ap-northeast-2",
 		"ap-northeast-1",
 	})
+	viper.SetDefault("separators.kv", ": ")
+	viper.SetDefault("separators.list", "\n")
 }
 
 func initConfig() error {

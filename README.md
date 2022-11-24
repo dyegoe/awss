@@ -57,6 +57,9 @@ regions:
   - us-east-1
 output: table
 show-empty: false
+separators:
+  kv: ": "
+  list: "\n"
 table_style: uc
 all_regions:
   - eu-central-1

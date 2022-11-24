@@ -230,7 +230,7 @@ func (i *instances) getRows() [][]string {
 			case reflect.String:
 				row = append(row, field.String())
 			case reflect.Map:
-				row = append(row, mapToString(field.Interface().(map[string]string)))
+				row = append(row, mapToString(field.Interface().(map[string]string), viper.GetString("separators.kv"), viper.GetString("separators.list")))
 			}
 		}
 		rows = append(rows, row)
