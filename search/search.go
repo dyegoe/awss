@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 
@@ -132,6 +133,7 @@ func mapToString(m map[string]string, kvSep, listSep string) string {
 	for k, v := range m {
 		tags = append(tags, fmt.Sprintf("%s%s%s", k, kvSep, v))
 	}
+	sort.Strings(tags)
 	return strings.Join(tags, listSep)
 }
 
