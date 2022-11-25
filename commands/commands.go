@@ -34,7 +34,7 @@ You can also pass 'all' to iterate over all regions.
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
 	// Remember to update this version when releasing a new version
-	Version: "0.5.5",
+	Version: "0.5.6",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		err := initConfig()
 		if err != nil {
@@ -82,8 +82,8 @@ func init() {
 	viper.BindPFlag("output", awssCmd.PersistentFlags().Lookup("output"))
 	viper.BindPFlag("show-empty", awssCmd.PersistentFlags().Lookup("show-empty"))
 	// Set default values for configuration
-	viper.SetDefault("table_style", "uc")
-	viper.SetDefault("all_regions", []string{
+	viper.SetDefault("table.style", "uc")
+	viper.SetDefault("all-regions", []string{
 		"eu-central-1",
 		"eu-north-1",
 		"eu-west-1",
@@ -102,6 +102,8 @@ func init() {
 		"ap-northeast-2",
 		"ap-northeast-1",
 	})
+	viper.SetDefault("separators.kv", ": ")
+	viper.SetDefault("separators.list", "\n")
 }
 
 func initConfig() error {
@@ -161,7 +163,7 @@ func getProfilesFromConfig() ([]string, error) {
 
 // getRegions returns the regions
 func getRegions(r []string) ([]string, error) {
-	regions := viper.GetStringSlice("all_regions")
+	regions := viper.GetStringSlice("all-regions")
 	if r[0] == "all" {
 		return regions, nil
 	}

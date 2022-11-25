@@ -86,7 +86,7 @@ You can use multiple filters at same time, for example:
 			return fmt.Errorf("you must specify at least one filter")
 		}
 
-		err := search.Run(viper.GetStringSlice("profiles"), viper.GetStringSlice("regions"), viper.GetString("output"), viper.GetBool("show-empty"), cmd.Name(), searchBy, viper.GetString("ec2.sort_by"))
+		err := search.Run(viper.GetStringSlice("profiles"), viper.GetStringSlice("regions"), viper.GetString("output"), viper.GetBool("show-empty"), cmd.Name(), searchBy, viper.GetString("ec2.sort"))
 		if err != nil {
 			return fmt.Errorf("something went wrong while running %s. error: %v", cmd.Name(), err)
 		}
@@ -107,8 +107,8 @@ func init() {
 	ec2Cmd.Flags().String("sort", "name", "Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
 	ec2Cmd.Flags().Bool("show-tags", false, "Show EC2 instances tags. `false`")
 	// Bind flags to viper
-	viper.BindPFlag("ec2.sort_by", ec2Cmd.Flags().Lookup("sort"))
-	viper.BindPFlag("ec2.show_tags", ec2Cmd.Flags().Lookup("show-tags"))
+	viper.BindPFlag("ec2.sort", ec2Cmd.Flags().Lookup("sort"))
+	viper.BindPFlag("ec2.show-tags", ec2Cmd.Flags().Lookup("show-tags"))
 }
 
 // ipToString converts a slice of net.IP to a slice of string

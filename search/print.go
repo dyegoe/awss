@@ -41,7 +41,7 @@ func printResult(sChan <-chan search, output string, showEmptyResults bool, done
 		switch o[0] {
 		case "table":
 			if len(o) == 1 {
-				printTable(s, viper.GetString("table_style"), showEmptyResults)
+				printTable(s, viper.GetString("table.style"), showEmptyResults)
 			} else if len(o) >= 2 {
 				printTable(s, o[1], showEmptyResults)
 			}

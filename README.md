@@ -6,7 +6,7 @@ It is a wrapper written in Go using AWS SDK Go v2. The work is still in progress
 ## Version
 
 <!-- Do not forget to update version on commands/commands.go Version -->
-The current version is 0.5.5
+The current version is 0.5.6
 
 ## Features
 
@@ -57,8 +57,12 @@ regions:
   - us-east-1
 output: table
 show-empty: false
-table_style: uc
-all_regions:
+separators:
+  kv: ": "
+  list: "\n"
+table:
+  style: uc
+all-regions:
   - eu-central-1
   - eu-north-1
   - eu-west-1
@@ -77,8 +81,8 @@ all_regions:
   - ap-northeast-2
   - ap-northeast-1
 ec2:
-  sort_by: name
-  show_tags: false
+  sort: name
+  show-tags: false
 ```
 
 ### Table Style
