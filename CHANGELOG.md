@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Rename config file option from `show_empty` to `show-empty` to be consistent with the command line option.
 - Rename config file option from `all_regions` to `all-regions` to be consistent with the other options.
 - Move config file option from `table_style` to `table.style`.
+- Tags are now sorted by default when using `--output table`.
 
 <!-- markdownlint-disable MD024 -->
 ### Added
