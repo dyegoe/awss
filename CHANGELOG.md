@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [v0.5.7] - 2022-12-02
+
+<!-- markdownlint-disable MD024 -->
+### Fixed
+
+- Fix private and public ip filters. They were stricted to the primary ip. Now it is possible to search for any attached IP.
+
 ## [v0.5.6] - 2022-11-25
 
 <!-- markdownlint-disable MD024 -->
