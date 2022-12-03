@@ -134,7 +134,7 @@ func (i *instances) filterByInstanceStates(instanceStates []string) []types.Filt
 func (i *instances) filterByPrivateIps(privateIps []string) []types.Filter {
 	return []types.Filter{
 		{
-			Name:   aws.String("private-ip-address"),
+			Name:   aws.String("network-interface.addresses.private-ip-address"),
 			Values: privateIps,
 		},
 	}
@@ -144,7 +144,7 @@ func (i *instances) filterByPrivateIps(privateIps []string) []types.Filter {
 func (i *instances) filterByPublicIps(publicIps []string) []types.Filter {
 	return []types.Filter{
 		{
-			Name:   aws.String("ip-address"),
+			Name:   aws.String("network-interface.addresses.association.public-ip"),
 			Values: publicIps,
 		},
 	}
