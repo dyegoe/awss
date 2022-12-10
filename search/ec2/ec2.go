@@ -53,31 +53,31 @@ type Results struct {
 
 // dataRow represents a row of the EC2 instances search results.
 type dataRow struct {
-	// ID of the instance.
+	// InstanceID is the instance ID.
 	InstanceID string `json:"instance_id,omitempty" header:"ID" sort:"id"`
 
-	// tag:Name of the instance.
+	// InstanceName is the tag:Name of the instance.
 	InstanceName string `json:"instance_name,omitempty" header:"Name" sort:"name"`
 
-	// Type of the instance.
+	// InstanceType is the Type of the instance.
 	InstanceType string `json:"instance_type,omitempty" header:"Type" sort:"type"`
 
-	// The Availability Zone.
+	// AvailabilityZone is the AZ of the instance.
 	AvailabilityZone string `json:"availability_zone,omitempty" header:"AZ" sort:"az"`
 
-	// The current state of the instance.
+	// InstanceState is the current state of the instance.
 	InstanceState string `json:"instance_state,omitempty" header:"State" sort:"state"`
 
-	// The private IP address assigned to the instance.
+	// PrivateIPAddress is the private IP address assigned to the instance.
 	PrivateIPAddress string `json:"private_ip_address,omitempty" header:"Private IP" sort:"private_ip"`
 
-	// The public IP address assigned to the instance.
+	// PublicIPAddress is the public IP address assigned to the instance.
 	PublicIPAddress string `json:"public_ip_address,omitempty" header:"Public IP" sort:"public_ip"`
 
-	// ENIs attached to the instance.
+	// NetworkInterfaces are the ENIs attached to the instance.
 	NetworkInterfaces []string `json:"network_interfaces,omitempty" header:"ENIs" sort:"enis"`
 
-	// The tags assigned to the instance.
+	// Tags are a map of the tags assigned to the instance.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
 }
 
