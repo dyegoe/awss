@@ -260,7 +260,7 @@ func GetSortFields(f string) (map[string]string, error) {
 //
 // It returns the value of the tag:Name or empty string in case that the instance has no name.
 func SearchInstanceName(profile, region, instanceID string) (string, error) {
-	r := New(profile, region, map[string][]string{"ids": {instanceID}}, "ids")
+	r := New(profile, region, map[string][]string{"instance-id": {instanceID}}, "id")
 	r.Search()
 	if len(r.Errors) > 0 {
 		return "", fmt.Errorf("error searching instance name: %v", r.Errors)
