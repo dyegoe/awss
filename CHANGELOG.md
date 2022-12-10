@@ -11,19 +11,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - General refactoring. The code is now more readable and maintainable.
 - `--output json:pretty` is now `--output json-pretty`
+- Configuration `show-empty` is now `show.empty`
 
 <!-- markdownlint-disable MD024 -->  
 ## Removed
 
-- Removed short flags for `-c`. Use `--config` instead.
-- Removed table styles support. `--output table:style`.
-- Removed configuration to define key/value and list separators. It uses the default only. `": "` and `"\n`.
-- Removed `--show-tags` as a flag from subcommands. Use `--show-tags` as a persistent flag instead.
+- Config short flag `-c`. Use `--config` instead.
+- Table styles support. `--output table:style`.
+- Configuration to define key/value and list separators. It uses the default only. `": "` and `"\n`.
+- `--show-tags` as a flag from subcommands. Use `--show-tags` as a persistent flag instead.
 
 <!-- markdownlint-disable MD024 -->
 ## Added
 
 - `--show-tags` as a persistent flag. It will show column Tag on any table output if it exists.
+- `show.tags` to the configuration file.
 - `--tag-key` as a new filter for ec2 instances. It will filter instances by tag key.
 
 ## [v0.5.7] - 2022-12-02

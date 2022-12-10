@@ -13,6 +13,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+// Package common contains common functions and types.
+//
+// It has AWS related functions and types.
+// It also has functions to print the results in different formats.
 package common
 
 import (

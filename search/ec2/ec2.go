@@ -13,6 +13,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+// Package ec2 contains the EC2 search functions.
+//
+// It implements the common.Results interface
 package ec2
 
 import (
@@ -26,25 +30,25 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 )
 
-// Describes results of the EC2 instances search.
-type results struct {
-	// The profile used to search.
+// Results describes results of the EC2 instances search.
+type Results struct {
+	// Profile is the profile used to search.
 	Profile string `json:"profile"`
 
-	// The region used to search.
+	// Region is the region used to search.
 	Region string `json:"region"`
 
-	// The erros found during the search.
+	// Errors contains the erros found during the search.
 	Errors []string `json:"errors,omitempty"`
 
-	// The instances found.
+	// Data contains the instances found.
 	Data []dataRow `json:"data"`
 
-	// The filters used to search.
-	filters map[string][]string
+	// Filters is a map of strings used to search.
+	Filters map[string][]string `json:"-"`
 
-	// sortField is the field used to sort the results.
-	sortField string
+	// SortField is the field used to sort the results.
+	SortField string `json:"-"`
 }
 
 // dataRow represents a row of the EC2 instances search results.
@@ -78,19 +82,19 @@ type dataRow struct {
 }
 
 // New initiates and returns a new instance of EC2 results.
-func New(profile, region string, filters map[string][]string, sortField string) *results {
-	return &results{
+func New(profile, region string, filters map[string][]string, sortField string) *Results {
+	return &Results{
 		Profile:   profile,
 		Region:    region,
-		filters:   filters,
-		sortField: sortField,
+		Filters:   filters,
+		SortField: sortField,
 	}
 }
 
 // Search performs the EC2s search.
 //
 // results are stored in the Data field.
-func (r *results) Search() {
+func (r *Results) Search() {
 	// Get search filters.
 	input := r.getFilters()
 
@@ -129,39 +133,39 @@ func (r *results) Search() {
 			})
 		}
 	}
-	err = r.sortResults(r.sortField)
+	err = r.sortResults(r.SortField)
 	if err != nil {
 		r.Errors = append(r.Errors, err.Error())
 	}
 }
 
 // Len returns the length of the results.
-func (r *results) Len() int {
+func (r *Results) Len() int {
 	return len(r.Data)
 }
 
 // GetProfile returns the profile used to search.
-func (r *results) GetProfile() string {
+func (r *Results) GetProfile() string {
 	return r.Profile
 }
 
 // GetRegion returns the region used to search.
-func (r *results) GetRegion() string {
+func (r *Results) GetRegion() string {
 	return r.Region
 }
 
 // GetErrors returns the errors found during the search.
-func (r *results) GetErrors() []string {
+func (r *Results) GetErrors() []string {
 	return r.Errors
 }
 
 // GetSortField returns the field used to sort the results.
-func (r *results) GetSortField() string {
-	return r.sortField
+func (r *Results) GetSortField() string {
+	return r.SortField
 }
 
-// Headers returns the the tag `header` of the struct fields.
-func (r *results) GetHeaders() []interface{} {
+// GetHeaders returns the the tag `header` of the struct fields.
+func (r *Results) GetHeaders() []interface{} {
 	headers := []interface{}{}
 
 	v := reflect.ValueOf(dataRow{})
@@ -176,8 +180,8 @@ func (r *results) GetHeaders() []interface{} {
 	return headers
 }
 
-// Rows iterates results.Data and returns the results as a slice of interface{}.
-func (r *results) GetRows() []interface{} {
+// GetRows iterates results.Data and returns the results as a slice of interface{}.
+func (r *Results) GetRows() []interface{} {
 	rows := []interface{}{}
 
 	for _, row := range r.Data {
@@ -192,10 +196,10 @@ func (r *results) GetRows() []interface{} {
 // This function expects the filters to be in the format used by the AWS SDK.
 // Except for "ids", "names", "tags" and "availability-zones", all other filters are passed as it is.
 // If no filters are given, it returns an empty list.
-func (r *results) getFilters() *ec2.DescribeInstancesInput {
+func (r *Results) getFilters() *ec2.DescribeInstancesInput {
 	input := ec2.DescribeInstancesInput{}
 
-	for key, values := range r.filters {
+	for key, values := range r.Filters {
 		switch key {
 		case "instance-id":
 			input.InstanceIds = values
@@ -213,7 +217,7 @@ func (r *results) getFilters() *ec2.DescribeInstancesInput {
 }
 
 // sortResults sorts the results by the given field.
-func (r *results) sortResults(field string) error {
+func (r *Results) sortResults(field string) error {
 	sortFields, err := GetSortFields(field)
 	if err != nil {
 		return err

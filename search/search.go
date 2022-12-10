@@ -13,6 +13,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+// Package search provides the entry point for the search command.
+//
+// It implements a search command that searches for resources in AWS.
+// The searchs are done in parallel and the results are printed in the
+// specified format.
 package search
 
 import (
@@ -71,6 +77,9 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 	return nil
 }
 
+// CheckSortField checks if the given sort field is valid for the given command.
+//
+// It returns an error if the sort field is not valid.
 func CheckSortField(cmd, f string) error {
 	switch cmd {
 	case "ec2":
