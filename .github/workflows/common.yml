@@ -5,7 +5,7 @@ on:
       - main
 jobs:
   check-pull-request:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout commit
         uses: actions/checkout@v3
@@ -15,7 +15,7 @@ jobs:
           go-version-file: "go.mod"
       - name: Install Go tools
         run: |
-          go install golang.org/x/lint/golint@latest
+          go install golang.org/x/lint/golint@v0.0.0-20210508222113-6edffad5e616
       - name: Run vet
         run: go vet ./...
       - name: Run lint
