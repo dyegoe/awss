@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <!-- markdownlint-disable MD024 -->
 ## Changed
 
-- General refactoring. The code is now more readable and maintainable.
+- General refactoring. The code is now more readable and maintainable. [#40](https://github.com/dyegoe/awss/issues/40)
 - `--output json:pretty` is now `--output json-pretty`
 - Configuration `show-empty` is now `show.empty`
 
