@@ -6,15 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [v0.7.0] - 2022-12-10
+
 <!-- markdownlint-disable MD024 -->
-## Changed
+### Added
+
+- ENI support. You can now search for ENIs by id, tag, instance id, availability zone, private ips and public ips. [#20](https://github.com/dyegoe/awss/issues/20)
+  - It is implemented without sorting support.
+
+## [v0.6.0] - 2022-12-10
+
+Although this is a minor version, it is a major change. The code was refactored to be more readable and maintainable. It is possible to add new features more easily. There is no binaries for this release. You can build it from source. Changes are carried over the next releases.
+
+<!-- markdownlint-disable MD024 -->
+### Changed
 
 - General refactoring. The code is now more readable and maintainable. [#40](https://github.com/dyegoe/awss/issues/40)
 - `--output json:pretty` is now `--output json-pretty`
 - Configuration `show-empty` is now `show.empty`
 
 <!-- markdownlint-disable MD024 -->  
-## Removed
+### Removed
 
 - Config short flag `-c`. Use `--config` instead.
 - Table styles support. `--output table:style`.
@@ -22,13 +34,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `--show-tags` as a flag from subcommands. Use `--show-tags` as a persistent flag instead.
 
 <!-- markdownlint-disable MD024 -->
-## Added
+### Added
 
 - `--show-tags` as a persistent flag. It will show column Tag on any table output if it exists.
 - `show.tags` to the configuration file.
 - `--tag-key` as a new filter for ec2 instances. It will filter instances by tag key.
-- ENI support. You can now search for ENIs by id, tag, instance id, availability zone, private ips and public ips. [#20](https://github.com/dyegoe/awss/issues/20)
-  - It is implemented without sorting support.
 
 ## [v0.5.7] - 2022-12-02
 

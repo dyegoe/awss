@@ -117,7 +117,8 @@ ec2:
 awss --help
 awss ec2 --help
 awss --profiles default,profile \
-  --regions eu-central-1,us-east-1,sa-east-1 ec2 \
+  --regions eu-central-1,us-east-1,sa-east-1 \
+  ec2 \
   --names 'some-wildcard*' \
   --tags Environment:dev,Environment:prod \
   --tag-keys 'zone-*' \
