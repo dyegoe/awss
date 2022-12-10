@@ -27,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `--show-tags` as a persistent flag. It will show column Tag on any table output if it exists.
 - `show.tags` to the configuration file.
 - `--tag-key` as a new filter for ec2 instances. It will filter instances by tag key.
+- ENI support. You can now search for ENIs by id, tag, instance id, availability zone, private ips and public ips. [#20](https://github.com/dyegoe/awss/issues/20)
+  - It is implemented without sorting support.
 
 ## [v0.5.7] - 2022-12-02
 

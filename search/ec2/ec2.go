@@ -69,10 +69,10 @@ type dataRow struct {
 	InstanceState string `json:"instance_state,omitempty" header:"State" sort:"state"`
 
 	// PrivateIPAddress is the private IP address assigned to the instance.
-	PrivateIPAddress string `json:"private_ip_address,omitempty" header:"Private IP" sort:"private_ip"`
+	PrivateIPAddress string `json:"private_ip_address,omitempty" header:"Private IP" sort:"private-ip"`
 
 	// PublicIPAddress is the public IP address assigned to the instance.
-	PublicIPAddress string `json:"public_ip_address,omitempty" header:"Public IP" sort:"public_ip"`
+	PublicIPAddress string `json:"public_ip_address,omitempty" header:"Public IP" sort:"public-ip"`
 
 	// NetworkInterfaces are the ENIs attached to the instance.
 	NetworkInterfaces []string `json:"network_interfaces,omitempty" header:"ENIs" sort:"enis"`
