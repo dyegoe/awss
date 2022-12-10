@@ -7,7 +7,7 @@ It is a wrapper written in Go using AWS SDK Go v2. The work is still in progress
 ## Version
 
 <!-- Do not forget to update version on commands/commands.go Version -->
-The current version is 0.6.0
+The current version is 0.7.0
 
 ## Features
 
@@ -42,6 +42,16 @@ The current version is 0.6.0
     - private ip `--sort private_ip`
     - public ip `--sort public_ip`
     - enis `--sort enis`
+- Search AWS ENIs
+  - Filter by:
+    - network interface ids `--network-interface-ids|-i eni-1234567890abcdef0,eni-0987654321fedcba0`
+    - tags `--tags|-t Name:my-eni-1,Name:my-eni-2`
+    - tag keys `--tag-keys|-k Name,Environment`
+    - instance ids `--instance-ids|-I i-1234567890abcdef0,i-0987654321fedcba0`
+    - availability zones `--availability-zones|-z a,b`
+    - private ips `--private-ips|-p 172.16.0.1,172.17.1.254`
+    - public ips `--public-ips|-P 52.28.19.20,52.30.31.32`
+  - ENIs doesn't support sort at the moment
 
 And you can combine these filters together.
 

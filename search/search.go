@@ -27,6 +27,7 @@ import (
 
 	"github.com/dyegoe/awss/common"
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
+	searchENI "github.com/dyegoe/awss/search/eni"
 )
 
 // Execute executes the search command.
@@ -53,6 +54,8 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 			switch cmd {
 			case "ec2":
 				searchResults = searchEC2.New(profile, region, filters, sortField)
+			case "eni":
+				searchResults = searchENI.New(profile, region, filters, sortField)
 			default:
 				return fmt.Errorf("command %s not found", cmd)
 			}
@@ -86,7 +89,8 @@ func CheckSortField(cmd, f string) error {
 		if _, err := searchEC2.GetSortFields(f); err != nil {
 			return err
 		}
-		return nil
+	default:
+		return fmt.Errorf("command %s not found for sort field %s", cmd, f)
 	}
-	return fmt.Errorf("command %s not found", cmd)
+	return nil
 }

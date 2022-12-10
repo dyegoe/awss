@@ -110,7 +110,12 @@ func toTable(r Results, showEmpty, showTags bool) (string, error) {
 		showErrors = fmt.Sprintf("\n\n%s", StringSliceToString(errors, "\n"))
 	}
 
-	t.SetTitle(fmt.Sprintf("[Profile] %s [Region] %s [Sort] %s%s", r.GetProfile(), r.GetRegion(), r.GetSortField(), showErrors))
+	showSort := ""
+	if sort := r.GetSortField(); sort != "" {
+		showSort = fmt.Sprintf("[Sort] %s", sort)
+	}
+
+	t.SetTitle(fmt.Sprintf("[Profile] %s [Region] %s %s %s", r.GetProfile(), r.GetRegion(), showSort, showErrors))
 
 	t.AppendHeader(r.GetHeaders())
 
