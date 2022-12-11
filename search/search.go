@@ -58,9 +58,8 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 			if runOnce {
 				if _, err := common.WhoAmI(profile, region); err != nil {
 					return err
-				} else {
-					runOnce = false
 				}
+				runOnce = false
 			}
 
 			switch cmd {
