@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [v0.7.1] - 2022-12-11
+
+<!-- markdownlint-disable MD024 -->
+### Fixed
+
+- Add workaround `common.WhoAmI(profile, region string)` to stop to spam Okta authentication when using `--profiles all` and/or `--all-regions`. [#60](https://github.com/dyegoe/awss/issues/60)
+
 ## [v0.7.0] - 2022-12-10
 
 <!-- markdownlint-disable MD024 -->

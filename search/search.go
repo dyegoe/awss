@@ -53,6 +53,8 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 		for _, region := range regions {
 			var searchResults common.Results
 
+			// Workaround to avoid to spam Okta with too many requests.
+			// It will run once just to pre-authenticate.
 			if runOnce {
 				if _, err := common.WhoAmI(profile, region); err != nil {
 					return err

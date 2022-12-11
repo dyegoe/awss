@@ -46,6 +46,10 @@ func AwsConfig(profile, region string) (aws.Config, error) {
 }
 
 // WhoAmI returns the AWS account ID and error.
+//
+// The profile and region are used to create the AWS config.
+// The AWS account ID is returned by the STS GetCallerIdentity API.
+// This function is used as workaround to pre-authenticate the AWS config.
 func WhoAmI(profile, region string) (string, error) {
 	cfg, err := AwsConfig(profile, region)
 	if err != nil {
