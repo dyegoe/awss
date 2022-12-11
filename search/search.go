@@ -47,9 +47,20 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 
 	go common.PrintResults(resultsChan, done, output, showEmpty, showTags)
 
+	runOnce := true
+
 	for _, profile := range profiles {
 		for _, region := range regions {
 			var searchResults common.Results
+
+			// Workaround to avoid to spam Okta with too many requests.
+			// It will run once just to pre-authenticate.
+			if runOnce {
+				if _, err := common.WhoAmI(profile, region); err != nil {
+					return err
+				}
+				runOnce = false
+			}
 
 			switch cmd {
 			case "ec2":
