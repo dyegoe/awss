@@ -74,6 +74,11 @@ You can use multiple filters at same time, for example:
 			return err
 		}
 
+		// Check if the tags are valid
+		if _, err := common.ParseTags(ec2F.Tags); err != nil {
+			return err
+		}
+
 		// Check if the sort is valid
 		if err := search.CheckSortField(cmd.Name(), viper.GetString("ec2.sort")); err != nil {
 			return err
