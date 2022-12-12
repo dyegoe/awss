@@ -122,13 +122,14 @@ func StructToFilters(s interface{}) (map[string][]string, error) {
 	filters := map[string][]string{}
 	v := reflect.ValueOf(s)
 	for i := 0; i < v.NumField(); i++ {
-		if v.Field(i).Len() > 0 {
-			switch reflect.TypeOf(v.Field(i).Interface()) {
-			case reflect.TypeOf([]net.IP{}):
-				filters[v.Type().Field(i).Tag.Get("filter")] = IPtoString(v.Field(i).Interface().([]net.IP))
-			case reflect.TypeOf([]string{}):
-				filters[v.Type().Field(i).Tag.Get("filter")] = v.Field(i).Interface().([]string)
-			}
+		if v.Field(i).Len() == 0 {
+			continue
+		}
+		switch reflect.TypeOf(v.Field(i).Interface()) {
+		case reflect.TypeOf([]net.IP{}):
+			filters[v.Type().Field(i).Tag.Get("filter")] = IPtoString(v.Field(i).Interface().([]net.IP))
+		case reflect.TypeOf([]string{}):
+			filters[v.Type().Field(i).Tag.Get("filter")] = v.Field(i).Interface().([]string)
 		}
 	}
 	if len(filters) == 0 {
