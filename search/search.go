@@ -91,17 +91,27 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 	return nil
 }
 
+// getSortFieldsCMDlist is a map of functions that return the sort fields for the given command.
+//
+// The key is the command name.
+// The value is the function that returns the sort fields.
+// We use a map to avoid a switch case and mock the functions in the tests.
+var getSortFieldsCMDList = map[string]func(string) (map[string]string, error){
+	"ec2": searchEC2.GetSortFields,
+}
+
 // CheckSortField checks if the given sort field is valid for the given command.
 //
 // It returns an error if the sort field is not valid.
 func CheckSortField(cmd, f string) error {
-	switch cmd {
-	case "ec2":
-		if _, err := searchEC2.GetSortFields(f); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("command %s not found for sort field %s", cmd, f)
+	execute, ok := getSortFieldsCMDList[cmd]
+	if !ok {
+		return fmt.Errorf("command %s not found", cmd)
 	}
+
+	if _, err := execute(f); err != nil {
+		return err
+	}
+
 	return nil
 }

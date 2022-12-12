@@ -21,9 +21,30 @@ limitations under the License.
 // specified format.
 package search
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestCheckSortField(t *testing.T) {
+	// Save the original getSortFieldsCMDList
+	oldGetSortFieldsCMDList := getSortFieldsCMDList
+	// Restore the original getSortFieldsCMDList after the test
+	defer func() {
+		getSortFieldsCMDList = oldGetSortFieldsCMDList
+	}()
+
+	// Mock the getSortFieldsCMDList
+	getSortFieldsCMDList = map[string]func(string) (map[string]string, error){
+		"test": func(f string) (map[string]string, error) {
+			fields := map[string]string{"field1": "value1"}
+			if _, ok := fields[f]; !ok {
+				return nil, fmt.Errorf("field %s not found", f)
+			}
+			return fields, nil
+		},
+	}
+
 	type args struct {
 		cmd string
 		f   string
@@ -33,17 +54,21 @@ func TestCheckSortField(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{name: "InstanceID", args: args{cmd: "ec2", f: "id"}, wantErr: false},
-		{name: "InstanceName", args: args{cmd: "ec2", f: "name"}, wantErr: false},
-		{name: "InstanceType", args: args{cmd: "ec2", f: "type"}, wantErr: false},
-		{name: "AvailabilityZone", args: args{cmd: "ec2", f: "az"}, wantErr: false},
-		{name: "InstanceState", args: args{cmd: "ec2", f: "state"}, wantErr: false},
-		{name: "PrivateIPAddress", args: args{cmd: "ec2", f: "private-ip"}, wantErr: false},
-		{name: "PublicIPAddress", args: args{cmd: "ec2", f: "public-ip"}, wantErr: false},
-		{name: "NetworkInterfaces", args: args{cmd: "ec2", f: "enis"}, wantErr: false},
-		{name: "Tags", args: args{cmd: "ec2", f: "tags"}, wantErr: true},
-		{name: "InvalidField", args: args{cmd: "ec2", f: "invalid"}, wantErr: true},
-		{name: "InvalidCommand", args: args{cmd: "invalid", f: "id"}, wantErr: true},
+		{
+			name:    "Command found and field found",
+			args:    args{cmd: "test", f: "field1"},
+			wantErr: false,
+		},
+		{
+			name:    "Command not found",
+			args:    args{cmd: "test2", f: "field1"},
+			wantErr: true,
+		},
+		{
+			name:    "Command found but field not found",
+			args:    args{cmd: "test", f: "field2"},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
