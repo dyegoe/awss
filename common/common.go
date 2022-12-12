@@ -67,7 +67,7 @@ func ParseTags(tags []string) (map[string][]string, error) {
 	for _, tag := range tags {
 		splited := strings.Split(tag, "=")
 		if len(splited) != 2 {
-			return nil, fmt.Errorf("invalid tag: %s", tag)
+			return nil, fmt.Errorf("invalid tag format: %s. It must be Key=Value", tag)
 		}
 		key := splited[0]
 		values := strings.Split(splited[1], ":")
@@ -122,13 +122,14 @@ func StructToFilters(s interface{}) (map[string][]string, error) {
 	filters := map[string][]string{}
 	v := reflect.ValueOf(s)
 	for i := 0; i < v.NumField(); i++ {
-		if v.Field(i).Len() > 0 {
-			switch reflect.TypeOf(v.Field(i).Interface()) {
-			case reflect.TypeOf([]net.IP{}):
-				filters[v.Type().Field(i).Tag.Get("filter")] = IPtoString(v.Field(i).Interface().([]net.IP))
-			case reflect.TypeOf([]string{}):
-				filters[v.Type().Field(i).Tag.Get("filter")] = v.Field(i).Interface().([]string)
-			}
+		if v.Field(i).Len() == 0 {
+			continue
+		}
+		switch reflect.TypeOf(v.Field(i).Interface()) {
+		case reflect.TypeOf([]net.IP{}):
+			filters[v.Type().Field(i).Tag.Get("filter")] = IPtoString(v.Field(i).Interface().([]net.IP))
+		case reflect.TypeOf([]string{}):
+			filters[v.Type().Field(i).Tag.Get("filter")] = v.Field(i).Interface().([]string)
 		}
 	}
 	if len(filters) == 0 {

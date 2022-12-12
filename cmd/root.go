@@ -46,7 +46,7 @@ It is a wrapper written in Go using AWS SDK Go v2.
 The work is still in progress and will be updated regularly.
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
-	Version: "0.7.1",
+	Version: "0.7.2", // TODO: Remember to update this version when releasing a new version.
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Try to read the config file.
 		if err := initConfig(); err != nil {

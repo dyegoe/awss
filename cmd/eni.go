@@ -72,6 +72,11 @@ You can use multiple filters at same time, for example:
 			return err
 		}
 
+		// Check if the tags are valid
+		if _, err := common.ParseTags(ec2F.Tags); err != nil {
+			return err
+		}
+
 		// Execute the search
 		err = search.Execute(cmd.Name(), viper.GetStringSlice("profiles"), viper.GetStringSlice("regions"), filters, "", viper.GetString("output"), viper.GetBool("show-empty"), viper.GetBool("show-tags"))
 		if err != nil {

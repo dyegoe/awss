@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [v0.7.2] - 2022-12-12
+
+<!-- markdownlint-disable MD024 -->
+### Fixed
+
+- Tags weren't being parsed correctly during Cobra command execution. [#63](https://github.com/dyegoe/awss/issues/63)
+  - Add `common.ParseTags(tags string)` to parse tags from the command line during `RunE` execution.
+
 ## [v0.7.1] - 2022-12-11
 
 <!-- markdownlint-disable MD024 -->
