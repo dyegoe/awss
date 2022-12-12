@@ -42,6 +42,8 @@ func TestCheckSortField(t *testing.T) {
 		{name: "PublicIPAddress", args: args{cmd: "ec2", f: "public-ip"}, wantErr: false},
 		{name: "NetworkInterfaces", args: args{cmd: "ec2", f: "enis"}, wantErr: false},
 		{name: "Tags", args: args{cmd: "ec2", f: "tags"}, wantErr: true},
+		{name: "InvalidField", args: args{cmd: "ec2", f: "invalid"}, wantErr: true},
+		{name: "InvalidCommand", args: args{cmd: "invalid", f: "id"}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
