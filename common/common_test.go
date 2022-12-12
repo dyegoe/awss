@@ -251,12 +251,12 @@ func TestIPtoString(t *testing.T) {
 			want: []string{},
 		},
 		{
-			name: "one",
+			name: "one ip",
 			args: args{i: []net.IP{net.ParseIP("172.16.0.1")}},
 			want: []string{"172.16.0.1"},
 		},
 		{
-			name: "two",
+			name: "two ips",
 			args: args{i: []net.IP{net.ParseIP("172.16.0.1"), net.ParseIP("172.17.1.254")}},
 			want: []string{"172.16.0.1", "172.17.1.254"},
 		},
@@ -279,18 +279,6 @@ func TestStructToFilters(t *testing.T) {
 		FieldNotTagged     string
 	}
 
-	testF := testFilters{
-		SliceOfStringField: []string{"value1", "value2"},
-		StringField:        "value3",
-		NetIPField:         []net.IP{net.ParseIP("172.16.0.1"), net.ParseIP("172.17.1.254")},
-		FieldNotTagged:     "value4",
-	}
-
-	testFiltersWant := map[string][]string{
-		"slice-of-string-field": {"value1", "value2"},
-		"net-ip-field":          {"172.16.0.1", "172.17.1.254"},
-	}
-
 	type args struct {
 		s interface{}
 	}
@@ -301,14 +289,26 @@ func TestStructToFilters(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "slice of string and net.IP",
-			args:    args{s: testF},
-			want:    testFiltersWant,
+			name: "slice of string and net.IP",
+			args: args{
+				s: testFilters{
+					SliceOfStringField: []string{"value1", "value2"},
+					StringField:        "value3",
+					NetIPField:         []net.IP{net.ParseIP("172.16.0.1"), net.ParseIP("172.17.1.254")},
+					FieldNotTagged:     "value4",
+				},
+			},
+			want: map[string][]string{
+				"slice-of-string-field": {"value1", "value2"},
+				"net-ip-field":          {"172.16.0.1", "172.17.1.254"},
+			},
 			wantErr: false,
 		},
 		{
-			name:    "empty struct",
-			args:    args{s: testFilters{}},
+			name: "empty struct",
+			args: args{
+				s: testFilters{},
+			},
 			want:    nil,
 			wantErr: true,
 		},
