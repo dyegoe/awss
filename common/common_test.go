@@ -133,11 +133,13 @@ func TestStringValue(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
+	// Variables to test the pointer
+	value1 := ""
+	value2 := "value"
+
 	type args struct {
 		s string
 	}
-	value1 := ""
-	value2 := "value"
 	tests := []struct {
 		name string
 		args args
