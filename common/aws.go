@@ -99,6 +99,9 @@ func TagsToMap(tags []types.Tag) map[string]string {
 
 // FilterNames returns a list of types.Filter where the filter Name is tag:Name and the names are the Values.
 func FilterNames(names []string) []types.Filter {
+	if len(names) == 0 {
+		return []types.Filter{}
+	}
 	return []types.Filter{
 		{
 			Name:   String("tag:Name"),
@@ -110,14 +113,18 @@ func FilterNames(names []string) []types.Filter {
 // FilterTags returns a list of types.Filter by tag:Key=Value1,Value2,Value3...
 func FilterTags(tags []string) []types.Filter {
 	filters := []types.Filter{}
+	if len(tags) == 0 {
+		return filters
+	}
 	parsed, err := ParseTags(tags)
-	if err == nil {
-		for key, values := range parsed {
-			filters = append(filters, types.Filter{
-				Name:   String(fmt.Sprintf("tag:%s", key)),
-				Values: values,
-			})
-		}
+	if err != nil {
+		return filters
+	}
+	for key, values := range parsed {
+		filters = append(filters, types.Filter{
+			Name:   String(fmt.Sprintf("tag:%s", key)),
+			Values: values,
+		})
 	}
 	return filters
 }
@@ -127,9 +134,19 @@ func FilterTags(tags []string) []types.Filter {
 // The availabilityZones must be a list of letters that represent the availability zone.
 // For example: "a", "b", "c". The region is used to get the full availability zone name.
 func FilterAvailabilityZones(availabilityZones []string, region string) []types.Filter {
+	if len(availabilityZones) == 0 {
+		return []types.Filter{}
+	}
+	options := []string{"a", "b", "c", "d", "e", "f"}
 	azs := []string{}
 	for _, value := range availabilityZones {
+		if !StringInSlice(value, options) {
+			continue
+		}
 		azs = append(azs, fmt.Sprintf("%s%s", region, value))
+	}
+	if len(azs) == 0 {
+		return []types.Filter{}
 	}
 	return []types.Filter{
 		{
@@ -141,6 +158,9 @@ func FilterAvailabilityZones(availabilityZones []string, region string) []types.
 
 // FilterDefault returns a list of types.Filter. The key is used as filter Name and the values as Values.
 func FilterDefault(key string, values []string) []types.Filter {
+	if key == "" || len(values) == 0 {
+		return []types.Filter{}
+	}
 	return []types.Filter{
 		{
 			Name:   String(key),
