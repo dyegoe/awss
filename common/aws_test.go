@@ -138,9 +138,6 @@ func TestFilterNames(t *testing.T) {
 }
 
 func TestFilterTags(t *testing.T) {
-	name1 := "tag:key"
-	name2 := "tag:key2"
-
 	type args struct {
 		tags []string
 	}
@@ -157,27 +154,27 @@ func TestFilterTags(t *testing.T) {
 		{
 			name: "key=value",
 			args: args{tags: []string{"key=value"}},
-			want: []types.Filter{{Name: &name1, Values: []string{"value"}}},
+			want: []types.Filter{{Name: aws.String("tag:key"), Values: []string{"value"}}},
 		},
 		{
 			name: "key=value,key2=value2",
 			args: args{tags: []string{"key=value", "key2=value2"}},
 			want: []types.Filter{
-				{Name: &name1, Values: []string{"value"}},
-				{Name: &name2, Values: []string{"value2"}},
+				{Name: aws.String("tag:key"), Values: []string{"value"}},
+				{Name: aws.String("tag:key2"), Values: []string{"value2"}},
 			},
 		},
 		{
 			name: "key=value:value2",
 			args: args{tags: []string{"key=value:value2"}},
-			want: []types.Filter{{Name: &name1, Values: []string{"value", "value2"}}},
+			want: []types.Filter{{Name: aws.String("tag:key"), Values: []string{"value", "value2"}}},
 		},
 		{
 			name: "key=value:value2,key2=value3:value4",
 			args: args{tags: []string{"key=value:value2", "key2=value3:value4"}},
 			want: []types.Filter{
-				{Name: &name1, Values: []string{"value", "value2"}},
-				{Name: &name2, Values: []string{"value3", "value4"}},
+				{Name: aws.String("tag:key"), Values: []string{"value", "value2"}},
+				{Name: aws.String("tag:key2"), Values: []string{"value3", "value4"}},
 			},
 		},
 		{
