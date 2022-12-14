@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+<!-- markdownlint-disable MD024 -->
+### Added
+
+- Initial tests for several packages. [#65](https://github.com/dyegoe/awss/issues/65)
+
+<!-- markdownlint-disable MD024 -->
+### Changed
+
+- Refactor a few functions to make them more testable. [#65](https://github.com/dyegoe/awss/issues/65)
+- Refactor a few functions to make them less nested. [#65](https://github.com/dyegoe/awss/issues/65)
+- Refactor a few functions to handle empty values. [#65](https://github.com/dyegoe/awss/issues/65)
+
 ## [v0.7.2] - 2022-12-12
 
 <!-- markdownlint-disable MD024 -->
