@@ -30,9 +30,7 @@ func TestCheckSortField(t *testing.T) {
 	// save the original getSortFieldsCMDList
 	oldGetSortFieldsCMDList := getSortFieldsCMDList
 	// restore the original getSortFieldsCMDList after the test
-	defer func() {
-		getSortFieldsCMDList = oldGetSortFieldsCMDList
-	}()
+	defer func() { getSortFieldsCMDList = oldGetSortFieldsCMDList }()
 
 	// mock the getSortFieldsCMDList
 	getSortFieldsCMDList = map[string]func(string) (map[string]string, error){
