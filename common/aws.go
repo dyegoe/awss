@@ -63,9 +63,17 @@ func WhoAmI(profile, region string) (string, error) {
 	return *resp.Account, nil
 }
 
+// defaultSharedConfigFilename is the default location of the AWS config file.
+//
+// We use this var to be able to mock it in the tests.
+var defaultSharedConfigFilename = config.DefaultSharedConfigFilename()
+
 // GetAwsProfiles returns a list of profiles from the AWS config file.
+//
+// It is used to get the list of profiles from the AWS config file.
+// The default location is ~/.aws/config.
 func GetAwsProfiles() ([]string, error) {
-	config, err := ini.Load(config.DefaultSharedConfigFilename())
+	config, err := ini.Load(defaultSharedConfigFilename)
 	if err != nil {
 		return nil, err
 	}

@@ -28,6 +28,39 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
+func TestGetAwsProfiles(t *testing.T) {
+	// save the original defaultSharedConfigFilename
+	oldDefaultSharedConfigFilename := defaultSharedConfigFilename
+	// restore the original defaultSharedConfigFilename after the test
+	defer func() { defaultSharedConfigFilename = oldDefaultSharedConfigFilename }()
+
+	// set the defaultSharedConfigFilename to a test file
+	defaultSharedConfigFilename = "testdata/config"
+
+	tests := []struct {
+		name    string
+		want    []string
+		wantErr bool
+	}{
+		{
+			name: "default",
+			want: []string{"default", "profile1", "profile2"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetAwsProfiles()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetAwsProfiles() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetAwsProfiles() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTagName(t *testing.T) {
 	type args struct {
 		tags []types.Tag
