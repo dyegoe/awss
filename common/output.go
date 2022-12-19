@@ -193,12 +193,12 @@ func sortedStringMapToString(m map[string]string) string {
 	var s []string
 
 	for k, v := range m {
-		s = append(s, fmt.Sprintf("%s: %s\n", text.Bold.Sprint(k), v))
+		s = append(s, fmt.Sprintf("%s: %s", text.Bold.Sprint(k), v))
 	}
 
 	sort.Strings(s)
 
-	return StringSliceToString(s, "")
+	return StringSliceToString(s, "\n")
 }
 
 // sortedStringSliceToString returns a string from a slice.
