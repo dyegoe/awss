@@ -168,18 +168,18 @@ func rowFromStruct(i interface{}) table.Row {
 // <header>: <value>
 // ...
 func headerStructFieldsToString(i interface{}) string {
-	var s string
+	var s []string
 
 	v := reflect.ValueOf(i)
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 
 		if header, ok := v.Type().Field(i).Tag.Lookup("header"); ok && field.Interface() != "" {
-			s += fmt.Sprintf("%s: %s\n", text.Bold.Sprint(header), v.Field(i).Interface())
+			s = append(s, fmt.Sprintf("%s: %s", text.Bold.Sprint(header), v.Field(i).Interface()))
 		}
 	}
 
-	return s
+	return StringSliceToString(s, "\n")
 }
 
 // sortedStringMapToString returns a string from a map.
