@@ -29,19 +29,19 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 )
 
+type testStruct struct {
+	Field1 testSubStruct     `header:"header1"`
+	Field2 map[string]string `header:"header2"`
+	Field3 []string          `header:"header3"`
+	Field4 string            `header:"header4"`
+}
+
+type testSubStruct struct {
+	SubField1 string `header:"subHeader1"`
+	SubField2 string `header:"subHeader2"`
+}
+
 func Test_rowFromStruct(t *testing.T) {
-	type testSubStruct struct {
-		SubField1 string `header:"subHeader1"`
-		SubField2 string `header:"subHeader2"`
-	}
-
-	type testStruct struct {
-		Field1 testSubStruct     `header:"header1"`
-		Field2 map[string]string `header:"header2"`
-		Field3 []string          `header:"header3"`
-		Field4 string            `header:"header4"`
-	}
-
 	type args struct {
 		i interface{}
 	}
@@ -83,11 +83,6 @@ func Test_rowFromStruct(t *testing.T) {
 }
 
 func Test_headerStructFieldsToString(t *testing.T) {
-	type testStruct struct {
-		Field1 string `header:"header1"`
-		Field2 string `header:"header2"`
-	}
-
 	type args struct {
 		i interface{}
 	}
@@ -103,8 +98,8 @@ func Test_headerStructFieldsToString(t *testing.T) {
 		},
 		{
 			name: "test struct",
-			args: args{i: testStruct{Field1: "value1", Field2: "value2"}},
-			want: fmt.Sprintf("%s: value1\n%s: value2", text.Bold.Sprint("header1"), text.Bold.Sprint("header2")),
+			args: args{i: testSubStruct{SubField1: "value1", SubField2: "value2"}},
+			want: fmt.Sprintf("%s: value1\n%s: value2", text.Bold.Sprint("subHeader1"), text.Bold.Sprint("subHeader2")),
 		},
 	}
 	for _, tt := range tests {
