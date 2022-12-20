@@ -27,6 +27,7 @@ import (
 	"testing"
 )
 
+// TestParseTags tests the ParseTags function.
 func TestParseTags(t *testing.T) {
 	type args struct {
 		tags []string
@@ -94,6 +95,7 @@ func TestParseTags(t *testing.T) {
 	}
 }
 
+// TestStringValue tests the StringValue function.
 func TestStringValue(t *testing.T) {
 	// Variables to test the pointer
 	value1 := ""
@@ -132,6 +134,7 @@ func TestStringValue(t *testing.T) {
 	}
 }
 
+// TestString tests the String function.
 func TestString(t *testing.T) {
 	// Variables to test the pointer
 	value1 := ""
@@ -165,6 +168,7 @@ func TestString(t *testing.T) {
 	}
 }
 
+// TestStringInSlice tests the StringInSlice function.
 func TestStringInSlice(t *testing.T) {
 	type args struct {
 		s     string
@@ -205,6 +209,7 @@ func TestStringInSlice(t *testing.T) {
 	}
 }
 
+// TestStringSliceToString tests the StringSliceToString function.
 func TestStringSliceToString(t *testing.T) {
 	type args struct {
 		s   []string
@@ -240,6 +245,7 @@ func TestStringSliceToString(t *testing.T) {
 	}
 }
 
+// TestIPtoString tests the IPtoString function.
 func TestIPtoString(t *testing.T) {
 	type args struct {
 		i []net.IP
@@ -274,6 +280,7 @@ func TestIPtoString(t *testing.T) {
 	}
 }
 
+// TestStructToFilters tests the StructToFilters function.
 func TestStructToFilters(t *testing.T) {
 	// This is a struct that will be used to test the StructToFilters function
 	type testFilters struct {

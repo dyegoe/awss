@@ -26,6 +26,7 @@ import (
 	"testing"
 )
 
+// TestCheckSortField tests the checkSortField function.
 func TestCheckSortField(t *testing.T) {
 	// save the original getSortFieldsCMDList
 	oldGetSortFieldsCMDList := getSortFieldsCMDList

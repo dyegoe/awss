@@ -28,6 +28,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
+// TestGetAwsProfiles tests the GetAwsProfiles function.
 func TestGetAwsProfiles(t *testing.T) {
 	// save the original defaultSharedConfigFilename
 	oldDefaultSharedConfigFilename := defaultSharedConfigFilename
@@ -61,6 +62,7 @@ func TestGetAwsProfiles(t *testing.T) {
 	}
 }
 
+// TestTagName tests the TagName function.
 func TestTagName(t *testing.T) {
 	type args struct {
 		tags []types.Tag
@@ -95,6 +97,7 @@ func TestTagName(t *testing.T) {
 	}
 }
 
+// TestTagsToMap tests the TagsToMap function.
 func TestTagsToMap(t *testing.T) {
 	type args struct {
 		tags []types.Tag
@@ -136,6 +139,7 @@ func TestTagsToMap(t *testing.T) {
 	}
 }
 
+// TestFilterNames tests the FilterNames function.
 func TestFilterNames(t *testing.T) {
 	type args struct {
 		names []string
@@ -170,6 +174,7 @@ func TestFilterNames(t *testing.T) {
 	}
 }
 
+// TestFilterTags tests the FilterTags function.
 func TestFilterTags(t *testing.T) {
 	type args struct {
 		tags []string
@@ -230,6 +235,7 @@ func TestFilterTags(t *testing.T) {
 	}
 }
 
+// TestFilterAvailabilityZones tests the FilterAvailabilityZones function.
 func TestFilterAvailabilityZones(t *testing.T) {
 	type args struct {
 		availabilityZones []string
@@ -290,6 +296,7 @@ func TestFilterAvailabilityZones(t *testing.T) {
 	}
 }
 
+// TestFilterDefault tests the FilterDefault function.
 func TestFilterDefault(t *testing.T) {
 	type args struct {
 		key    string
