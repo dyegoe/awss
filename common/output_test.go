@@ -29,18 +29,332 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 )
 
-type testStruct struct {
-	Field1 testSubStruct     `header:"header1"`
-	Field2 map[string]string `header:"header2"`
-	Field3 []string          `header:"header3"`
-	Field4 string            `header:"header4"`
+// testResults is a struct used for testing.
+//
+// It will implement Results interface.
+type TestResults struct {
+	Profile string        `json:"profile"`
+	Region  string        `json:"region"`
+	Errors  []string      `json:"errors,omitempty"`
+	Data    []testDataRow `json:"data"`
 }
 
-type testSubStruct struct {
-	SubField1 string `header:"subHeader1"`
-	SubField2 string `header:"subHeader2"`
+// Results interface is implemented by testResults.
+// Using the functions below, testResults will be able to be printed in different formats.
+
+func (tr *TestResults) Search()              {}
+func (tr *TestResults) Len() int             { return len(tr.Data) }
+func (tr *TestResults) GetProfile() string   { return tr.Profile }
+func (tr *TestResults) GetRegion() string    { return tr.Region }
+func (tr *TestResults) GetErrors() []string  { return tr.Errors }
+func (tr *TestResults) GetSortField() string { return "" }
+func (tr *TestResults) GetHeaders() []interface{} {
+	headers := []interface{}{}
+
+	v := reflect.ValueOf(testDataRow{})
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Type().Field(i)
+
+		if header, ok := field.Tag.Lookup("header"); ok {
+			headers = append(headers, header)
+		}
+	}
+
+	return headers
+}
+func (tr *TestResults) GetRows() []interface{} {
+	rows := []interface{}{}
+
+	for _, row := range tr.Data {
+		rows = append(rows, row)
+	}
+	return rows
 }
 
+// testDataRow is a struct used for testing.
+//
+// It represents a row of the TestResults.
+type testDataRow struct {
+	StructField testInfo          `json:"struct_field" header:"Struct Field"`
+	MapField    map[string]string `json:"map_field" header:"Map Field"`
+	SliceField  []string          `json:"slice_field" header:"Slice Field"`
+	StringField string            `json:"string_field" header:"String Field"`
+}
+
+// testInfo is a struct used for testing.
+//
+// It represents a field of the testDataRow.
+type testInfo struct {
+	InfoString1 string `json:"info_string1" header:"Info String1"`
+	InfoString2 string `json:"info_string2" header:"Info String2"`
+}
+
+// tr is a TestResults used for testing.
+//
+//	json:"profile" = testProfile
+//	json:"region"  = testRegion
+//	json:"errors"  = []string{"testError1", "testError2"}
+//	json:"data"    = []testDataRow{tdr1, tdr2}
+var tr = TestResults{
+	Profile: "testProfile",
+	Region:  "testRegion",
+	Errors:  []string{"testError1", "testError2"},
+	Data: []testDataRow{
+		tdr1,
+		tdr2,
+	},
+}
+
+// trEmpty is a TestResults used for testing.
+//
+//	json:"profile" = testProfileEmpty
+//	json:"region"  = testRegionEmpty
+//	json:"errors"  = []string{}
+//	json:"data"    = []testDataRow{}
+var trEmpty = TestResults{
+	Profile: "testProfileEmpty",
+	Region:  "testRegionEmpty",
+	Errors:  []string{},
+	Data:    []testDataRow{},
+}
+
+// tdr1 is a testDataRow used for testing.
+//
+//	json:"struct_field" header:"Struct Field"
+//	  json:"info_string1" header:"Info String1" = testInfo1String1
+//	  json:"info_string2" header:"Info String2" = testInfo1String2
+//	json:"map_field"    header:"Map Field" = map[string]string{"key1": "value1", "key2": "value2"}
+//	json:"slice_field"  header:"Slice Field" = []string{"sliceValue1", "sliceValue2"}
+//	json:"string_field" header:"String Field" = testString1
+var tdr1 = testDataRow{
+	StructField: ti1,
+	MapField: map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	},
+	SliceField:  []string{"sliceValue1", "sliceValue2"},
+	StringField: "testString1",
+}
+
+// tdr2 is a testDataRow used for testing.
+//
+//	json:"struct_field" header:"Struct Field"
+//	  json:"info_string1" header:"Info String1" = testInfo2String1
+//	  json:"info_string2" header:"Info String2" = testInfo2String2
+//	json:"map_field" header:"Map Field" = map[string]string{"key3": "value3", "key4": "value4"}
+//	json:"slice_field" header:"Slice Field" = []string{"sliceValue3", "sliceValue4"}
+//	json:"string_field" header:"String Field" = testString2
+var tdr2 = testDataRow{
+	StructField: ti2,
+	MapField: map[string]string{
+		"key3": "value3",
+		"key4": "value4",
+	},
+	SliceField:  []string{"sliceValue3", "sliceValue4"},
+	StringField: "testString2",
+}
+
+// ti1
+//
+//	json:"info_string1" header:"Info String1" = testInfo1String1
+//	json:"info_string2" header:"Info String2" = testInfo1String2
+var ti1 = testInfo{
+	InfoString1: "testInfo1String1",
+	InfoString2: "testInfo1String2",
+}
+
+// ti2
+//
+//	json:"info_string1" header:"Info String1" = testInfo2String1
+//	json:"info_string2" header:"Info String2" = testInfo2String2
+var ti2 = testInfo{
+	InfoString1: "testInfo2String1",
+	InfoString2: "testInfo2String2",
+}
+
+// TestPrintResults is a test function for PrintResults.
+func TestPrintResults(t *testing.T) {
+	type args struct {
+		resultsChan <-chan Results
+		done        chan<- bool
+		output      string
+		showEmpty   bool
+		showTags    bool
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			PrintResults(tt.args.resultsChan, tt.args.done, tt.args.output, tt.args.showEmpty, tt.args.showTags)
+		})
+	}
+}
+
+// Test_toJSON is a test function for toJSON.
+func Test_toJSON(t *testing.T) {
+	type args struct {
+		r         Results
+		pretty    bool
+		showEmpty bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "toJSON, pretty false, showEmpty false",
+			args: args{
+				r:         &trEmpty,
+				pretty:    false,
+				showEmpty: false,
+			},
+			want:    "",
+			wantErr: false,
+		},
+		{
+			name: "toJSON, pretty true, showEmpty false",
+			args: args{
+				r:         &trEmpty,
+				pretty:    true,
+				showEmpty: false,
+			},
+			want:    "",
+			wantErr: false,
+		},
+		{
+			name: "toJSON, pretty false, showEmpty true, empty errors",
+			args: args{
+				r:         &trEmpty,
+				pretty:    false,
+				showEmpty: true,
+			},
+			want:    `{"profile":"testProfileEmpty","region":"testRegionEmpty","data":[]}`,
+			wantErr: false,
+		},
+		{
+			name: "toJSON, pretty true, showEmpty true, empty errors",
+			args: args{
+				r:         &trEmpty,
+				pretty:    true,
+				showEmpty: true,
+			},
+			want: `{
+  "profile": "testProfileEmpty",
+  "region": "testRegionEmpty",
+  "data": []
+}`,
+			wantErr: false,
+		},
+		{
+			name: "toJSON, pretty false, showEmpty false",
+			args: args{
+				r:         &tr,
+				pretty:    false,
+				showEmpty: false,
+			},
+			want:    `{"profile":"testProfile","region":"testRegion","errors":["testError1","testError2"],"data":[{"struct_field":{"info_string1":"testInfo1String1","info_string2":"testInfo1String2"},"map_field":{"key1":"value1","key2":"value2"},"slice_field":["sliceValue1","sliceValue2"],"string_field":"testString1"},{"struct_field":{"info_string1":"testInfo2String1","info_string2":"testInfo2String2"},"map_field":{"key3":"value3","key4":"value4"},"slice_field":["sliceValue3","sliceValue4"],"string_field":"testString2"}]}`,
+			wantErr: false,
+		},
+		{
+			name: "toJSON, pretty true, showEmpty false",
+			args: args{
+				r:         &tr,
+				pretty:    true,
+				showEmpty: false,
+			},
+			want: `{
+  "profile": "testProfile",
+  "region": "testRegion",
+  "errors": [
+    "testError1",
+    "testError2"
+  ],
+  "data": [
+    {
+      "struct_field": {
+        "info_string1": "testInfo1String1",
+        "info_string2": "testInfo1String2"
+      },
+      "map_field": {
+        "key1": "value1",
+        "key2": "value2"
+      },
+      "slice_field": [
+        "sliceValue1",
+        "sliceValue2"
+      ],
+      "string_field": "testString1"
+    },
+    {
+      "struct_field": {
+        "info_string1": "testInfo2String1",
+        "info_string2": "testInfo2String2"
+      },
+      "map_field": {
+        "key3": "value3",
+        "key4": "value4"
+      },
+      "slice_field": [
+        "sliceValue3",
+        "sliceValue4"
+      ],
+      "string_field": "testString2"
+    }
+  ]
+}`,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := toJSON(tt.args.r, tt.args.pretty, tt.args.showEmpty)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("toJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("toJSON() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Test_toTable is a test function for toTable.
+func Test_toTable(t *testing.T) {
+	type args struct {
+		r         Results
+		showEmpty bool
+		showTags  bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := toTable(tt.args.r, tt.args.showEmpty, tt.args.showTags)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("toTable() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("toTable() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Test_rowFromStruct is a test function for rowFromStruct.
 func Test_rowFromStruct(t *testing.T) {
 	type args struct {
 		i interface{}
@@ -58,18 +372,13 @@ func Test_rowFromStruct(t *testing.T) {
 		{
 			name: "test struct",
 			args: args{
-				i: testStruct{
-					Field1: testSubStruct{SubField1: "subValue1", SubField2: "subValue2"},
-					Field2: map[string]string{"key2.1": "value2.1", "key2.2": "value2.2"},
-					Field3: []string{"value3.1", "value3.2"},
-					Field4: "value1",
-				},
+				i: tdr1,
 			},
 			want: table.Row{
-				fmt.Sprintf("%s: subValue1\n%s: subValue2", text.Bold.Sprint("subHeader1"), text.Bold.Sprint("subHeader2")),
-				fmt.Sprintf("%s: value2.1\n%s: value2.2", text.Bold.Sprint("key2.1"), text.Bold.Sprint("key2.2")),
-				"value3.1\nvalue3.2",
-				"value1",
+				fmt.Sprintf("%s: %s\n%s: %s", text.Bold.Sprint("Info String1"), "testInfo1String1", text.Bold.Sprint("Info String2"), "testInfo1String2"),
+				fmt.Sprintf("%s: %s\n%s: %s", text.Bold.Sprint("key1"), "value1", text.Bold.Sprint("key2"), "value2"),
+				"sliceValue1\nsliceValue2",
+				"testString1",
 			},
 		},
 	}
@@ -82,6 +391,7 @@ func Test_rowFromStruct(t *testing.T) {
 	}
 }
 
+// Test_headerStructFieldsToString is a test function for headerStructFieldsToString.
 func Test_headerStructFieldsToString(t *testing.T) {
 	type args struct {
 		i interface{}
@@ -97,9 +407,14 @@ func Test_headerStructFieldsToString(t *testing.T) {
 			want: "",
 		},
 		{
-			name: "test struct",
-			args: args{i: testSubStruct{SubField1: "value1", SubField2: "value2"}},
-			want: fmt.Sprintf("%s: value1\n%s: value2", text.Bold.Sprint("subHeader1"), text.Bold.Sprint("subHeader2")),
+			name: "testInfo struct 1",
+			args: args{i: ti1},
+			want: fmt.Sprintf("%s: %s\n%s: %s", text.Bold.Sprint("Info String1"), "testInfo1String1", text.Bold.Sprint("Info String2"), "testInfo1String2"),
+		},
+		{
+			name: "testInfo struct 2",
+			args: args{i: ti2},
+			want: fmt.Sprintf("%s: %s\n%s: %s", text.Bold.Sprint("Info String1"), "testInfo2String1", text.Bold.Sprint("Info String2"), "testInfo2String2"),
 		},
 	}
 	for _, tt := range tests {
@@ -111,6 +426,7 @@ func Test_headerStructFieldsToString(t *testing.T) {
 	}
 }
 
+// Test_sortedStringMapToString is a test function for sortedStringMapToString.
 func Test_sortedStringMapToString(t *testing.T) {
 	type args struct {
 		m map[string]string
@@ -150,6 +466,7 @@ func Test_sortedStringMapToString(t *testing.T) {
 	}
 }
 
+// Test_sortedStringSliceToString is a test function for sortedStringSliceToString.
 func Test_sortedStringSliceToString(t *testing.T) {
 	type args struct {
 		s []string
