@@ -140,29 +140,19 @@ func (r *Results) Search() {
 }
 
 // Len returns the length of the results.
-func (r *Results) Len() int {
-	return len(r.Data)
-}
+func (r *Results) Len() int { return len(r.Data) }
 
 // GetProfile returns the profile used to search.
-func (r *Results) GetProfile() string {
-	return r.Profile
-}
+func (r *Results) GetProfile() string { return r.Profile }
 
 // GetRegion returns the region used to search.
-func (r *Results) GetRegion() string {
-	return r.Region
-}
+func (r *Results) GetRegion() string { return r.Region }
 
 // GetErrors returns the errors found during the search.
-func (r *Results) GetErrors() []string {
-	return r.Errors
-}
+func (r *Results) GetErrors() []string { return r.Errors }
 
 // GetSortField returns the field used to sort the results.
-func (r *Results) GetSortField() string {
-	return r.SortField
-}
+func (r *Results) GetSortField() string { return r.SortField }
 
 // GetHeaders returns the the tag `header` of the struct fields.
 func (r *Results) GetHeaders() []interface{} {
