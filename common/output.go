@@ -65,6 +65,9 @@ func PrintResults(resultsChan <-chan Results, done chan<- bool, output string, s
 	done <- true
 }
 
+// Bold is the function used to bold text.
+//
+// We use this var to allow tests to mock the function.
 var Bold = toBold
 
 // toJSON returns the results in JSON format.
