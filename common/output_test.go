@@ -194,59 +194,21 @@ func TestPrintResults(t *testing.T) {
 	}
 }
 
+// jsonEmptyNoPretty is a json string used for testing.
+var jsonEmptyNoPretty = `{"profile":"testProfileEmpty","region":"testRegionEmpty","data":[]}`
+
+// jsonEmptyPretty is a json string used for testing.
 var jsonEmptyPretty = `{
   "profile": "testProfileEmpty",
   "region": "testRegionEmpty",
   "data": []
 }`
 
-// Test_toJSON is a test function for toJSON.
-func Test_toJSON(t *testing.T) {
-	type args struct {
-		r         Results
-		pretty    bool
-		showEmpty bool
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
-	}{
-		{
-			name:    "toJSON, pretty false, showEmpty false",
-			args:    args{r: &trEmpty, pretty: false, showEmpty: false},
-			want:    "",
-			wantErr: false,
-		},
-		{
-			name:    "toJSON, pretty true, showEmpty false",
-			args:    args{r: &trEmpty, pretty: true, showEmpty: false},
-			want:    "",
-			wantErr: false,
-		},
-		{
-			name:    "toJSON, pretty false, showEmpty true, empty errors",
-			args:    args{r: &trEmpty, pretty: false, showEmpty: true},
-			want:    `{"profile":"testProfileEmpty","region":"testRegionEmpty","data":[]}`,
-			wantErr: false,
-		},
-		{
-			name:    "toJSON, pretty true, showEmpty true, empty errors",
-			args:    args{r: &trEmpty, pretty: true, showEmpty: true},
-			want:    jsonEmptyPretty,
-			wantErr: false,
-		},
-		{
-			name:    "toJSON, pretty false, showEmpty false",
-			args:    args{r: &tr, pretty: false, showEmpty: false},
-			want:    `{"profile":"testProfile","region":"testRegion","errors":["testError1","testError2"],"data":[{"struct_field":{"info_string1":"testInfo1String1","info_string2":"testInfo1String2"},"map_field":{"key1":"value1","key2":"value2"},"slice_field":["sliceValue1","sliceValue2"],"string_field":"testString1"},{"struct_field":{"info_string1":"testInfo2String1","info_string2":"testInfo2String2"},"map_field":{"key3":"value3","key4":"value4"},"slice_field":["sliceValue3","sliceValue4"],"string_field":"testString2"}]}`,
-			wantErr: false,
-		},
-		{
-			name: "toJSON, pretty true, showEmpty false",
-			args: args{r: &tr, pretty: true, showEmpty: false},
-			want: `{
+// jsonNoPretty is a json string used for testing.
+var jsonNoPretty = `{"profile":"testProfile","region":"testRegion","errors":["testError1","testError2"],"data":[{"struct_field":{"info_string1":"testInfo1String1","info_string2":"testInfo1String2"},"map_field":{"key1":"value1","key2":"value2"},"slice_field":["sliceValue1","sliceValue2"],"string_field":"testString1"},{"struct_field":{"info_string1":"testInfo2String1","info_string2":"testInfo2String2"},"map_field":{"key3":"value3","key4":"value4"},"slice_field":["sliceValue3","sliceValue4"],"string_field":"testString2"}]}`
+
+// jsonPretty is a json string used for testing.
+var jsonPretty = `{
   "profile": "testProfile",
   "region": "testRegion",
   "errors": [
@@ -285,7 +247,55 @@ func Test_toJSON(t *testing.T) {
       "string_field": "testString2"
     }
   ]
-}`,
+}`
+
+// Test_toJSON is a test function for toJSON.
+func Test_toJSON(t *testing.T) {
+	type args struct {
+		r         Results
+		pretty    bool
+		showEmpty bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "empty json showEmpty false",
+			args:    args{r: &trEmpty, pretty: false, showEmpty: false},
+			want:    "",
+			wantErr: false,
+		},
+		{
+			name:    "empty json pretty showEmpty false",
+			args:    args{r: &trEmpty, pretty: true, showEmpty: false},
+			want:    "",
+			wantErr: false,
+		},
+		{
+			name:    "empty json",
+			args:    args{r: &trEmpty, pretty: false, showEmpty: true},
+			want:    jsonEmptyNoPretty,
+			wantErr: false,
+		},
+		{
+			name:    "empty json pretty",
+			args:    args{r: &trEmpty, pretty: true, showEmpty: true},
+			want:    jsonEmptyPretty,
+			wantErr: false,
+		},
+		{
+			name:    "json",
+			args:    args{r: &tr, pretty: false, showEmpty: false},
+			want:    jsonNoPretty,
+			wantErr: false,
+		},
+		{
+			name:    "json pretty",
+			args:    args{r: &tr, pretty: true, showEmpty: false},
+			want:    jsonPretty,
 			wantErr: false,
 		},
 	}
@@ -378,31 +388,31 @@ func Test_toTable(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "&tr, showEmpty false, showTags false",
+			name:    "table with no tags",
 			args:    args{r: &tr, showEmpty: false, showTags: false},
 			want:    tableNoTags,
 			wantErr: false,
 		},
 		{
-			name:    "&tr, showEmpty false, showTags true",
+			name:    "table with tags",
 			args:    args{r: &tr, showEmpty: false, showTags: true},
 			want:    tableTags,
 			wantErr: false,
 		},
 		{
-			name:    "&trEmpty, showEmpty true, showTags false",
+			name:    "empty table with no tags",
 			args:    args{r: &trEmpty, showEmpty: true, showTags: false},
 			want:    tableEmptyNoTags,
 			wantErr: false,
 		},
 		{
-			name:    "&trEmpty, showEmpty true, showTags true",
+			name:    "empty table with tags",
 			args:    args{r: &trEmpty, showEmpty: true, showTags: true},
 			want:    tableEmptyTags,
 			wantErr: false,
 		},
 		{
-			name:    "&trEmpty, showEmpty false, showTags false",
+			name:    "empty table showEmpty false",
 			args:    args{r: &trEmpty, showEmpty: false, showTags: false},
 			want:    "",
 			wantErr: false,
