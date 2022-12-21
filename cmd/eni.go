@@ -83,7 +83,7 @@ You can use multiple filters at same time, for example:
 			viper.GetStringSlice(viperProfiles),
 			viper.GetStringSlice(viperRegions),
 			filters,
-			viper.GetString(viperEC2Sort),
+			"", // TODO: add support for --sort
 			viper.GetString(viperOutput),
 			viper.GetBool(viperShowEmpty),
 			viper.GetBool(viperShowTags),
