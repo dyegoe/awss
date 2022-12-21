@@ -76,7 +76,7 @@ func (tr *TestResults) GetRows() []interface{} {
 // It represents a row of the TestResults.
 type testDataRow struct {
 	StructField testInfo          `json:"struct_field" header:"Struct Field"`
-	MapField    map[string]string `json:"map_field" header:"Map Field"`
+	MapField    map[string]string `json:"map_field" header:"Tags"` // header is `Tags`` because there is a test case for `--show-tags` on toTable().
 	SliceField  []string          `json:"slice_field" header:"Slice Field"`
 	StringField string            `json:"string_field" header:"String Field"`
 }
@@ -208,42 +208,26 @@ func Test_toJSON(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "toJSON, pretty false, showEmpty false",
-			args: args{
-				r:         &trEmpty,
-				pretty:    false,
-				showEmpty: false,
-			},
+			name:    "toJSON, pretty false, showEmpty false",
+			args:    args{r: &trEmpty, pretty: false, showEmpty: false},
 			want:    "",
 			wantErr: false,
 		},
 		{
-			name: "toJSON, pretty true, showEmpty false",
-			args: args{
-				r:         &trEmpty,
-				pretty:    true,
-				showEmpty: false,
-			},
+			name:    "toJSON, pretty true, showEmpty false",
+			args:    args{r: &trEmpty, pretty: true, showEmpty: false},
 			want:    "",
 			wantErr: false,
 		},
 		{
-			name: "toJSON, pretty false, showEmpty true, empty errors",
-			args: args{
-				r:         &trEmpty,
-				pretty:    false,
-				showEmpty: true,
-			},
+			name:    "toJSON, pretty false, showEmpty true, empty errors",
+			args:    args{r: &trEmpty, pretty: false, showEmpty: true},
 			want:    `{"profile":"testProfileEmpty","region":"testRegionEmpty","data":[]}`,
 			wantErr: false,
 		},
 		{
 			name: "toJSON, pretty true, showEmpty true, empty errors",
-			args: args{
-				r:         &trEmpty,
-				pretty:    true,
-				showEmpty: true,
-			},
+			args: args{r: &trEmpty, pretty: true, showEmpty: true},
 			want: `{
   "profile": "testProfileEmpty",
   "region": "testRegionEmpty",
@@ -252,22 +236,14 @@ func Test_toJSON(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "toJSON, pretty false, showEmpty false",
-			args: args{
-				r:         &tr,
-				pretty:    false,
-				showEmpty: false,
-			},
+			name:    "toJSON, pretty false, showEmpty false",
+			args:    args{r: &tr, pretty: false, showEmpty: false},
 			want:    `{"profile":"testProfile","region":"testRegion","errors":["testError1","testError2"],"data":[{"struct_field":{"info_string1":"testInfo1String1","info_string2":"testInfo1String2"},"map_field":{"key1":"value1","key2":"value2"},"slice_field":["sliceValue1","sliceValue2"],"string_field":"testString1"},{"struct_field":{"info_string1":"testInfo2String1","info_string2":"testInfo2String2"},"map_field":{"key3":"value3","key4":"value4"},"slice_field":["sliceValue3","sliceValue4"],"string_field":"testString2"}]}`,
 			wantErr: false,
 		},
 		{
 			name: "toJSON, pretty true, showEmpty false",
-			args: args{
-				r:         &tr,
-				pretty:    true,
-				showEmpty: false,
-			},
+			args: args{r: &tr, pretty: true, showEmpty: false},
 			want: `{
   "profile": "testProfile",
   "region": "testRegion",
@@ -338,7 +314,10 @@ func Test_toTable(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "toTable, showEmpty false, showTags false",
+			args: args{r: &tr, showEmpty: false, showTags: false},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -371,9 +350,7 @@ func Test_rowFromStruct(t *testing.T) {
 		},
 		{
 			name: "test struct",
-			args: args{
-				i: tdr1,
-			},
+			args: args{i: tdr1},
 			want: table.Row{
 				fmt.Sprintf("%s: %s\n%s: %s", text.Bold.Sprint("Info String1"), "testInfo1String1", text.Bold.Sprint("Info String2"), "testInfo1String2"),
 				fmt.Sprintf("%s: %s\n%s: %s", text.Bold.Sprint("key1"), "value1", text.Bold.Sprint("key2"), "value2"),
