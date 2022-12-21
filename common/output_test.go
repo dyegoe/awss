@@ -421,8 +421,6 @@ func Test_toTable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := toTable(tt.args.r, tt.args.showEmpty, tt.args.showTags)
-			// fmt.Println(got)
-			// return
 			if (err != nil) != tt.wantErr {
 				t.Errorf("toTable() error = %v, wantErr %v", err, tt.wantErr)
 				return
