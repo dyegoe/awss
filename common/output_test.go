@@ -23,6 +23,7 @@ package common
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -47,7 +48,7 @@ func (tr *TestResults) Len() int             { return len(tr.Data) }
 func (tr *TestResults) GetProfile() string   { return tr.Profile }
 func (tr *TestResults) GetRegion() string    { return tr.Region }
 func (tr *TestResults) GetErrors() []string  { return tr.Errors }
-func (tr *TestResults) GetSortField() string { return "" }
+func (tr *TestResults) GetSortField() string { return "field" }
 func (tr *TestResults) GetHeaders() []interface{} {
 	headers := []interface{}{}
 
@@ -301,6 +302,25 @@ func Test_toJSON(t *testing.T) {
 	}
 }
 
+// table1 is a test table output from tr.
+var table1 = []string{
+	"+-------------------------------------------------------------+",
+	fmt.Sprintf("| %s testProfile %s testRegion %s field      |", text.Bold.Sprint("[Profile]"), text.Bold.Sprint("[Region]"), text.Bold.Sprint("[Sort]")),
+	"|                                                             |",
+	"| testError1                                                  |",
+	"| testError2                                                  |",
+	"+--------------------------------+-------------+--------------+",
+	"| Struct Field                   | Slice Field | String Field |",
+	"+--------------------------------+-------------+--------------+",
+	fmt.Sprintf("| %s: testInfo1String1 | sliceValue1 | testString1  |", text.Bold.Sprint("Info String1")),
+	fmt.Sprintf("| %s: testInfo1String2 | sliceValue2 |              |", text.Bold.Sprint("Info String2")),
+	"+--------------------------------+-------------+--------------+",
+	fmt.Sprintf("| %s: testInfo2String1 | sliceValue3 | testString2  |", text.Bold.Sprint("Info String1")),
+	fmt.Sprintf("| %s: testInfo2String2 | sliceValue4 |              |", text.Bold.Sprint("Info String2")),
+	"+--------------------------------+-------------+--------------+",
+	"",
+}
+
 // Test_toTable is a test function for toTable.
 func Test_toTable(t *testing.T) {
 	type args struct {
@@ -315,13 +335,17 @@ func Test_toTable(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "toTable, showEmpty false, showTags false",
-			args: args{r: &tr, showEmpty: false, showTags: false},
+			name:    "toTable, showEmpty false, showTags false",
+			args:    args{r: &tr, showEmpty: false, showTags: false},
+			want:    strings.Join(table1, "\n"),
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := toTable(tt.args.r, tt.args.showEmpty, tt.args.showTags)
+			// fmt.Println(got)
+			// return
 			if (err != nil) != tt.wantErr {
 				t.Errorf("toTable() error = %v, wantErr %v", err, tt.wantErr)
 				return

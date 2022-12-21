@@ -95,9 +95,7 @@ func toTable(r Results, showEmpty, showTags bool) (string, error) {
 
 	tableStyle := table.StyleDefault
 	tableStyle.Format.Header = text.FormatDefault
-	tableStyle.Color.Header = text.Colors{text.Bold}
 	tableStyle.Title.Align = text.AlignLeft
-	tableStyle.Title.Colors = text.Colors{text.Bold}
 
 	t := table.NewWriter()
 	t.SetStyle(tableStyle)
@@ -112,10 +110,10 @@ func toTable(r Results, showEmpty, showTags bool) (string, error) {
 
 	showSort := ""
 	if sort := r.GetSortField(); sort != "" {
-		showSort = fmt.Sprintf("[Sort] %s", sort)
+		showSort = fmt.Sprintf("%s %s", text.Bold.Sprint("[Sort]"), sort)
 	}
 
-	t.SetTitle(fmt.Sprintf("[Profile] %s [Region] %s %s %s", r.GetProfile(), r.GetRegion(), showSort, showErrors))
+	t.SetTitle(fmt.Sprintf("%s %s %s %s %s %s", text.Bold.Sprint("[Profile]"), r.GetProfile(), text.Bold.Sprint("[Region]"), r.GetRegion(), showSort, showErrors))
 
 	t.AppendHeader(r.GetHeaders())
 
