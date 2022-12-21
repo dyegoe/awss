@@ -73,12 +73,21 @@ You can use multiple filters at same time, for example:
 		}
 
 		// Check if the tags are valid
-		if _, err := common.ParseTags(ec2F.Tags); err != nil {
+		if _, err := common.ParseTags(eniF.Tags); err != nil {
 			return err
 		}
 
 		// Execute the search
-		err = search.Execute(cmd.Name(), viper.GetStringSlice("profiles"), viper.GetStringSlice("regions"), filters, "", viper.GetString("output"), viper.GetBool("show-empty"), viper.GetBool("show-tags"))
+		err = search.Execute(
+			cmd.Name(),
+			viper.GetStringSlice(viperProfiles),
+			viper.GetStringSlice(viperRegions),
+			filters,
+			viper.GetString(viperEC2Sort),
+			viper.GetString(viperOutput),
+			viper.GetBool(viperShowEmpty),
+			viper.GetBool(viperShowTags),
+		)
 		if err != nil {
 			return err
 		}

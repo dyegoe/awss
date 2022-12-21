@@ -31,6 +31,29 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	// viperOutput is the Viper key for the output used by the application. It is set by the flag --output.
+	viperOutput = "output"
+	// viperProfiles is the Viper key for the profiles used by the application. It is set by the flag --profiles.
+	viperProfiles = "profiles"
+	// viperRegions is the Viper key for the regions used by the application. It is set by the flag --regions.
+	viperRegions = "regions"
+	// viperShowEmpty is the Viper key for the show.empty used by the application. It is set by the flag --show-empty.
+	viperShowEmpty = "show.empty"
+	// viperShowTags is the Viper key for the show.tags used by the application. It is set by the flag --show-tags.
+	viperShowTags = "show.tags"
+	// viperAllRegions is the Viper key for the all-regions used by the application. It is set by the config file section all-regions.]
+	viperAllRegions = "all-regions"
+	// viperConfigName is the Viper default config file name.
+	viperConfigName = "config"
+	// viperConfigType is the Viper default config file type.
+	viperConfigType = "yaml"
+	// viperConfigPathCurrent is the Viper default config file path for the current directory.
+	viperConfigPathCurrent = "."
+	// viperConfigPathHome is the Viper default config file path for the home directory.
+	viperConfigPathHome = "$HOME/.awss/"
+)
+
 // cfgFile is the config file used by the application. It is set by the flag --config.
 var cfgFile string
 
@@ -54,23 +77,23 @@ https://github.com/dyegoe/awss`,
 		}
 
 		// Check if the output is valid.
-		if output := viper.GetString("output"); !common.StringInSlice(output, common.Outputs) {
+		if output := viper.GetString(viperOutput); !common.StringInSlice(output, common.Outputs) {
 			return fmt.Errorf("output format %s not found", output)
 		}
 
 		// Check if the profiles are valid.
-		profiles, err := checkProfiles(viper.GetStringSlice("profiles"))
+		profiles, err := checkProfiles(viper.GetStringSlice(viperProfiles))
 		if err != nil {
 			return err
 		}
-		viper.Set("profiles", profiles)
+		viper.Set(viperProfiles, profiles)
 
 		// Check if the regions are valid.
-		regions, err := checkRegions(viper.GetStringSlice("regions"))
+		regions, err := checkRegions(viper.GetStringSlice(viperRegions))
 		if err != nil {
 			return err
 		}
-		viper.Set("regions", regions)
+		viper.Set(viperRegions, regions)
 
 		return nil
 	},
@@ -96,13 +119,13 @@ func init() {
 	rootCmd.PersistentFlags().Bool("show-tags", false, "Show/hide Tags column on table output. Default is false")
 	// Viper will bind the flags to the config file.
 	// This way, you can use the flags or the config file to set the values.
-	viper.BindPFlag("profiles", rootCmd.PersistentFlags().Lookup("profiles"))
-	viper.BindPFlag("regions", rootCmd.PersistentFlags().Lookup("regions"))
-	viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
-	viper.BindPFlag("show.empty", rootCmd.PersistentFlags().Lookup("show-empty"))
-	viper.BindPFlag("show.tags", rootCmd.PersistentFlags().Lookup("show-tags"))
+	viper.BindPFlag(viperOutput, rootCmd.PersistentFlags().Lookup("profiles"))
+	viper.BindPFlag(viperRegions, rootCmd.PersistentFlags().Lookup("regions"))
+	viper.BindPFlag(viperOutput, rootCmd.PersistentFlags().Lookup("output"))
+	viper.BindPFlag(viperShowEmpty, rootCmd.PersistentFlags().Lookup("show-empty"))
+	viper.BindPFlag(viperShowTags, rootCmd.PersistentFlags().Lookup("show-tags"))
 	// Set the default values for other config file options.
-	viper.SetDefault("all-regions", []string{
+	viper.SetDefault(viperAllRegions, []string{
 		"eu-central-1",
 		"eu-north-1",
 		"eu-west-1",
@@ -151,12 +174,12 @@ func initConfig() error {
 			viper.AddConfigPath(path)
 		}
 	} else { // If no config flag is passed, use the default config file name
-		viper.SetConfigName("config")
+		viper.SetConfigName(viperConfigName)
 	}
 	// Set the config file type and search path
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("$HOME/.awss/")
+	viper.SetConfigType(viperConfigType)
+	viper.AddConfigPath(viperConfigPathCurrent)
+	viper.AddConfigPath(viperConfigPathHome)
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err != nil {
@@ -195,7 +218,7 @@ func checkProfiles(p []string) ([]string, error) {
 // If the user passes a list of regions, it will check if they are valid and return them.
 // It compares the regions passwd by the user with the all-regions list in the config file.
 func checkRegions(r []string) ([]string, error) {
-	regions := viper.GetStringSlice("all-regions")
+	regions := viper.GetStringSlice(viperAllRegions)
 
 	if len(r) == 1 && r[0] == "all" {
 		return regions, nil

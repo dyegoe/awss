@@ -29,6 +29,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	// viperEC2Sort is the Viper key for the ec2.sort used by the application. It is set by the flag --sort.
+	viperEC2Sort = "ec2.sort"
+)
+
 // ec2Filters represents the filters for the eni command.
 //
 // The filters are used to filter the results.
@@ -80,12 +85,21 @@ You can use multiple filters at same time, for example:
 		}
 
 		// Check if the sort is valid
-		if err := search.CheckSortField(cmd.Name(), viper.GetString("ec2.sort")); err != nil {
+		if err := search.CheckSortField(cmd.Name(), viper.GetString(viperEC2Sort)); err != nil {
 			return err
 		}
 
 		// Execute the search
-		err = search.Execute(cmd.Name(), viper.GetStringSlice("profiles"), viper.GetStringSlice("regions"), filters, viper.GetString("ec2.sort"), viper.GetString("output"), viper.GetBool("show.empty"), viper.GetBool("show.tags"))
+		err = search.Execute(
+			cmd.Name(),
+			viper.GetStringSlice(viperProfiles),
+			viper.GetStringSlice(viperRegions),
+			filters,
+			viper.GetString(viperEC2Sort),
+			viper.GetString(viperOutput),
+			viper.GetBool(viperShowEmpty),
+			viper.GetBool(viperShowTags),
+		)
 		if err != nil {
 			return err
 		}
@@ -107,5 +121,5 @@ func init() {
 	ec2Cmd.Flags().IPSliceVarP(&ec2F.PublicIPs, "public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
 	ec2Cmd.Flags().String("sort", "name", "Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
 	// Bind flags to viper
-	viper.BindPFlag("ec2.sort", ec2Cmd.Flags().Lookup("sort"))
+	viper.BindPFlag(viperEC2Sort, ec2Cmd.Flags().Lookup("sort"))
 }
