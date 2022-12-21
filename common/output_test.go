@@ -23,7 +23,6 @@ package common
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -195,6 +194,12 @@ func TestPrintResults(t *testing.T) {
 	}
 }
 
+var jsonEmptyPretty = `{
+  "profile": "testProfileEmpty",
+  "region": "testRegionEmpty",
+  "data": []
+}`
+
 // Test_toJSON is a test function for toJSON.
 func Test_toJSON(t *testing.T) {
 	type args struct {
@@ -227,13 +232,9 @@ func Test_toJSON(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "toJSON, pretty true, showEmpty true, empty errors",
-			args: args{r: &trEmpty, pretty: true, showEmpty: true},
-			want: `{
-  "profile": "testProfileEmpty",
-  "region": "testRegionEmpty",
-  "data": []
-}`,
+			name:    "toJSON, pretty true, showEmpty true, empty errors",
+			args:    args{r: &trEmpty, pretty: true, showEmpty: true},
+			want:    jsonEmptyPretty,
 			wantErr: false,
 		},
 		{
@@ -302,27 +303,69 @@ func Test_toJSON(t *testing.T) {
 	}
 }
 
-// table1 is a test table output from tr.
-var table1 = []string{
-	"+-------------------------------------------------------------+",
-	fmt.Sprintf("| %s testProfile %s testRegion %s field      |", text.Bold.Sprint("[Profile]"), text.Bold.Sprint("[Region]"), text.Bold.Sprint("[Sort]")),
-	"|                                                             |",
-	"| testError1                                                  |",
-	"| testError2                                                  |",
-	"+--------------------------------+-------------+--------------+",
-	"| Struct Field                   | Slice Field | String Field |",
-	"+--------------------------------+-------------+--------------+",
-	fmt.Sprintf("| %s: testInfo1String1 | sliceValue1 | testString1  |", text.Bold.Sprint("Info String1")),
-	fmt.Sprintf("| %s: testInfo1String2 | sliceValue2 |              |", text.Bold.Sprint("Info String2")),
-	"+--------------------------------+-------------+--------------+",
-	fmt.Sprintf("| %s: testInfo2String1 | sliceValue3 | testString2  |", text.Bold.Sprint("Info String1")),
-	fmt.Sprintf("| %s: testInfo2String2 | sliceValue4 |              |", text.Bold.Sprint("Info String2")),
-	"+--------------------------------+-------------+--------------+",
-	"",
-}
+// tableNoTags is a test table output from tr.
+var tableNoTags = `+-------------------------------------------------------------+
+| [Profile] testProfile [Region] testRegion [Sort] field      |
+|                                                             |
+| testError1                                                  |
+| testError2                                                  |
++--------------------------------+-------------+--------------+
+| Struct Field                   | Slice Field | String Field |
++--------------------------------+-------------+--------------+
+| Info String1: testInfo1String1 | sliceValue1 | testString1  |
+| Info String2: testInfo1String2 | sliceValue2 |              |
++--------------------------------+-------------+--------------+
+| Info String1: testInfo2String1 | sliceValue3 | testString2  |
+| Info String2: testInfo2String2 | sliceValue4 |              |
++--------------------------------+-------------+--------------+
+`
+
+// tableTags is a test table output from tr with tags.
+var tableTags = `+----------------------------------------------------------------------------+
+| [Profile] testProfile [Region] testRegion [Sort] field                     |
+|                                                                            |
+| testError1                                                                 |
+| testError2                                                                 |
++--------------------------------+--------------+-------------+--------------+
+| Struct Field                   | Tags         | Slice Field | String Field |
++--------------------------------+--------------+-------------+--------------+
+| Info String1: testInfo1String1 | key1: value1 | sliceValue1 | testString1  |
+| Info String2: testInfo1String2 | key2: value2 | sliceValue2 |              |
++--------------------------------+--------------+-------------+--------------+
+| Info String1: testInfo2String1 | key3: value3 | sliceValue3 | testString2  |
+| Info String2: testInfo2String2 | key4: value4 | sliceValue4 |              |
++--------------------------------+--------------+-------------+--------------+
+`
+
+// tableEmptyNoTags is a test table output from trEmpty.
+var tableEmptyNoTags = `+-------------------------------------------+
+| [Profile] testProfileEmpty [Region] testR |
+| egionEmpty [Sort] field                   |
++--------------+-------------+--------------+
+| Struct Field | Slice Field | String Field |
++--------------+-------------+--------------+
++--------------+-------------+--------------+
+`
+
+// tableEmptyTags is a test table output from trEmpty with tags.
+var tableEmptyTags = `+--------------------------------------------------+
+| [Profile] testProfileEmpty [Region] testRegionEm |
+| pty [Sort] field                                 |
++--------------+------+-------------+--------------+
+| Struct Field | Tags | Slice Field | String Field |
++--------------+------+-------------+--------------+
++--------------+------+-------------+--------------+
+`
 
 // Test_toTable is a test function for toTable.
 func Test_toTable(t *testing.T) {
+	// save the original Bold function
+	oldBold := Bold
+	// restore the original Bold function
+	defer func() { Bold = oldBold }()
+	// set Bold to a function that returns the input string
+	Bold = func(s string) string { return s }
+
 	type args struct {
 		r         Results
 		showEmpty bool
@@ -335,9 +378,33 @@ func Test_toTable(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "toTable, showEmpty false, showTags false",
+			name:    "&tr, showEmpty false, showTags false",
 			args:    args{r: &tr, showEmpty: false, showTags: false},
-			want:    strings.Join(table1, "\n"),
+			want:    tableNoTags,
+			wantErr: false,
+		},
+		{
+			name:    "&tr, showEmpty false, showTags true",
+			args:    args{r: &tr, showEmpty: false, showTags: true},
+			want:    tableTags,
+			wantErr: false,
+		},
+		{
+			name:    "&trEmpty, showEmpty true, showTags false",
+			args:    args{r: &trEmpty, showEmpty: true, showTags: false},
+			want:    tableEmptyNoTags,
+			wantErr: false,
+		},
+		{
+			name:    "&trEmpty, showEmpty true, showTags true",
+			args:    args{r: &trEmpty, showEmpty: true, showTags: true},
+			want:    tableEmptyTags,
+			wantErr: false,
+		},
+		{
+			name:    "&trEmpty, showEmpty false, showTags false",
+			args:    args{r: &trEmpty, showEmpty: false, showTags: false},
+			want:    "",
 			wantErr: false,
 		},
 	}

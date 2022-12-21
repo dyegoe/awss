@@ -65,6 +65,8 @@ func PrintResults(resultsChan <-chan Results, done chan<- bool, output string, s
 	done <- true
 }
 
+var Bold = toBold
+
 // toJSON returns the results in JSON format.
 //
 // If pretty is true, the JSON is formatted.
@@ -110,10 +112,10 @@ func toTable(r Results, showEmpty, showTags bool) (string, error) {
 
 	showSort := ""
 	if sort := r.GetSortField(); sort != "" {
-		showSort = fmt.Sprintf("%s %s", text.Bold.Sprint("[Sort]"), sort)
+		showSort = fmt.Sprintf("%s %s", Bold("[Sort]"), sort)
 	}
 
-	t.SetTitle(fmt.Sprintf("%s %s %s %s %s %s", text.Bold.Sprint("[Profile]"), r.GetProfile(), text.Bold.Sprint("[Region]"), r.GetRegion(), showSort, showErrors))
+	t.SetTitle(fmt.Sprintf("%s %s %s %s %s %s", Bold("[Profile]"), r.GetProfile(), Bold("[Region]"), r.GetRegion(), showSort, showErrors))
 
 	t.AppendHeader(r.GetHeaders())
 
@@ -173,7 +175,7 @@ func headerStructFieldsToString(i interface{}) string {
 		field := v.Field(i)
 
 		if header, ok := v.Type().Field(i).Tag.Lookup("header"); ok && field.Interface() != "" {
-			s = append(s, fmt.Sprintf("%s: %s", text.Bold.Sprint(header), v.Field(i).Interface()))
+			s = append(s, fmt.Sprintf("%s: %s", Bold(header), v.Field(i).Interface()))
 		}
 	}
 
@@ -191,7 +193,7 @@ func sortedStringMapToString(m map[string]string) string {
 	var s []string
 
 	for k, v := range m {
-		s = append(s, fmt.Sprintf("%s: %s", text.Bold.Sprint(k), v))
+		s = append(s, fmt.Sprintf("%s: %s", Bold(k), v))
 	}
 
 	sort.Strings(s)
@@ -209,4 +211,9 @@ func sortedStringMapToString(m map[string]string) string {
 func sortedStringSliceToString(s []string) string {
 	sort.Strings(s)
 	return StringSliceToString(s, "\n")
+}
+
+// toBold returns a string in bold.
+func toBold(s string) string {
+	return fmt.Sprintf("\033[1m%s\033[0m", s)
 }
