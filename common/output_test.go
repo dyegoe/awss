@@ -32,7 +32,7 @@ import (
 // testResults is a struct used for testing.
 //
 // It will implement Results interface.
-type TestResults struct {
+type testResults struct {
 	Profile string        `json:"profile"`
 	Region  string        `json:"region"`
 	Errors  []string      `json:"errors,omitempty"`
@@ -42,13 +42,13 @@ type TestResults struct {
 // Results interface is implemented by testResults.
 // Using the functions below, testResults will be able to be printed in different formats.
 
-func (tr *TestResults) Search()              {}
-func (tr *TestResults) Len() int             { return len(tr.Data) }
-func (tr *TestResults) GetProfile() string   { return tr.Profile }
-func (tr *TestResults) GetRegion() string    { return tr.Region }
-func (tr *TestResults) GetErrors() []string  { return tr.Errors }
-func (tr *TestResults) GetSortField() string { return "field" }
-func (tr *TestResults) GetHeaders() []interface{} {
+func (tr *testResults) Search()              {}
+func (tr *testResults) Len() int             { return len(tr.Data) }
+func (tr *testResults) GetProfile() string   { return tr.Profile }
+func (tr *testResults) GetRegion() string    { return tr.Region }
+func (tr *testResults) GetErrors() []string  { return tr.Errors }
+func (tr *testResults) GetSortField() string { return "field" }
+func (tr *testResults) GetHeaders() []interface{} {
 	headers := []interface{}{}
 
 	v := reflect.ValueOf(testDataRow{})
@@ -62,7 +62,7 @@ func (tr *TestResults) GetHeaders() []interface{} {
 
 	return headers
 }
-func (tr *TestResults) GetRows() []interface{} {
+func (tr *testResults) GetRows() []interface{} {
 	rows := []interface{}{}
 
 	for _, row := range tr.Data {
@@ -73,7 +73,7 @@ func (tr *TestResults) GetRows() []interface{} {
 
 // testDataRow is a struct used for testing.
 //
-// It represents a row of the TestResults.
+// It represents a row of the testResults.
 type testDataRow struct {
 	StructField testInfo          `json:"struct_field" header:"Struct Field"`
 	MapField    map[string]string `json:"map_field" header:"Tags"` // header is `Tags`` because there is a test case for `--show-tags` on toTable().
@@ -89,13 +89,13 @@ type testInfo struct {
 	InfoString2 string `json:"info_string2" header:"Info String2"`
 }
 
-// tr is a TestResults used for testing.
+// tr is a testResults used for testing.
 //
 //	json:"profile" = testProfile
 //	json:"region"  = testRegion
 //	json:"errors"  = []string{"testError1", "testError2"}
 //	json:"data"    = []testDataRow{tdr1, tdr2}
-var tr = TestResults{
+var tr = testResults{
 	Profile: "testProfile",
 	Region:  "testRegion",
 	Errors:  []string{"testError1", "testError2"},
@@ -105,13 +105,13 @@ var tr = TestResults{
 	},
 }
 
-// trEmpty is a TestResults used for testing.
+// trEmpty is a testResults used for testing.
 //
 //	json:"profile" = testProfileEmpty
 //	json:"region"  = testRegionEmpty
 //	json:"errors"  = []string{}
 //	json:"data"    = []testDataRow{}
-var trEmpty = TestResults{
+var trEmpty = testResults{
 	Profile: "testProfileEmpty",
 	Region:  "testRegionEmpty",
 	Errors:  []string{},
