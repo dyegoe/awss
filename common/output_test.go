@@ -253,8 +253,8 @@ var jsonPretty = `{
 func Test_toJSON(t *testing.T) {
 	type args struct {
 		r         Results
-		pretty    bool
 		showEmpty bool
+		pretty    bool
 	}
 	tests := []struct {
 		name    string
@@ -264,44 +264,44 @@ func Test_toJSON(t *testing.T) {
 	}{
 		{
 			name:    "empty json showEmpty false",
-			args:    args{r: &trEmpty, pretty: false, showEmpty: false},
+			args:    args{r: &trEmpty, showEmpty: false, pretty: false},
 			want:    "",
 			wantErr: false,
 		},
 		{
 			name:    "empty json pretty showEmpty false",
-			args:    args{r: &trEmpty, pretty: true, showEmpty: false},
+			args:    args{r: &trEmpty, showEmpty: false, pretty: true},
 			want:    "",
 			wantErr: false,
 		},
 		{
 			name:    "empty json",
-			args:    args{r: &trEmpty, pretty: false, showEmpty: true},
+			args:    args{r: &trEmpty, showEmpty: true, pretty: false},
 			want:    jsonEmptyNoPretty,
 			wantErr: false,
 		},
 		{
 			name:    "empty json pretty",
-			args:    args{r: &trEmpty, pretty: true, showEmpty: true},
+			args:    args{r: &trEmpty, showEmpty: true, pretty: true},
 			want:    jsonEmptyPretty,
 			wantErr: false,
 		},
 		{
 			name:    "json",
-			args:    args{r: &tr, pretty: false, showEmpty: false},
+			args:    args{r: &tr, showEmpty: false, pretty: false},
 			want:    jsonNoPretty,
 			wantErr: false,
 		},
 		{
 			name:    "json pretty",
-			args:    args{r: &tr, pretty: true, showEmpty: false},
+			args:    args{r: &tr, showEmpty: false, pretty: true},
 			want:    jsonPretty,
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := toJSON(tt.args.r, tt.args.pretty, tt.args.showEmpty)
+			got, err := toJSON(tt.args.r, tt.args.showEmpty, tt.args.pretty)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("toJSON() error = %v, wantErr %v", err, tt.wantErr)
 				return

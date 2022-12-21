@@ -30,8 +30,17 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 )
 
-// Outputs is the list of available output formats.
-var Outputs = []string{"json", "json-pretty", "table"}
+const (
+	// JSON is the JSON output format.
+	JSON = "json"
+	// JSONPretty is the pretty JSON output format.
+	JSONPretty = "json-pretty"
+	// TABLE is the table output format.
+	Table = "table"
+)
+
+// ValidOutputs is the list of available output formats.
+var ValidOutputs = []string{JSON, JSONPretty, Table}
 
 // PrintResults prints the results in the given format.
 //
@@ -45,11 +54,11 @@ func PrintResults(resultsChan <-chan Results, done chan<- bool, output string, s
 
 	for results := range resultsChan {
 		switch output {
-		case "json":
-			s, err = toJSON(results, false, showEmpty)
-		case "json-pretty":
-			s, err = toJSON(results, true, showEmpty)
-		case "table":
+		case JSON:
+			s, err = toJSON(results, showEmpty, false)
+		case JSONPretty:
+			s, err = toJSON(results, showEmpty, true)
+		case Table:
 			s, err = toTable(results, showEmpty, showTags)
 		default:
 			err = fmt.Errorf("output format %s not found", output)
@@ -73,7 +82,7 @@ var Bold = toBold
 // toJSON returns the results in JSON format.
 //
 // If pretty is true, the JSON is formatted.
-func toJSON(r Results, pretty, showEmpty bool) (string, error) {
+func toJSON(r Results, showEmpty, pretty bool) (string, error) {
 	var b []byte
 	var err error
 	if r.Len() > 0 || showEmpty {

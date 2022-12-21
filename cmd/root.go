@@ -77,7 +77,7 @@ https://github.com/dyegoe/awss`,
 		}
 
 		// Check if the output is valid.
-		if output := viper.GetString(viperOutput); !common.StringInSlice(output, common.Outputs) {
+		if output := viper.GetString(viperOutput); !common.StringInSlice(output, common.ValidOutputs) {
 			return fmt.Errorf("output format %s not found", output)
 		}
 
