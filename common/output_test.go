@@ -583,3 +583,32 @@ func Test_sortedStringSliceToString(t *testing.T) {
 		})
 	}
 }
+
+func Test_toBold(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "empty",
+			args: args{s: ""},
+			want: "",
+		},
+		{
+			name: "string",
+			args: args{s: "string"},
+			want: "\033[1mstring\033[0m",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := toBold(tt.args.s); got != tt.want {
+				t.Errorf("toBold() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

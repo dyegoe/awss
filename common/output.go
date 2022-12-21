@@ -218,5 +218,8 @@ func sortedStringSliceToString(s []string) string {
 
 // toBold returns a string in bold.
 func toBold(s string) string {
+	if s == "" {
+		return ""
+	}
 	return fmt.Sprintf("\033[1m%s\033[0m", s)
 }
