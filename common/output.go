@@ -39,8 +39,26 @@ const (
 	Table = "table"
 )
 
-// ValidOutputs is the list of available output formats.
-var ValidOutputs = []string{JSON, JSONPretty, Table}
+// outputs is a map of output formats to functions that print the results in the given format.
+//
+// The key is the output format.
+// The value is the function that prints the results in the given format.
+var outputs = map[string]func(Results, bool, bool) (string, error){
+	JSON:       toJSON,
+	JSONPretty: toJSONPretty,
+	Table:      toTable,
+}
+
+// ValidOutputs returns the valid output formats and if the given output is valid.
+func ValidOutputs(o string) (string, bool) {
+	var valid []string
+	for k := range outputs {
+		valid = append(valid, k)
+	}
+	sort.Strings(valid)
+	_, ok := outputs[o]
+	return StringSliceToString(valid, ", "), ok
+}
 
 // PrintResults prints the results in the given format.
 //
@@ -48,21 +66,15 @@ var ValidOutputs = []string{JSON, JSONPretty, Table}
 // The done channel is used to signal that the results were printed.
 // The output is the format of the output.
 // The showEmpty flag indicates if empty results should be shown.
+// The showTags flag indicates if the tags should be shown.
 func PrintResults(resultsChan <-chan Results, done chan<- bool, output string, showEmpty, showTags bool) {
-	s := ""
-	err := error(nil)
-
 	for results := range resultsChan {
-		switch output {
-		case JSON:
-			s, err = toJSON(results, showEmpty, showTags)
-		case JSONPretty:
-			s, err = toJSONPretty(results, showEmpty, showTags)
-		case Table:
-			s, err = toTable(results, showEmpty, showTags)
-		default:
-			err = fmt.Errorf("output format %s not found", output)
+		printResults, ok := outputs[output]
+		if !ok {
+			fmt.Printf("Invalid output format: %s", output)
+			continue
 		}
+		s, err := printResults(results, showEmpty, showTags)
 		if err != nil {
 			fmt.Println(err)
 			continue
