@@ -55,9 +55,9 @@ func PrintResults(resultsChan <-chan Results, done chan<- bool, output string, s
 	for results := range resultsChan {
 		switch output {
 		case JSON:
-			s, err = toJSON(results, showEmpty, false)
+			s, err = toJSON(results, showEmpty, showTags)
 		case JSONPretty:
-			s, err = toJSON(results, showEmpty, true)
+			s, err = toJSONPretty(results, showEmpty, showTags)
 		case Table:
 			s, err = toTable(results, showEmpty, showTags)
 		default:
@@ -81,27 +81,38 @@ var Bold = toBold
 
 // toJSON returns the results in JSON format.
 //
-// If pretty is true, the JSON is formatted.
-func toJSON(r Results, showEmpty, pretty bool) (string, error) {
-	var b []byte
-	var err error
-	if r.Len() > 0 || showEmpty {
-		if pretty {
-			b, err = json.MarshalIndent(r, "", "  ")
-		} else {
-			b, err = json.Marshal(r)
-		}
-		if err != nil {
-			return "", err
-		}
-		return string(b), nil
+// showEmpty indicates if empty results should be shown.
+// showTags indicates if the tags should be shown. It is ignored for json format.
+func toJSON(r Results, showEmpty, showTags bool) (string, error) {
+	b, err := json.Marshal(r)
+	if err != nil {
+		return "", err
 	}
-	return "", nil
+	if r.Len() == 0 && !showEmpty {
+		return "", nil
+	}
+	return string(b), nil
+}
+
+// toJSONPretty returns the results in JSON format.
+//
+// showEmpty indicates if empty results should be shown.
+// showTags indicates if the tags should be shown. It is ignored for json format.
+func toJSONPretty(r Results, showEmpty, showTags bool) (string, error) {
+	b, err := json.MarshalIndent(r, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	if r.Len() == 0 && !showEmpty {
+		return "", nil
+	}
+	return string(b), nil
 }
 
 // toTable returns the results in table format.
 //
-// If showEmpty is true, the table is shown even if there are no results.
+// showEmpty indicates if empty results should be shown.
+// showTags indicates if the tags should be shown.
 func toTable(r Results, showEmpty, showTags bool) (string, error) {
 	if r.Len() == 0 && !showEmpty {
 		return "", nil
