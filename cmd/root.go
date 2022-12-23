@@ -77,8 +77,8 @@ https://github.com/dyegoe/awss`,
 		}
 
 		// Check if the output is valid.
-		if output := viper.GetString(viperOutput); !common.StringInSlice(output, common.ValidOutputs) {
-			return fmt.Errorf("output format %s not found", output)
+		if valid, ok := common.ValidOutputs(viper.GetString(viperOutput)); !ok {
+			return fmt.Errorf("output format %s not found. Valid outpus are: %s", viper.GetString(viperOutput), valid)
 		}
 
 		// Check if the profiles are valid.
@@ -110,11 +110,14 @@ func Execute() {
 }
 
 func init() {
+	// set the valid outputs for the flag --output.
+	validOutputs, _ := common.ValidOutputs("")
+
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.awss/config.yaml)")
 	// Flags that can be used by all subcommands and be configured in the config file.
-	rootCmd.PersistentFlags().StringSlice("profiles", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. `profile1,profile2`")
-	rootCmd.PersistentFlags().StringSlice("regions", []string{"us-east-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. `region1,region2`")
-	rootCmd.PersistentFlags().String("output", "table", "Select the output format. `table`, json or json-pretty")
+	rootCmd.PersistentFlags().StringSlice("profiles", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. e.g. `profile1,profile2`")
+	rootCmd.PersistentFlags().StringSlice("regions", []string{"us-east-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. e.g. `region1,region2`")
+	rootCmd.PersistentFlags().String("output", "table", fmt.Sprintf("Select the output format. Valid outputs: %s", validOutputs))
 	rootCmd.PersistentFlags().Bool("show-empty", false, "Show/hide empty results. Default is false")
 	rootCmd.PersistentFlags().Bool("show-tags", false, "Show/hide Tags column on table output. Default is false")
 	// Viper will bind the flags to the config file.
