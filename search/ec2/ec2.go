@@ -87,6 +87,8 @@ func New(profile, region string, filters map[string][]string, sortField string) 
 		Profile:   profile,
 		Region:    region,
 		Filters:   filters,
+		Errors:    []string{},
+		Data:      []dataRow{},
 		SortField: sortField,
 	}
 }
