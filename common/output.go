@@ -36,7 +36,7 @@ const (
 	JSON = "json"
 	// JSONPretty is the pretty JSON output format.
 	JSONPretty = "json-pretty"
-	// TABLE is the table output format.
+	// Table is the table output format.
 	Table = "table"
 )
 
