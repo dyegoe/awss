@@ -23,6 +23,7 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"reflect"
 	"sort"
 
@@ -67,20 +68,20 @@ func ValidOutputs(o string) (string, bool) {
 // The output is the format of the output.
 // The showEmpty flag indicates if empty results should be shown.
 // The showTags flag indicates if the tags should be shown.
-func PrintResults(resultsChan <-chan Results, done chan<- bool, output string, showEmpty, showTags bool) {
+func PrintResults(w io.Writer, resultsChan <-chan Results, done chan<- bool, output string, showEmpty, showTags bool) {
 	for results := range resultsChan {
 		printResults, ok := outputs[output]
 		if !ok {
-			fmt.Printf("Invalid output format: %s", output)
+			fmt.Fprintf(w, "Invalid output format: %s\n", output)
 			continue
 		}
 		s, err := printResults(results, showEmpty, showTags)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Fprintln(w, err)
 			continue
 		}
 		if s != "" {
-			fmt.Println(s)
+			fmt.Fprintln(w, s)
 		}
 	}
 	done <- true

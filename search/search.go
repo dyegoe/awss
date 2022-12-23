@@ -23,6 +23,7 @@ package search
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/dyegoe/awss/common"
@@ -45,7 +46,7 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 
 	done := make(chan bool)
 
-	go common.PrintResults(resultsChan, done, output, showEmpty, showTags)
+	go common.PrintResults(os.Stdout, resultsChan, done, output, showEmpty, showTags)
 
 	runOnce := true
 
