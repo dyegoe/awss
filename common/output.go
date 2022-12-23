@@ -92,6 +92,14 @@ func PrintResults(w io.Writer, resultsChan <-chan Results, done chan<- bool, out
 // We use this var to allow tests to mock the function.
 var Bold = toBold
 
+// toBold returns a string in bold.
+func toBold(s string) string {
+	if s == "" {
+		return ""
+	}
+	return fmt.Sprintf("\033[1m%s\033[0m", s)
+}
+
 // toJSON returns the results in JSON format.
 //
 // showEmpty indicates if empty results should be shown.
@@ -247,12 +255,4 @@ func sortedStringMapToString(m map[string]string) string {
 func sortedStringSliceToString(s []string) string {
 	sort.Strings(s)
 	return StringSliceToString(s, "\n")
-}
-
-// toBold returns a string in bold.
-func toBold(s string) string {
-	if s == "" {
-		return ""
-	}
-	return fmt.Sprintf("\033[1m%s\033[0m", s)
 }

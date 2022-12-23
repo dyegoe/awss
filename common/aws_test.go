@@ -28,6 +28,62 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
+// // TestAwsConfig tests the AwsConfig function.
+// func TestAwsConfig(t *testing.T) {
+// 	type args struct {
+// 		profile string
+// 		region  string
+// 	}
+// 	tests := []struct {
+// 		name    string
+// 		args    args
+// 		want    aws.Config
+// 		wantErr bool
+// 	}{
+// 		// TODO: Add test cases.
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			got, err := AwsConfig(tt.args.profile, tt.args.region)
+// 			if (err != nil) != tt.wantErr {
+// 				t.Errorf("AwsConfig() error = %v, wantErr %v", err, tt.wantErr)
+// 				return
+// 			}
+// 			if !reflect.DeepEqual(got, tt.want) {
+// 				t.Errorf("AwsConfig() = %v, want %v", got, tt.want)
+// 			}
+// 		})
+// 	}
+// }
+
+// // TestWhoAmI tests the WhoAmI function.
+// func TestWhoAmI(t *testing.T) {
+// 	type args struct {
+// 		profile string
+// 		region  string
+// 	}
+// 	tests := []struct {
+// 		name    string
+// 		args    args
+// 		want    string
+// 		wantErr bool
+// 	}{
+// 		// TODO: Add test cases.
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			got, err := WhoAmI(tt.args.profile, tt.args.region)
+// 			if (err != nil) != tt.wantErr {
+// 				t.Errorf("WhoAmI() error = %v, wantErr %v", err, tt.wantErr)
+// 				return
+// 			}
+// 			if got != tt.want {
+// 				t.Errorf("WhoAmI() = %v, want %v", got, tt.want)
+// 			}
+// 		})
+// 	}
+// }
+
 // TestGetAwsProfiles tests the GetAwsProfiles function.
 func TestGetAwsProfiles(t *testing.T) {
 	// save the original defaultSharedConfigFilename

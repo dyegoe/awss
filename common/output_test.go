@@ -159,6 +159,36 @@ func TestPrintResults(t *testing.T) {
 	}
 }
 
+// Test_toBold is a test function for toBold.
+func Test_toBold(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "empty",
+			args: args{s: ""},
+			want: "",
+		},
+		{
+			name: "string",
+			args: args{s: "string"},
+			want: "\033[1mstring\033[0m",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := toBold(tt.args.s); got != tt.want {
+				t.Errorf("toBold() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // Test_toJSON is a test function for toJSON.
 func Test_toJSON(t *testing.T) {
 	type args struct {
@@ -205,7 +235,7 @@ func Test_toJSON(t *testing.T) {
 	}
 }
 
-// Test_toJSON is a test function for toJSON.
+// Test_toJSONPretty is a test function for toJSONPretty.
 func Test_toJSONPretty(t *testing.T) {
 	type args struct {
 		r         Results
@@ -461,35 +491,6 @@ func Test_sortedStringSliceToString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := sortedStringSliceToString(tt.args.s); got != tt.want {
 				t.Errorf("sortedStringSliceToString() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_toBold(t *testing.T) {
-	type args struct {
-		s string
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		{
-			name: "empty",
-			args: args{s: ""},
-			want: "",
-		},
-		{
-			name: "string",
-			args: args{s: "string"},
-			want: "\033[1mstring\033[0m",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := toBold(tt.args.s); got != tt.want {
-				t.Errorf("toBold() = %v, want %v", got, tt.want)
 			}
 		})
 	}

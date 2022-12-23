@@ -26,6 +26,34 @@ import (
 	"testing"
 )
 
+// // TestExecute tests the Execute function.
+// func TestExecute(t *testing.T) {
+// 	type args struct {
+// 		cmd       string
+// 		profiles  []string
+// 		regions   []string
+// 		filters   map[string][]string
+// 		sortField string
+// 		output    string
+// 		showEmpty bool
+// 		showTags  bool
+// 	}
+// 	tests := []struct {
+// 		name    string
+// 		args    args
+// 		wantErr bool
+// 	}{
+// 		// TODO: Add test cases.
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			if err := Execute(tt.args.cmd, tt.args.profiles, tt.args.regions, tt.args.filters, tt.args.sortField, tt.args.output, tt.args.showEmpty, tt.args.showTags); (err != nil) != tt.wantErr {
+// 				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
+// 			}
+// 		})
+// 	}
+// }
+
 // TestCheckSortField tests the checkSortField function.
 func TestCheckSortField(t *testing.T) {
 	// save the original getSortFieldsCMDList
