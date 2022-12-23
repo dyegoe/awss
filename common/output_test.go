@@ -29,6 +29,79 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 )
 
+func TestValidOutputs(t *testing.T) {
+	type args struct {
+		o string
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  string
+		want1 bool
+	}{
+		{
+			name: "Valid output",
+			args: args{
+				o: "json",
+			},
+			want:  "json, json-pretty, table",
+			want1: true,
+		},
+		{
+			name: "Invalid output",
+			args: args{
+				o: "invalid",
+			},
+			want:  "json, json-pretty, table",
+			want1: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := ValidOutputs(tt.args.o)
+			if got != tt.want {
+				t.Errorf("ValidOutputs() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("ValidOutputs() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+// TestPrintResults is a test function for PrintResults.
+func TestPrintResults(t *testing.T) {
+	// save the original Bold function
+	originalOutputs := outputs
+	// restore the original Bold function
+	defer func() { outputs = originalOutputs }()
+	// set Bold to a function that returns the input string
+	outputs = map[string]func(Results, bool, bool) (string, error){
+		JSON:       func(r Results, b1, b2 bool) (string, error) { return "json", nil },
+		JSONPretty: func(r Results, b1, b2 bool) (string, error) { return "json-pretty", nil },
+		Table:      func(r Results, b1, b2 bool) (string, error) { return "table", nil },
+	}
+
+	type args struct {
+		resultsChan <-chan Results
+		done        chan<- bool
+		output      string
+		showEmpty   bool
+		showTags    bool
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			PrintResults(tt.args.resultsChan, tt.args.done, tt.args.output, tt.args.showEmpty, tt.args.showTags)
+		})
+	}
+}
+
 // testResults is a struct used for testing.
 //
 // It will implement Results interface.
@@ -170,28 +243,6 @@ var ti1 = testInfo{
 var ti2 = testInfo{
 	InfoString1: "testInfo2String1",
 	InfoString2: "testInfo2String2",
-}
-
-// TestPrintResults is a test function for PrintResults.
-func TestPrintResults(t *testing.T) {
-	type args struct {
-		resultsChan <-chan Results
-		done        chan<- bool
-		output      string
-		showEmpty   bool
-		showTags    bool
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			PrintResults(tt.args.resultsChan, tt.args.done, tt.args.output, tt.args.showEmpty, tt.args.showTags)
-		})
-	}
 }
 
 // jsonEmptyNoPretty is a json string used for testing.
