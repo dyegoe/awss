@@ -66,14 +66,14 @@ You can use multiple filters at same time, for example:
 			return err
 		}
 
-		// Convert the struct to a map[string][]string to be used as filters
-		filters, err := common.StructToFilters(eniF)
-		if err != nil {
+		// Check if the tags are valid
+		if _, err := common.ParseTags(eniF.Tags); err != nil {
 			return err
 		}
 
-		// Check if the tags are valid
-		if _, err := common.ParseTags(eniF.Tags); err != nil {
+		// Convert the struct to a map[string][]string to be used as filters
+		filters, err := common.StructToFilters(eniF)
+		if err != nil {
 			return err
 		}
 

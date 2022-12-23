@@ -73,12 +73,6 @@ You can use multiple filters at same time, for example:
 			return err
 		}
 
-		// Convert the struct to a map[string][]string to be used as filters
-		filters, err := common.StructToFilters(ec2F)
-		if err != nil {
-			return err
-		}
-
 		// Check if the tags are valid
 		if _, err := common.ParseTags(ec2F.Tags); err != nil {
 			return err
@@ -86,6 +80,12 @@ You can use multiple filters at same time, for example:
 
 		// Check if the sort is valid
 		if err := search.CheckSortField(cmd.Name(), viper.GetString(viperEC2Sort)); err != nil {
+			return err
+		}
+
+		// Convert the struct to a map[string][]string to be used as filters
+		filters, err := common.StructToFilters(ec2F)
+		if err != nil {
 			return err
 		}
 
