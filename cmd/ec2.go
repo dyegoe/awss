@@ -20,6 +20,7 @@ limitations under the License.
 package cmd
 
 import (
+	"log"
 	"net"
 
 	"github.com/dyegoe/awss/common"
@@ -121,5 +122,7 @@ func init() {
 	ec2Cmd.Flags().IPSliceVarP(&ec2F.PublicIPs, "public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
 	ec2Cmd.Flags().String("sort", "name", "Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
 	// Bind flags to viper
-	viper.BindPFlag(viperEC2Sort, ec2Cmd.Flags().Lookup("sort"))
+	if err := viper.BindPFlag(viperEC2Sort, ec2Cmd.Flags().Lookup("sort")); err != nil {
+		log.Fatal(err)
+	}
 }

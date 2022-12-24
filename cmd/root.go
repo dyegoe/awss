@@ -21,6 +21,7 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -122,11 +123,21 @@ func init() {
 	rootCmd.PersistentFlags().Bool("show-tags", false, "Show/hide Tags column on table output. Default is false")
 	// Viper will bind the flags to the config file.
 	// This way, you can use the flags or the config file to set the values.
-	viper.BindPFlag(viperOutput, rootCmd.PersistentFlags().Lookup("profiles"))
-	viper.BindPFlag(viperRegions, rootCmd.PersistentFlags().Lookup("regions"))
-	viper.BindPFlag(viperOutput, rootCmd.PersistentFlags().Lookup("output"))
-	viper.BindPFlag(viperShowEmpty, rootCmd.PersistentFlags().Lookup("show-empty"))
-	viper.BindPFlag(viperShowTags, rootCmd.PersistentFlags().Lookup("show-tags"))
+	if err := viper.BindPFlag(viperOutput, rootCmd.PersistentFlags().Lookup("profiles")); err != nil {
+		log.Fatal(err)
+	}
+	if err := viper.BindPFlag(viperRegions, rootCmd.PersistentFlags().Lookup("regions")); err != nil {
+		log.Fatal(err)
+	}
+	if err := viper.BindPFlag(viperOutput, rootCmd.PersistentFlags().Lookup("output")); err != nil {
+		log.Fatal(err)
+	}
+	if err := viper.BindPFlag(viperShowEmpty, rootCmd.PersistentFlags().Lookup("show-empty")); err != nil {
+		log.Fatal(err)
+	}
+	if err := viper.BindPFlag(viperShowTags, rootCmd.PersistentFlags().Lookup("show-tags")); err != nil {
+		log.Fatal(err)
+	}
 	// Set the default values for other config file options.
 	viper.SetDefault(viperAllRegions, []string{
 		"eu-central-1",
