@@ -48,15 +48,26 @@ Ready to contribute? Here's how to set up `awss` for local development.
     git clone git@github.com:your_name_here/awss.git
     ```
 
-3. Create a branch for local development:
+3. Setup `pre-commit`:
+
+    ```bash
+    sudo apt install pre-commit
+    go install golang.org/x/tools/cmd/goimports@latest
+    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.50.1
+    go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+    go install github.com/go-critic/go-critic/cmd/gocritic@latest
+    precommit install
+    ```
+
+4. Create a branch for local development:
 
       ```bash
       git checkout -b name-of-your-bugfix-or-feature
       ```
 
-    Now you can make your changes locally. Remember to change the version in `cmd/rootCmd.go` and `README.md` files.
+    Now you can make your changes locally. Remember to change the version in `cmd/root.go` and `README.md` files.
 
-4. Commit your changes and push your branch to GitHub::
+5. Commit your changes and push your branch to GitHub::
 
     ```bash
     git add .
@@ -64,7 +75,7 @@ Ready to contribute? Here's how to set up `awss` for local development.
     git push origin name-of-your-bugfix-or-feature
     ```
   
-5. Submit a pull request through the GitHub website.
+6. Submit a pull request through the GitHub website.
 
 ## Pull Request Guidelines
 
