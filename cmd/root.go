@@ -33,17 +33,23 @@ import (
 )
 
 const (
-	// viperOutput is the Viper key for the output used by the application. It is set by the flag --output.
+	// viperOutput is the Viper key for the output used by the application.
+	// It is set by the flag --output.
 	viperOutput = "output"
-	// viperProfiles is the Viper key for the profiles used by the application. It is set by the flag --profiles.
+	// viperProfiles is the Viper key for the profiles used by the application.
+	// It is set by the flag --profiles.
 	viperProfiles = "profiles"
-	// viperRegions is the Viper key for the regions used by the application. It is set by the flag --regions.
+	// viperRegions is the Viper key for the regions used by the application.
+	// It is set by the flag --regions.
 	viperRegions = "regions"
-	// viperShowEmpty is the Viper key for the show.empty used by the application. It is set by the flag --show-empty.
+	// viperShowEmpty is the Viper key for the show.empty used by the application.
+	// It is set by the flag --show-empty.
 	viperShowEmpty = "show.empty"
-	// viperShowTags is the Viper key for the show.tags used by the application. It is set by the flag --show-tags.
+	// viperShowTags is the Viper key for the show.tags used by the application.
+	// It is set by the flag --show-tags.
 	viperShowTags = "show.tags"
-	// viperAllRegions is the Viper key for the all-regions used by the application. It is set by the config file section all-regions.]
+	// viperAllRegions is the Viper key for the all-regions used by the application.
+	// It is set by the config file section all-regions.
 	viperAllRegions = "all-regions"
 	// viperConfigName is the Viper default config file name.
 	viperConfigName = "config"
@@ -55,7 +61,8 @@ const (
 	viperConfigPathHome = "$HOME/.awss/"
 )
 
-// cfgFile is the config file used by the application. It is set by the flag --config.
+// cfgFile is the config file used by the application.
+// It is set by the flag --config.
 var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
@@ -116,9 +123,12 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.awss/config.yaml)")
 	// Flags that can be used by all subcommands and be configured in the config file.
-	rootCmd.PersistentFlags().StringSlice("profiles", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. e.g. `profile1,profile2`")
-	rootCmd.PersistentFlags().StringSlice("regions", []string{"us-east-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. e.g. `region1,region2`")
-	rootCmd.PersistentFlags().String("output", "table", fmt.Sprintf("Select the output format. Valid outputs: %s", validOutputs))
+	rootCmd.PersistentFlags().StringSlice("profiles", []string{"default"},
+		"Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. e.g. `profile1,profile2`")
+	rootCmd.PersistentFlags().StringSlice("regions", []string{"us-east-1"},
+		"Select a region to perform your API calls. You can pass multiple regions separated by comma. e.g. `region1,region2`")
+	rootCmd.PersistentFlags().String("output", "table",
+		fmt.Sprintf("Select the output format. Valid outputs: %s", validOutputs))
 	rootCmd.PersistentFlags().Bool("show-empty", false, "Show/hide empty results. Default is false")
 	rootCmd.PersistentFlags().Bool("show-tags", false, "Show/hide Tags column on table output. Default is false")
 	// Viper will bind the flags to the config file.

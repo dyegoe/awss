@@ -17,7 +17,7 @@ limitations under the License.
 // Package search provides the entry point for the search command.
 //
 // It implements a search command that searches for resources in AWS.
-// The searchs are done in parallel and the results are printed in the
+// The searches are done in parallel and the results are printed in the
 // specified format.
 package search
 
@@ -47,7 +47,17 @@ import (
 // 	}
 // 	for _, tt := range tests {
 // 		t.Run(tt.name, func(t *testing.T) {
-// 			if err := Execute(tt.args.cmd, tt.args.profiles, tt.args.regions, tt.args.filters, tt.args.sortField, tt.args.output, tt.args.showEmpty, tt.args.showTags); (err != nil) != tt.wantErr {
+// 			err := Execute(
+// 				tt.args.cmd,
+// 				tt.args.profiles,
+// 				tt.args.regions,
+// 				tt.args.filters,
+// 				tt.args.sortField,
+// 				tt.args.output,
+// 				tt.args.showEmpty,
+// 				tt.args.showTags,
+// 			)
+// 			if (err != nil) != tt.wantErr {
 // 				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
 // 			}
 // 		})

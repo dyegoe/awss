@@ -125,7 +125,7 @@ func (r *Results) Search() {
 	}
 
 	// Parse response.
-	for _, eni := range response.NetworkInterfaces {
+	for _, eni := range response.NetworkInterfaces { //nolint:gocritic
 		row := dataRow{
 			InterfaceInfo: eniInfo{
 				NetworkInterfaceID: *eni.NetworkInterfaceId,
@@ -192,7 +192,7 @@ func (r *Results) GetHeaders() []interface{} {
 func (r *Results) GetRows() []interface{} {
 	rows := []interface{}{}
 
-	for _, row := range r.Data {
+	for _, row := range r.Data { //nolint:gocritic
 		rows = append(rows, row)
 	}
 	return rows

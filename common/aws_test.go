@@ -310,37 +310,14 @@ func TestFilterAvailabilityZones(t *testing.T) {
 		{
 			name: "AZ: a",
 			args: args{availabilityZones: []string{"a"}, region: "us-east-1"},
-			want: []types.Filter{{Name: aws.String("availability-zone"), Values: []string{"us-east-1a"}}},
-		},
-		{
-			name: "AZ: a,b",
-			args: args{availabilityZones: []string{"a", "b"}, region: "us-east-1"},
-			want: []types.Filter{{Name: aws.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b"}}},
-		},
-		{
-			name: "AZ: a,b,c",
-			args: args{availabilityZones: []string{"a", "b", "c"}, region: "us-east-1"},
-			want: []types.Filter{{Name: aws.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b", "us-east-1c"}}},
-		},
-		{
-			name: "AZ: a,b,c,d",
-			args: args{availabilityZones: []string{"a", "b", "c", "d"}, region: "us-east-1"},
-			want: []types.Filter{{Name: aws.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b", "us-east-1c", "us-east-1d"}}},
-		},
-		{
-			name: "AZ: a,b,c,d,e",
-			args: args{availabilityZones: []string{"a", "b", "c", "d", "e"}, region: "us-east-1"},
-			want: []types.Filter{{Name: aws.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b", "us-east-1c", "us-east-1d", "us-east-1e"}}},
-		},
-		{
-			name: "AZ: a,b,c,d,e,f",
-			args: args{availabilityZones: []string{"a", "b", "c", "d", "e", "f"}, region: "us-east-1"},
-			want: []types.Filter{{Name: aws.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b", "us-east-1c", "us-east-1d", "us-east-1e", "us-east-1f"}}},
+			want: []types.Filter{{Name: aws.String("availability-zone"),
+				Values: []string{"us-east-1a"}}},
 		},
 		{
 			name: "AZ: a,b,c,d,e,f,g",
 			args: args{availabilityZones: []string{"a", "b", "c", "d", "e", "f", "g"}, region: "us-east-1"},
-			want: []types.Filter{{Name: aws.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b", "us-east-1c", "us-east-1d", "us-east-1e", "us-east-1f"}}},
+			want: []types.Filter{{Name: aws.String("availability-zone"),
+				Values: []string{"us-east-1a", "us-east-1b", "us-east-1c", "us-east-1d", "us-east-1e", "us-east-1f"}}},
 		},
 	}
 	for _, tt := range tests {

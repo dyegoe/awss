@@ -68,8 +68,9 @@ func (tr *testResults) GetRows() []interface{} {
 //
 // It represents a row of the testResults.
 type testDataRow struct {
-	StructField testInfo          `json:"struct_field" header:"Struct Field"`
-	MapField    map[string]string `json:"map_field" header:"Tags"` // header is `Tags`` because there is a test case for `--show-tags` on toTable().
+	StructField testInfo `json:"struct_field" header:"Struct Field"`
+	// MapField header is `Tags`` because there is a test case for `--show-tags` on toTable().
+	MapField    map[string]string `json:"map_field" header:"Tags"`
 	SliceField  []string          `json:"slice_field" header:"Slice Field"`
 	StringField string            `json:"string_field" header:"String Field"`
 }
@@ -169,6 +170,8 @@ var ti2 = testInfo{
 var jsonEmptyNoPretty = `{"profile":"testProfileEmpty","region":"testRegionEmpty","data":[]}`
 
 // jsonNoPretty is a json string used for testing.
+//
+//nolint:lll
 var jsonNoPretty = `{"profile":"testProfile","region":"testRegion","errors":["testError1","testError2"],"data":[{"struct_field":{"info_string1":"testInfo1String1","info_string2":"testInfo1String2"},"map_field":{"key1":"value1","key2":"value2"},"slice_field":["sliceValue1","sliceValue2"],"string_field":"testString1"},{"struct_field":{"info_string1":"testInfo2String1","info_string2":"testInfo2String2"},"map_field":{"key3":"value3","key4":"value4"},"slice_field":["sliceValue3","sliceValue4"],"string_field":"testString2"}]}`
 
 // jsonEmptyPretty is a json string used for testing.

@@ -117,9 +117,9 @@ func (r *Results) Search() {
 
 	// Parse response.
 	for _, i := range response.Reservations {
-		for _, inst := range i.Instances {
+		for _, inst := range i.Instances { //nolint:gocritic
 			enis := []string{}
-			for _, eni := range inst.NetworkInterfaces {
+			for _, eni := range inst.NetworkInterfaces { //nolint:gocritic
 				enis = append(enis, *eni.NetworkInterfaceId)
 			}
 			r.Data = append(r.Data, dataRow{
@@ -176,7 +176,7 @@ func (r *Results) GetHeaders() []interface{} {
 func (r *Results) GetRows() []interface{} {
 	rows := []interface{}{}
 
-	for _, row := range r.Data {
+	for _, row := range r.Data { //nolint:gocritic
 		rows = append(rows, row)
 	}
 	return rows
@@ -216,7 +216,9 @@ func (r *Results) sortResults(field string) error {
 	}
 
 	sort.Slice(r.Data, func(p, q int) bool {
-		return reflect.ValueOf(r.Data[p]).FieldByName(sortFields[field]).String() < reflect.ValueOf(r.Data[q]).FieldByName(sortFields[field]).String()
+		sortField1 := reflect.ValueOf(r.Data[p]).FieldByName(sortFields[field]).String()
+		sortField2 := reflect.ValueOf(r.Data[q]).FieldByName(sortFields[field]).String()
+		return sortField1 < sortField2
 	})
 	return nil
 }
@@ -232,8 +234,8 @@ func GetSortFields(f string) (map[string]string, error) {
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Type().Field(i)
 
-		if sort, ok := field.Tag.Lookup("sort"); ok {
-			sortFields[sort] = field.Name
+		if s, ok := field.Tag.Lookup("sort"); ok {
+			sortFields[s] = field.Name
 		}
 	}
 

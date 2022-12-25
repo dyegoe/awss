@@ -73,12 +73,12 @@ var defaultSharedConfigFilename = config.DefaultSharedConfigFilename()
 // It is used to get the list of profiles from the AWS config file.
 // The default location is ~/.aws/config.
 func GetAwsProfiles() ([]string, error) {
-	config, err := ini.Load(defaultSharedConfigFilename)
+	cfg, err := ini.Load(defaultSharedConfigFilename)
 	if err != nil {
 		return nil, err
 	}
 	profiles := []string{}
-	for _, section := range config.Sections() {
+	for _, section := range cfg.Sections() {
 		if strings.HasPrefix(section.Name(), "profile ") {
 			profiles = append(profiles, strings.TrimPrefix(section.Name(), "profile "))
 		}

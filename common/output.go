@@ -44,7 +44,7 @@ const (
 //
 // The key is the output format.
 // The value is the function that prints the results in the given format.
-var outputs = map[string]func(Results, bool, bool) (string, error){
+var outputs = map[string]func(Results, bool, bool) string{
 	JSON:       toJSON,
 	JSONPretty: toJSONPretty,
 	Table:      toTable,
@@ -75,11 +75,7 @@ func PrintResults(w io.Writer, resultsChan <-chan Results, done chan<- bool, out
 			fmt.Fprintf(w, "Invalid output format: %s\n", output)
 			continue
 		}
-		s, err := printResults(results, showEmpty, showTags)
-		if err != nil {
-			fmt.Fprintln(w, err)
-			continue
-		}
+		s := printResults(results, showEmpty, showTags)
 		if s != "" {
 			fmt.Fprintln(w, s)
 		}
@@ -104,39 +100,41 @@ func toBold(s string) string {
 //
 // showEmpty indicates if empty results should be shown.
 // showTags indicates if the tags should be shown. It is ignored for json format.
-func toJSON(r Results, showEmpty, showTags bool) (string, error) {
+func toJSON(r Results, showEmpty, showTags bool) string {
+	_ = showTags // ignored for json format
 	b, err := json.Marshal(r)
 	if err != nil {
-		return "", err
+		return ""
 	}
 	if r.Len() == 0 && !showEmpty {
-		return "", nil
+		return ""
 	}
-	return string(b), nil
+	return string(b)
 }
 
 // toJSONPretty returns the results in JSON format.
 //
 // showEmpty indicates if empty results should be shown.
 // showTags indicates if the tags should be shown. It is ignored for json format.
-func toJSONPretty(r Results, showEmpty, showTags bool) (string, error) {
+func toJSONPretty(r Results, showEmpty, showTags bool) string {
+	_ = showTags // ignored for json format
 	b, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
-		return "", err
+		return ""
 	}
 	if r.Len() == 0 && !showEmpty {
-		return "", nil
+		return ""
 	}
-	return string(b), nil
+	return string(b)
 }
 
 // toTable returns the results in table format.
 //
 // showEmpty indicates if empty results should be shown.
 // showTags indicates if the tags should be shown.
-func toTable(r Results, showEmpty, showTags bool) (string, error) {
+func toTable(r Results, showEmpty, showTags bool) string {
 	if r.Len() == 0 && !showEmpty {
-		return "", nil
+		return ""
 	}
 
 	tableStyle := table.StyleDefault
@@ -155,11 +153,19 @@ func toTable(r Results, showEmpty, showTags bool) (string, error) {
 	}
 
 	showSort := ""
-	if sort := r.GetSortField(); sort != "" {
-		showSort = fmt.Sprintf("%s %s", Bold("[Sort]"), sort)
+	if s := r.GetSortField(); s != "" {
+		showSort = fmt.Sprintf("%s %s", Bold("[Sort]"), s)
 	}
 
-	t.SetTitle(fmt.Sprintf("%s %s %s %s %s %s", Bold("[Profile]"), r.GetProfile(), Bold("[Region]"), r.GetRegion(), showSort, showErrors))
+	t.SetTitle(
+		fmt.Sprintf("%s %s %s %s %s %s",
+			Bold("[Profile]"),
+			r.GetProfile(),
+			Bold("[Region]"),
+			r.GetRegion(),
+			showSort,
+			showErrors),
+	)
 
 	t.AppendHeader(r.GetHeaders())
 
@@ -173,7 +179,7 @@ func toTable(r Results, showEmpty, showTags bool) (string, error) {
 		},
 	)
 
-	return fmt.Sprintf("%s\n", t.Render()), nil
+	return fmt.Sprintf("%s\n", t.Render())
 }
 
 // RowsFromStruct returns a table.Row from a struct.

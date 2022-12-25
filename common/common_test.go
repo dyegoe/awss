@@ -28,6 +28,8 @@ import (
 )
 
 // TestParseTags tests the ParseTags function.
+//
+//nolint:funlen
 func TestParseTags(t *testing.T) {
 	type args struct {
 		tags []string

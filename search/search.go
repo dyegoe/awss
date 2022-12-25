@@ -17,7 +17,7 @@ limitations under the License.
 // Package search provides the entry point for the search command.
 //
 // It implements a search command that searches for resources in AWS.
-// The searchs are done in parallel and the results are printed in the
+// The searches are done in parallel and the results are printed in the
 // specified format.
 package search
 
@@ -37,7 +37,7 @@ import (
 // The filters are used to filter the results.
 // The output is the format of the output.
 // The showEmpty flag indicates if empty results should be shown.
-func Execute(cmd string, profiles, regions []string, filters map[string][]string, sortField string, output string, showEmpty, showTags bool) error {
+func Execute(cmd string, profiles, regions []string, filters map[string][]string, sortField, output string, showEmpty, showTags bool) error { //nolint:lll
 	wg := sync.WaitGroup{}
 
 	numInteractions := len(profiles) * len(regions)

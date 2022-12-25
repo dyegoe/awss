@@ -60,7 +60,8 @@ var ec2Cmd = &cobra.Command{
 	Short: "Search for EC2 instances.",
 	Long: `
 Search for EC2 instances.
-You can search EC2 instances using the following filters: ids, names, tags, instance-types, availability-zones, instance-states, private-ips and public-ips.
+You can search EC2 instances using the following filters:
+  ids, names, tags, instance-types, availability-zones, instance-states, private-ips and public-ips.
 You can use multiple values for each filter, separated by comma. Example: --names 'Name1,Name2'
 
 You can use multiple filters at same time, for example:
@@ -111,16 +112,26 @@ You can use multiple filters at same time, for example:
 func init() {
 	rootCmd.AddCommand(ec2Cmd)
 
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.Ids, "ids", "i", []string{}, "Filter EC2 instances by ids. `i-1230456078901,i-1230456078902`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.Names, "names", "n", []string{}, "Filter EC2 instances by names. It searchs using the 'tag:Name'. `instance-1,instance-2`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.Tags, "tags", "t", []string{}, "Filter EC2 instances by tags. `'Key=Value1:Value2,Environment=Production'`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.TagsKey, "tags-key", "k", []string{}, "Filter EC2 instances by tags key. `Key,Environment`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.InstanceTypes, "instance-types", "T", []string{}, "Filter EC2 instances by instance type. `t2.micro,t2.small`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.AvailabilityZones, "availability-zones", "z", []string{}, "Filter EC2 instances by availability zones. It will append to current region. `a,b`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.InstanceStates, "instance-states", "s", []string{}, "Filter EC2 instances by instance state. `running,stopped`")
-	ec2Cmd.Flags().IPSliceVarP(&ec2F.PrivateIPs, "private-ips", "p", []net.IP{}, "Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
-	ec2Cmd.Flags().IPSliceVarP(&ec2F.PublicIPs, "public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
-	ec2Cmd.Flags().String("sort", "name", "Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.Ids, "ids", "i", []string{},
+		"Filter EC2 instances by ids. `i-1230456078901,i-1230456078902`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.Names, "names", "n", []string{},
+		"Filter EC2 instances by names. It searches using the 'tag:Name'. `instance-1,instance-2`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.Tags, "tags", "t", []string{},
+		"Filter EC2 instances by tags. `'Key=Value1:Value2,Environment=Production'`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.TagsKey, "tags-key", "k", []string{},
+		"Filter EC2 instances by tags key. `Key,Environment`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.InstanceTypes, "instance-types", "T", []string{},
+		"Filter EC2 instances by instance type. `t2.micro,t2.small`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.AvailabilityZones, "availability-zones", "z", []string{},
+		"Filter EC2 instances by availability zones. It will append to current region. `a,b`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.InstanceStates, "instance-states", "s", []string{},
+		"Filter EC2 instances by instance state. `running,stopped`")
+	ec2Cmd.Flags().IPSliceVarP(&ec2F.PrivateIPs, "private-ips", "p", []net.IP{},
+		"Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
+	ec2Cmd.Flags().IPSliceVarP(&ec2F.PublicIPs, "public-ips", "P", []net.IP{},
+		"Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
+	ec2Cmd.Flags().String("sort", "name",
+		"Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
 	// Bind flags to viper
 	if err := viper.BindPFlag(viperEC2Sort, ec2Cmd.Flags().Lookup("sort")); err != nil {
 		log.Fatal(err)
