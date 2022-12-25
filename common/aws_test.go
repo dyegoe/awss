@@ -86,12 +86,9 @@ import (
 
 // TestGetAwsProfiles tests the GetAwsProfiles function.
 func TestGetAwsProfiles(t *testing.T) {
-	// save the original defaultSharedConfigFilename
+	// save the original variable, defer the restore and mock the variable
 	oldDefaultSharedConfigFilename := defaultSharedConfigFilename
-	// restore the original defaultSharedConfigFilename after the test
 	defer func() { defaultSharedConfigFilename = oldDefaultSharedConfigFilename }()
-
-	// set the defaultSharedConfigFilename to a test file
 	defaultSharedConfigFilename = "testdata/config"
 
 	tests := []struct {
