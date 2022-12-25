@@ -35,7 +35,7 @@ const (
 	viperEC2Sort = "ec2.sort"
 )
 
-// ec2Filters represents the filters for the eni command.
+// ec2Filters represents the filters for the ec2 command.
 //
 // The filters are used to filter the results.
 // common.StructToFilters is used to convert the struct to a map[string][]string.

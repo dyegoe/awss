@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - Function order, since the filter were applied before all checks. [#81](https://github.com/dyegoe/awss/issues/81)
+- Struct description for `cmd/ec2.go`. [#80](https://github.com/dyegoe/awss/issues/80)
 
 ## [v0.7.2] - 2022-12-12
 
