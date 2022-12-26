@@ -206,6 +206,9 @@ func initConfig(cfg string) error {
 	viper.AddConfigPath(viperConfigPathHome)
 
 	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok && cfg == "" {
+			return nil
+		}
 		return err
 	}
 	return nil
