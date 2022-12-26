@@ -57,10 +57,10 @@ type dataRow struct {
 	InterfaceInfo eniInfo `json:"interface_info,omitempty" header:"Interface Info"`
 
 	// PrivateIPAddresses are the private IP addresses assigned to the network interface.
-	PrivateIPAddresses []string `json:"private_ip_addresses,omitempty" header:"Private IPs" sort:"private-ips"`
+	PrivateIPAddresses []string `json:"private_ips,omitempty" header:"Private IPs"`
 
 	// PublicIPAddresses are the public IP addresses or Elastic IP addresses bound to the network interface.
-	PublicIPAddresses []string `json:"public_ip_addresses,omitempty" header:"Public IPs" sort:"public-ips"`
+	PublicIPAddresses []string `json:"public_ips,omitempty" header:"Public IPs"`
 
 	// Tags are the tags assigned to the network interface.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
@@ -69,22 +69,22 @@ type dataRow struct {
 // eniInfo represents the network interface info.
 type eniInfo struct {
 	// NetworkInterfaceID is the ID of the network interface.
-	NetworkInterfaceID string `json:"network_interface_id,omitempty" header:"ID"`
+	NetworkInterfaceID string `json:"id,omitempty" header:"ID"`
 
 	// InterfaceType is the interface type.
-	InterfaceType string `json:"interface_type,omitempty" header:"Type"`
+	InterfaceType string `json:"type,omitempty" header:"Type"`
 
 	// AvailabilityZone is the AZ of the network interface.
-	AvailabilityZone string `json:"availability_zone,omitempty" header:"AZ"`
+	AvailabilityZone string `json:"az,omitempty" header:"AZ"`
 
 	// Status is the status of the network interface.
 	Status string `json:"status,omitempty" header:"Status"`
 
 	// SubnetID is the ID of the subnet that the network interface is in.
-	SubnetID string `json:"subnet_id,omitempty" header:"Subnet"`
+	SubnetID string `json:"subnet_id,omitempty" header:"Subnet ID"`
 
 	// InstanceID is the ID of the instance that this interface is associate.
-	InstanceID string `json:"instance_id,omitempty" header:"Instance"`
+	InstanceID string `json:"instance_id,omitempty" header:"Instance ID"`
 
 	// InstanceName is the name of the instance that this interface is associate.
 	InstanceName string `json:"instance_name,omitempty" header:"Instance Name"`
