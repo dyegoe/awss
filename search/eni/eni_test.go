@@ -22,6 +22,11 @@ package eni
 import (
 	"reflect"
 	"testing"
+
+	"github.com/dyegoe/awss/common"
+
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
 // TestNew tests the New function.
@@ -42,7 +47,7 @@ func TestNew(t *testing.T) {
 			args: args{
 				profile:   "default",
 				region:    "us-east-1",
-				filters:   map[string][]string{"tag:Name": {"test"}},
+				filters:   map[string][]string{"network-interface-id": {"eni-1234567890abcdef0"}},
 				sortField: "id",
 			},
 			want: &Results{
@@ -50,7 +55,7 @@ func TestNew(t *testing.T) {
 				Region:    "us-east-1",
 				Errors:    []string{},
 				Data:      []dataRow{},
-				Filters:   map[string][]string{"tag:Name": {"test"}},
+				Filters:   map[string][]string{"network-interface-id": {"eni-1234567890abcdef0"}},
 				SortField: "id",
 			},
 		},
@@ -85,7 +90,7 @@ var mockResults = &Results{
 		*mockDataRow1,
 		*mockDataRow2,
 	},
-	Filters:   map[string][]string{"tag:Name": {"test"}},
+	Filters:   map[string][]string{"network-interface-id": {"eni-1234567890abcdef0"}},
 	SortField: "id",
 }
 
@@ -326,20 +331,56 @@ func TestResults_GetRows(t *testing.T) {
 	}
 }
 
-// // TestResults_getFilters tests the getFilters function.
-// func TestResults_getFilters(t *testing.T) {
-// 	tests := []struct {
-// 		name    string
-// 		results *Results
-// 		want    *ec2.DescribeInstancesInput
-// 	}{
-// 		// TODO: Add test cases.
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			if got := tt.results.getFilters(); !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("Results.getFilters() = %#v, want %#v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
+// TestResults_getFilters tests the getFilters function.
+func TestResults_getFilters(t *testing.T) {
+	tests := []struct {
+		name    string
+		results *Results
+		want    *ec2.DescribeNetworkInterfacesInput
+	}{
+		{
+			name:    "network-interface-id",
+			results: &Results{Filters: map[string][]string{"network-interface-id": {"eni-1234567890abcdef0"}}},
+			want: &ec2.DescribeNetworkInterfacesInput{
+				NetworkInterfaceIds: []string{
+					"eni-1234567890abcdef0",
+				},
+			},
+		},
+		{
+			name:    "tag",
+			results: &Results{Filters: map[string][]string{"tag": {"key=value:value3", "key2=value2"}}},
+			want: &ec2.DescribeNetworkInterfacesInput{
+				Filters: []types.Filter{
+					{Name: common.String("tag:key"), Values: []string{"value", "value3"}},
+					{Name: common.String("tag:key2"), Values: []string{"value2"}},
+				},
+			},
+		},
+		{
+			name:    "availability-zone",
+			results: &Results{Region: "us-east-1", Filters: map[string][]string{"availability-zone": {"a", "b"}}},
+			want: &ec2.DescribeNetworkInterfacesInput{
+				Filters: []types.Filter{
+					{Name: common.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b"}},
+				},
+			},
+		},
+		{
+			name:    "private-ip-address",
+			results: &Results{Filters: map[string][]string{"private-ip-address": {"172.16.0.1"}}},
+			want: &ec2.DescribeNetworkInterfacesInput{
+				Filters: []types.Filter{
+					{Name: common.String("private-ip-address"), Values: []string{"172.16.0.1"}},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.results.getFilters(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Results.getFilters() = \n%#v, want \n%#v", got, tt.want)
+			}
+		})
+	}
+}
