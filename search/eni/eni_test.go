@@ -90,7 +90,12 @@ var mockResults = &Results{
 		*mockDataRow1,
 		*mockDataRow2,
 	},
-	Filters:   map[string][]string{"network-interface-id": {"eni-1234567890abcdef0"}},
+	Filters: map[string][]string{
+		"network-interface-id": {"eni-1234567890abcdef0"},
+		"tag":                  {"key=value:value3", "key2=value2"},
+		"availability-zone":    {"a", "b"},
+		"private-ip-address":   {"172.16.0.1"},
+	},
 	SortField: "id",
 }
 
@@ -339,38 +344,14 @@ func TestResults_getFilters(t *testing.T) {
 		want    *ec2.DescribeNetworkInterfacesInput
 	}{
 		{
-			name:    "network-interface-id",
-			results: &Results{Filters: map[string][]string{"network-interface-id": {"eni-1234567890abcdef0"}}},
+			name:    "mutiple filters",
+			results: mockResults,
 			want: &ec2.DescribeNetworkInterfacesInput{
-				NetworkInterfaceIds: []string{
-					"eni-1234567890abcdef0",
-				},
-			},
-		},
-		{
-			name:    "tag",
-			results: &Results{Filters: map[string][]string{"tag": {"key=value:value3", "key2=value2"}}},
-			want: &ec2.DescribeNetworkInterfacesInput{
+				NetworkInterfaceIds: []string{"eni-1234567890abcdef0"},
 				Filters: []types.Filter{
 					{Name: common.String("tag:key"), Values: []string{"value", "value3"}},
 					{Name: common.String("tag:key2"), Values: []string{"value2"}},
-				},
-			},
-		},
-		{
-			name:    "availability-zone",
-			results: &Results{Region: "us-east-1", Filters: map[string][]string{"availability-zone": {"a", "b"}}},
-			want: &ec2.DescribeNetworkInterfacesInput{
-				Filters: []types.Filter{
 					{Name: common.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b"}},
-				},
-			},
-		},
-		{
-			name:    "private-ip-address",
-			results: &Results{Filters: map[string][]string{"private-ip-address": {"172.16.0.1"}}},
-			want: &ec2.DescribeNetworkInterfacesInput{
-				Filters: []types.Filter{
 					{Name: common.String("private-ip-address"), Values: []string{"172.16.0.1"}},
 				},
 			},
