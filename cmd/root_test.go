@@ -24,26 +24,40 @@ import (
 	"testing"
 )
 
-// // Test_initConfig tests the initConfig function.
-// func Test_initConfig(t *testing.T) {
-// 	type args struct {
-// 		cfg string
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		wantErr bool
-// 	}{
-// 		// TODO: Add test cases.
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			if err := initConfig(tt.args.cfg); (err != nil) != tt.wantErr {
-// 				t.Errorf("initConfig() error = %v, wantErr %v", err, tt.wantErr)
-// 			}
-// 		})
-// 	}
-// }
+// Test_initConfig tests the initConfig function.
+func Test_initConfig(t *testing.T) {
+	type args struct {
+		cfg string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "empty",
+			args:    args{cfg: ""},
+			wantErr: false,
+		},
+		{
+			name:    "non-existent",
+			args:    args{cfg: "non-existent"},
+			wantErr: true,
+		},
+		{
+			name:    "existent",
+			args:    args{cfg: "testdata/config.yaml"},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := initConfig(tt.args.cfg); (err != nil) != tt.wantErr {
+				t.Errorf("initConfig() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
 
 // Test_checkProfiles tests the checkProfiles function.
 func Test_checkProfiles(t *testing.T) {

@@ -1,0 +1,13 @@
+profiles:
+  - default
+regions:
+  - us-east-1
+output: table
+show:
+  empty: true
+  tags: false
+all-regions:
+  - eu-central-1
+  - eu-north-1
+ec2:
+  sort: name
