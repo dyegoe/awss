@@ -22,6 +22,11 @@ package ec2
 import (
 	"reflect"
 	"testing"
+
+	"github.com/dyegoe/awss/common"
+
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
 // TestNew tests the New function.
@@ -85,7 +90,13 @@ var mockResults = &Results{
 		*mockDataRow1,
 		*mockDataRow2,
 	},
-	Filters:   map[string][]string{"tag:Name": {"test"}},
+	Filters: map[string][]string{
+		"instance-id":         {"i-1234567890abcdef0", "i-0987654321fedcba9"},
+		"tag:Name":            {"instance-name-1", "instance-name-2"},
+		"tag":                 {"key=value:value3", "key2=value2"},
+		"availability-zone":   {"a", "b"},
+		"instance-state-name": {"running", "stopped"},
+	},
 	SortField: "id",
 }
 
@@ -316,46 +327,75 @@ func TestResults_GetRows(t *testing.T) {
 	}
 }
 
-// // TestResults_getFilters tests the getFilters function.
-// func TestResults_getFilters(t *testing.T) {
-// 	tests := []struct {
-// 		name    string
-// 		results *Results
-// 		want    *ec2.DescribeInstancesInput
-// 	}{
-// 		// TODO: Add test cases.
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			if got := tt.results.getFilters(); !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("Results.getFilters()\n%#v\nwant\n%#v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
+// TestResults_getFilters tests the getFilters function.
+func TestResults_getFilters(t *testing.T) {
+	tests := []struct {
+		name    string
+		results *Results
+		want    *ec2.DescribeInstancesInput
+	}{
+		{
+			name:    "multiple filters",
+			results: mockResults,
+			want: &ec2.DescribeInstancesInput{
+				InstanceIds: []string{"i-1234567890abcdef0", "i-0987654321fedcba9"},
+				Filters: []types.Filter{
+					{Name: common.String("tag:Name"), Values: []string{"instance-name-1", "instance-name-2"}},
+					{Name: common.String("tag:key"), Values: []string{"value", "value3"}},
+					{Name: common.String("tag:key2"), Values: []string{"value2"}},
+					{Name: common.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b"}},
+					{Name: common.String("instance-state-name"), Values: []string{"running", "stopped"}},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.results.getFilters(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Results.getFilters()\n%#v\nwant\n%#v", got, tt.want)
+			}
+		})
+	}
+}
 
-// // TestResults_sortResults tests the sortResults function.
-// func TestResults_sortResults(t *testing.T) {
-// 	type args struct {
-// 		field string
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		results *Results
-// 		args    args
-// 		wantErr bool
-// 	}{
-// 		// TODO: Add test cases.
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			if err := tt.results.sortResults(tt.args.field); (err != nil) != tt.wantErr {
-// 				t.Errorf("Results.sortResults() error = %v, wantErr %v", err, tt.wantErr)
-// 			}
-// 		})
-// 	}
-// }
+// TestResults_sortResults tests the sortResults function.
+func TestResults_sortResults(t *testing.T) {
+	type args struct {
+		field string
+	}
+	tests := []struct {
+		name    string
+		results *Results
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "type",
+			results: mockResults,
+			args: args{
+				field: "type",
+			},
+			wantErr: false,
+		},
+		{
+			name:    "invalid",
+			results: mockResults,
+			args: args{
+				field: "invalid",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.results.sortResults(tt.args.field); (err != nil) != tt.wantErr {
+				t.Errorf("Results.sortResults() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
 
+// TestGetSortFields tests the getSortFields function.
 func TestGetSortFields(t *testing.T) {
 	type args struct {
 		f string
