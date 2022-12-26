@@ -31,19 +31,17 @@ import (
 	"golang.org/x/term"
 )
 
-// TermWidth is the width of the terminal.
-var TermWidth int
+type terminalSize struct {
+	Width  int
+	Height int
+}
 
-// TermWHeight is the height of the terminal.
-var TermWHeight int
-
-// init sets the terminal width and height.
-func init() {
+func TerminalSize() terminalSize {
 	w, h, err := term.GetSize(int(os.Stdout.Fd()))
-	if err == nil {
-		TermWidth = w
-		TermWHeight = h
+	if err != nil {
+		return terminalSize{Width: 80, Height: 24}
 	}
+	return terminalSize{Width: w, Height: h}
 }
 
 // Results is an interface that defines the methods that a result must implement.

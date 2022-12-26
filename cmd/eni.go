@@ -60,42 +60,41 @@ You can use multiple filters at same time, for example:
 	
 (You can use the wildcard '*' to search for all values in a filter)
 `,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check if the availability zones are valid
-		if err := checkAvailabilityZones(eniF.AvailabilityZones); err != nil {
-			return err
-		}
-
-		// Check if the tags are valid
-		if _, err := common.ParseTags(eniF.Tags); err != nil {
-			return err
-		}
-
-		// Convert the struct to a map[string][]string to be used as filters
-		filters, err := common.StructToFilters(eniF)
-		if err != nil {
-			return err
-		}
-
-		// Execute the search
-		err = search.Execute(
-			cmd.Name(),
-			viper.GetStringSlice(viperProfiles),
-			viper.GetStringSlice(viperRegions),
-			filters,
-			"", // TODO: add support for --sort
-			viper.GetString(viperOutput),
-			viper.GetBool(viperShowEmpty),
-			viper.GetBool(viperShowTags),
-		)
-		if err != nil {
-			return err
-		}
-		return nil
-	},
+	RunE: eniRunE,
 }
 
-func init() {
+func eniRunE(cmd *cobra.Command, args []string) error {
+	if err := checkAvailabilityZones(eniF.AvailabilityZones); err != nil {
+		return err
+	}
+
+	if _, err := common.ParseTags(eniF.Tags); err != nil {
+		return err
+	}
+
+	filters, err := common.StructToFilters(eniF)
+	if err != nil {
+		return err
+	}
+
+	err = search.Execute(
+		cmd.Name(),
+		viper.GetStringSlice(labelProfiles),
+		viper.GetStringSlice(labelRegions),
+		filters,
+		"",
+		viper.GetString(labelOutput),
+		viper.GetBool(labelShowEmpty),
+		viper.GetBool(labelShowTags),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func eniInitFlags() {
 	rootCmd.AddCommand(eniCmd)
 
 	eniCmd.Flags().StringSliceVarP(&eniF.Ids, "ids", "i", []string{},

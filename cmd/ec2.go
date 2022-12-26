@@ -20,7 +20,7 @@ limitations under the License.
 package cmd
 
 import (
-	"log"
+	"fmt"
 	"net"
 
 	"github.com/dyegoe/awss/common"
@@ -31,8 +31,7 @@ import (
 )
 
 const (
-	// viperEC2Sort is the Viper key for the ec2.sort used by the application. It is set by the flag --sort.
-	viperEC2Sort = "ec2.sort"
+	labelEc2Sort = "ec2.sort"
 )
 
 // ec2Filters represents the filters for the ec2 command.
@@ -69,47 +68,46 @@ You can use multiple filters at same time, for example:
 
 (You can use the wildcard '*' to search for all values in a filter)
 `,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check if the availability zones are valid
-		if err := checkAvailabilityZones(ec2F.AvailabilityZones); err != nil {
-			return err
-		}
-
-		// Check if the tags are valid
-		if _, err := common.ParseTags(ec2F.Tags); err != nil {
-			return err
-		}
-
-		// Check if the sort is valid
-		if err := search.CheckSortField(cmd.Name(), viper.GetString(viperEC2Sort)); err != nil {
-			return err
-		}
-
-		// Convert the struct to a map[string][]string to be used as filters
-		filters, err := common.StructToFilters(ec2F)
-		if err != nil {
-			return err
-		}
-
-		// Execute the search
-		err = search.Execute(
-			cmd.Name(),
-			viper.GetStringSlice(viperProfiles),
-			viper.GetStringSlice(viperRegions),
-			filters,
-			viper.GetString(viperEC2Sort),
-			viper.GetString(viperOutput),
-			viper.GetBool(viperShowEmpty),
-			viper.GetBool(viperShowTags),
-		)
-		if err != nil {
-			return err
-		}
-		return nil
-	},
+	RunE: ec2RunE,
 }
 
-func init() {
+func ec2RunE(cmd *cobra.Command, args []string) error {
+	err := checkAvailabilityZones(ec2F.AvailabilityZones)
+	if err != nil && err.Error() != "no availability zone selected" {
+		return err
+	}
+
+	if _, err := common.ParseTags(ec2F.Tags); err != nil {
+		return err
+	}
+
+	if err := search.CheckSortField(cmd.Name(), viper.GetString(labelEc2Sort)); err != nil {
+		return err
+	}
+
+	filters, err := common.StructToFilters(ec2F)
+	if err != nil {
+		return err
+	}
+
+	err = search.Execute(
+		cmd.Name(),
+		viper.GetStringSlice(labelProfiles),
+		viper.GetStringSlice(labelRegions),
+		filters,
+		viper.GetString(labelEc2Sort),
+		viper.GetString(labelOutput),
+		viper.GetBool(labelShowEmpty),
+		viper.GetBool(labelShowTags),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ec2InitFlags() {
 	rootCmd.AddCommand(ec2Cmd)
 
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.Ids, "ids", "i", []string{},
@@ -132,8 +130,11 @@ func init() {
 		"Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
 	ec2Cmd.Flags().String("sort", "name",
 		"Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
-	// Bind flags to viper
-	if err := viper.BindPFlag(viperEC2Sort, ec2Cmd.Flags().Lookup("sort")); err != nil {
-		log.Fatal(err)
+}
+
+func ec2InitViper() error {
+	if err := viper.BindPFlag(labelEc2Sort, ec2Cmd.Flags().Lookup("sort")); err != nil {
+		return fmt.Errorf("error binding flag: %w", err)
 	}
+	return nil
 }

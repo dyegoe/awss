@@ -143,7 +143,7 @@ func toTable(r Results, showEmpty, showTags bool) string {
 
 	t := table.NewWriter()
 	t.SetStyle(tableStyle)
-	t.SetAllowedRowLength(TermWidth)
+	t.SetAllowedRowLength(TerminalSize().Width)
 	t.Style().Options.SeparateRows = true
 
 	errors := r.GetErrors()
