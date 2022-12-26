@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Refactor a few functions to make them less nested. [#65](https://github.com/dyegoe/awss/issues/65)
 - Refactor a few functions to handle empty values. [#65](https://github.com/dyegoe/awss/issues/65)
 - Outputs are now constants. [#83](https://github.com/dyegoe/awss/issues/83)
+- Upgrade dependencies. [#75](https://github.com/dyegoe/awss/issues/75)
 
 ### Fixed
 
