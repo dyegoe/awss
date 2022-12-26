@@ -50,7 +50,7 @@ import (
 // 				return
 // 			}
 // 			if !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("AwsConfig() = %v, want %v", got, tt.want)
+// 				t.Errorf("AwsConfig()\n%#v\nwant\n%#v", got, tt.want)
 // 			}
 // 		})
 // 	}
@@ -78,7 +78,7 @@ import (
 // 				return
 // 			}
 // 			if got != tt.want {
-// 				t.Errorf("WhoAmI() = %v, want %v", got, tt.want)
+// 				t.Errorf("WhoAmI()\n%#v\nwant\n%#v", got, tt.want)
 // 			}
 // 		})
 // 	}
@@ -109,7 +109,7 @@ func TestGetAwsProfiles(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetAwsProfiles() = %v, want %v", got, tt.want)
+				t.Errorf("GetAwsProfiles()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -144,7 +144,7 @@ func TestTagName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := TagName(tt.args.tags); got != tt.want {
-				t.Errorf("TagName() = %v, want %v", got, tt.want)
+				t.Errorf("TagName()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -186,7 +186,7 @@ func TestTagsToMap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := TagsToMap(tt.args.tags); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("TagsToMap() = %v, want %v", got, tt.want)
+				t.Errorf("TagsToMap()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -221,7 +221,7 @@ func TestFilterNames(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := FilterNames(tt.args.names); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("FilterNames() = %v, want %v", got, tt.want)
+				t.Errorf("FilterNames()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -282,7 +282,7 @@ func TestFilterTags(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := FilterTags(tt.args.tags); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("FilterTags() = %v, want %v", got, tt.want)
+				t.Errorf("FilterTags()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -320,7 +320,7 @@ func TestFilterAvailabilityZones(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := FilterAvailabilityZones(tt.args.availabilityZones, tt.args.region); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("FilterAvailabilityZones() = %v, want %v", got, tt.want)
+				t.Errorf("FilterAvailabilityZones()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -361,7 +361,7 @@ func TestFilterDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := FilterDefault(tt.args.key, tt.args.values); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("FilterDefault() = %v, want %v", got, tt.want)
+				t.Errorf("FilterDefault()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}

@@ -116,7 +116,7 @@ func Test_checkProfiles(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("checkProfiles() = %#v, want %#v", got, tt.want)
+				t.Errorf("checkProfiles()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -175,7 +175,7 @@ func Test_checkRegions(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("checkRegions() = %v, want %v", got, tt.want)
+				t.Errorf("checkRegions()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}

@@ -91,7 +91,7 @@ func TestParseTags(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ParseTags() = %v, want %v", got, tt.want)
+				t.Errorf("ParseTags()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -130,7 +130,7 @@ func TestStringValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := StringValue(tt.args.s); got != tt.want {
-				t.Errorf("StringValue() = %v, want %v", got, tt.want)
+				t.Errorf("StringValue()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -164,7 +164,7 @@ func TestString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := String(tt.args.s); *got != *tt.want {
-				t.Errorf("String() = %v, want %v", got, tt.want)
+				t.Errorf("String()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -205,7 +205,7 @@ func TestStringInSlice(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := StringInSlice(tt.args.s, tt.args.slice); got != tt.want {
-				t.Errorf("StringInSlice() = %v, want %v", got, tt.want)
+				t.Errorf("StringInSlice()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -241,7 +241,7 @@ func TestStringSliceToString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := StringSliceToString(tt.args.s, tt.args.sep); got != tt.want {
-				t.Errorf("StringSliceToString() = %v, want %v", got, tt.want)
+				t.Errorf("StringSliceToString()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -276,7 +276,7 @@ func TestIPtoString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := IPtoString(tt.args.i); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("IPtoString() = %v, want %v", got, tt.want)
+				t.Errorf("IPtoString()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -334,7 +334,7 @@ func TestStructToFilters(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("StructToFilters() = %v, want %v", got, tt.want)
+				t.Errorf("StructToFilters()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}

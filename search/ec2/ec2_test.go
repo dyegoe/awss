@@ -59,7 +59,7 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := New(tt.args.profile, tt.args.region, tt.args.filters, tt.args.sortField)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("New() = %#v, want %#v", got, tt.want)
+				t.Errorf("New()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -155,7 +155,7 @@ func TestResults_Len(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.results.Len(); got != tt.want {
-				t.Errorf("Results.Len() = %#v, want %#v", got, tt.want)
+				t.Errorf("Results.Len()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -182,7 +182,7 @@ func TestResults_GetProfile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.results.GetProfile(); got != tt.want {
-				t.Errorf("Results.GetProfile() = %#v, want %#v", got, tt.want)
+				t.Errorf("Results.GetProfile()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -209,7 +209,7 @@ func TestResults_GetRegion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.results.GetRegion(); got != tt.want {
-				t.Errorf("Results.GetRegion() = %#v, want %#v", got, tt.want)
+				t.Errorf("Results.GetRegion()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -236,7 +236,7 @@ func TestResults_GetErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.results.GetErrors(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Results.GetErrors() = %#v, want %#v", got, tt.want)
+				t.Errorf("Results.GetErrors()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -263,7 +263,7 @@ func TestResults_GetSortField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.results.GetSortField(); got != tt.want {
-				t.Errorf("Results.GetSortField() = %#v, want %#v", got, tt.want)
+				t.Errorf("Results.GetSortField()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -285,7 +285,7 @@ func TestResults_GetHeaders(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.results.GetHeaders(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Results.GetHeaders() = %#v, want %#v", got, tt.want)
+				t.Errorf("Results.GetHeaders()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -310,7 +310,7 @@ func TestResults_GetRows(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.results.GetRows(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Results.GetRows() = %#v, want %#v", got, tt.want)
+				t.Errorf("Results.GetRows()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -328,7 +328,7 @@ func TestResults_GetRows(t *testing.T) {
 // 	for _, tt := range tests {
 // 		t.Run(tt.name, func(t *testing.T) {
 // 			if got := tt.results.getFilters(); !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("Results.getFilters() = %#v, want %#v", got, tt.want)
+// 				t.Errorf("Results.getFilters()\n%#v\nwant\n%#v", got, tt.want)
 // 			}
 // 		})
 // 	}
@@ -400,7 +400,7 @@ func TestGetSortFields(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetSortFields() = %#v, want %#v", got, tt.want)
+				t.Errorf("GetSortFields()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -429,7 +429,7 @@ func TestGetSortFields(t *testing.T) {
 // 				return
 // 			}
 // 			if got != tt.want {
-// 				t.Errorf("SearchInstanceName() = %#v, want %#v", got, tt.want)
+// 				t.Errorf("SearchInstanceName()\n%#v\nwant\n%#v", got, tt.want)
 // 			}
 // 		})
 // 	}

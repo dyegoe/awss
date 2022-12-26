@@ -62,10 +62,10 @@ func TestValidOutputs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, got1 := ValidOutputs(tt.args.o)
 			if got != tt.want {
-				t.Errorf("ValidOutputs() got = %v, want %v", got, tt.want)
+				t.Errorf("ValidOutputs() got\n%#v\nwant\n%#v", got, tt.want)
 			}
 			if got1 != tt.want1 {
-				t.Errorf("ValidOutputs() got1 = %v, want %v", got1, tt.want1)
+				t.Errorf("ValidOutputs() got1\n%#v\nwant\n%#v", got1, tt.want1)
 			}
 		})
 	}
@@ -127,7 +127,7 @@ func TestPrintResults(t *testing.T) {
 			w := bytes.Buffer{}
 			PrintResults(&w, resultsChan, done, tt.args.output, tt.args.showEmpty, tt.args.showTags)
 			if got := w.String(); got != tt.want {
-				t.Errorf("PrintResults() = %v, want %v", got, tt.want)
+				t.Errorf("PrintResults()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -157,7 +157,7 @@ func Test_toBold(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := toBold(tt.args.s); got != tt.want {
-				t.Errorf("toBold() = %v, want %v", got, tt.want)
+				t.Errorf("toBold()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -197,7 +197,7 @@ func Test_toJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := toJSON(tt.args.r, tt.args.showEmpty, tt.args.showTags)
 			if got != tt.want {
-				t.Errorf("toJSON() = %v, want %v", got, tt.want)
+				t.Errorf("toJSON()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -237,7 +237,7 @@ func Test_toJSONPretty(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := toJSONPretty(tt.args.r, tt.args.showEmpty, tt.args.showTags)
 			if got != tt.want {
-				t.Errorf("toJSON() = %v, want %v", got, tt.want)
+				t.Errorf("toJSON()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -290,7 +290,7 @@ func Test_toTable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := toTable(tt.args.r, tt.args.showEmpty, tt.args.showTags)
 			if got != tt.want {
-				t.Errorf("toTable() = %v, want %v", got, tt.want)
+				t.Errorf("toTable()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -333,7 +333,7 @@ func Test_rowFromStruct(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := rowFromStruct(tt.args.i); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("rowFromStruct() = %v, want %v", got, tt.want)
+				t.Errorf("rowFromStruct()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -376,7 +376,7 @@ func Test_headerStructFieldsToString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := headerStructFieldsToString(tt.args.i); got != tt.want {
-				t.Errorf("headerStructFieldsToString() = %v, want %v", got, tt.want)
+				t.Errorf("headerStructFieldsToString()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -419,7 +419,7 @@ func Test_sortedStringMapToString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := sortedStringMapToString(tt.args.m); got != tt.want {
-				t.Errorf("sortedStringMapToString() = %v, want %v", got, tt.want)
+				t.Errorf("sortedStringMapToString()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
@@ -459,7 +459,7 @@ func Test_sortedStringSliceToString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := sortedStringSliceToString(tt.args.s); got != tt.want {
-				t.Errorf("sortedStringSliceToString() = %v, want %v", got, tt.want)
+				t.Errorf("sortedStringSliceToString()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
