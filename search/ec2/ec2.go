@@ -54,28 +54,28 @@ type Results struct {
 // dataRow represents a row of the EC2 instances search results.
 type dataRow struct {
 	// InstanceID is the instance ID.
-	InstanceID string `json:"instance_id,omitempty" header:"ID" sort:"id"`
+	InstanceID string `json:"id,omitempty" header:"ID" sort:"id"`
 
 	// InstanceName is the tag:Name of the instance.
-	InstanceName string `json:"instance_name,omitempty" header:"Name" sort:"name"`
+	InstanceName string `json:"name,omitempty" header:"Name" sort:"name"`
 
 	// InstanceType is the Type of the instance.
-	InstanceType string `json:"instance_type,omitempty" header:"Type" sort:"type"`
+	InstanceType string `json:"type,omitempty" header:"Type" sort:"type"`
 
 	// AvailabilityZone is the AZ of the instance.
-	AvailabilityZone string `json:"availability_zone,omitempty" header:"AZ" sort:"az"`
+	AvailabilityZone string `json:"az,omitempty" header:"AZ" sort:"az"`
 
 	// InstanceState is the current state of the instance.
-	InstanceState string `json:"instance_state,omitempty" header:"State" sort:"state"`
+	InstanceState string `json:"state,omitempty" header:"State" sort:"state"`
 
 	// PrivateIPAddress is the private IP address assigned to the instance.
-	PrivateIPAddress string `json:"private_ip_address,omitempty" header:"Private IP" sort:"private-ip"`
+	PrivateIPAddress string `json:"private_ip,omitempty" header:"Private IP" sort:"private-ip"`
 
 	// PublicIPAddress is the public IP address assigned to the instance.
-	PublicIPAddress string `json:"public_ip_address,omitempty" header:"Public IP" sort:"public-ip"`
+	PublicIPAddress string `json:"public_ip,omitempty" header:"Public IP" sort:"public-ip"`
 
 	// NetworkInterfaces are the ENIs attached to the instance.
-	NetworkInterfaces []string `json:"network_interfaces,omitempty" header:"ENIs" sort:"enis"`
+	NetworkInterfaces []string `json:"enis,omitempty" header:"ENIs" sort:"enis"`
 
 	// Tags are a map of the tags assigned to the instance.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
@@ -87,6 +87,8 @@ func New(profile, region string, filters map[string][]string, sortField string) 
 		Profile:   profile,
 		Region:    region,
 		Filters:   filters,
+		Errors:    []string{},
+		Data:      []dataRow{},
 		SortField: sortField,
 	}
 }
@@ -115,9 +117,9 @@ func (r *Results) Search() {
 
 	// Parse response.
 	for _, i := range response.Reservations {
-		for _, inst := range i.Instances {
+		for _, inst := range i.Instances { //nolint:gocritic
 			enis := []string{}
-			for _, eni := range inst.NetworkInterfaces {
+			for _, eni := range inst.NetworkInterfaces { //nolint:gocritic
 				enis = append(enis, *eni.NetworkInterfaceId)
 			}
 			r.Data = append(r.Data, dataRow{
@@ -140,29 +142,19 @@ func (r *Results) Search() {
 }
 
 // Len returns the length of the results.
-func (r *Results) Len() int {
-	return len(r.Data)
-}
+func (r *Results) Len() int { return len(r.Data) }
 
 // GetProfile returns the profile used to search.
-func (r *Results) GetProfile() string {
-	return r.Profile
-}
+func (r *Results) GetProfile() string { return r.Profile }
 
 // GetRegion returns the region used to search.
-func (r *Results) GetRegion() string {
-	return r.Region
-}
+func (r *Results) GetRegion() string { return r.Region }
 
 // GetErrors returns the errors found during the search.
-func (r *Results) GetErrors() []string {
-	return r.Errors
-}
+func (r *Results) GetErrors() []string { return r.Errors }
 
 // GetSortField returns the field used to sort the results.
-func (r *Results) GetSortField() string {
-	return r.SortField
-}
+func (r *Results) GetSortField() string { return r.SortField }
 
 // GetHeaders returns the the tag `header` of the struct fields.
 func (r *Results) GetHeaders() []interface{} {
@@ -184,7 +176,7 @@ func (r *Results) GetHeaders() []interface{} {
 func (r *Results) GetRows() []interface{} {
 	rows := []interface{}{}
 
-	for _, row := range r.Data {
+	for _, row := range r.Data { //nolint:gocritic
 		rows = append(rows, row)
 	}
 	return rows
@@ -224,7 +216,9 @@ func (r *Results) sortResults(field string) error {
 	}
 
 	sort.Slice(r.Data, func(p, q int) bool {
-		return reflect.ValueOf(r.Data[p]).FieldByName(sortFields[field]).String() < reflect.ValueOf(r.Data[q]).FieldByName(sortFields[field]).String()
+		sortField1 := reflect.ValueOf(r.Data[p]).FieldByName(sortFields[field]).String()
+		sortField2 := reflect.ValueOf(r.Data[q]).FieldByName(sortFields[field]).String()
+		return sortField1 < sortField2
 	})
 	return nil
 }
@@ -240,8 +234,8 @@ func GetSortFields(f string) (map[string]string, error) {
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Type().Field(i)
 
-		if sort, ok := field.Tag.Lookup("sort"); ok {
-			sortFields[sort] = field.Name
+		if s, ok := field.Tag.Lookup("sort"); ok {
+			sortFields[s] = field.Name
 		}
 	}
 

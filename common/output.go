@@ -23,6 +23,7 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"reflect"
 	"sort"
 
@@ -30,8 +31,35 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 )
 
-// Outputs is the list of available output formats.
-var Outputs = []string{"json", "json-pretty", "table"}
+const (
+	// JSON is the JSON output format.
+	JSON = "json"
+	// JSONPretty is the pretty JSON output format.
+	JSONPretty = "json-pretty"
+	// Table is the table output format.
+	Table = "table"
+)
+
+// outputs is a map of output formats to functions that print the results in the given format.
+//
+// The key is the output format.
+// The value is the function that prints the results in the given format.
+var outputs = map[string]func(Results, bool, bool) string{
+	JSON:       toJSON,
+	JSONPretty: toJSONPretty,
+	Table:      toTable,
+}
+
+// ValidOutputs returns the valid output formats and if the given output is valid.
+func ValidOutputs(o string) (string, bool) {
+	var valid []string
+	for k := range outputs {
+		valid = append(valid, k)
+	}
+	sort.Strings(valid)
+	_, ok := outputs[o]
+	return StringSliceToString(valid, ", "), ok
+}
 
 // PrintResults prints the results in the given format.
 //
@@ -39,69 +67,83 @@ var Outputs = []string{"json", "json-pretty", "table"}
 // The done channel is used to signal that the results were printed.
 // The output is the format of the output.
 // The showEmpty flag indicates if empty results should be shown.
-func PrintResults(resultsChan <-chan Results, done chan<- bool, output string, showEmpty, showTags bool) {
-	s := ""
-	err := error(nil)
-
+// The showTags flag indicates if the tags should be shown.
+func PrintResults(w io.Writer, resultsChan <-chan Results, done chan<- bool, output string, showEmpty, showTags bool) {
 	for results := range resultsChan {
-		switch output {
-		case "json":
-			s, err = toJSON(results, false, showEmpty)
-		case "json-pretty":
-			s, err = toJSON(results, true, showEmpty)
-		case "table":
-			s, err = toTable(results, showEmpty, showTags)
-		default:
-			err = fmt.Errorf("output format %s not found", output)
-		}
-		if err != nil {
-			fmt.Println(err)
+		printResults, ok := outputs[output]
+		if !ok {
+			fmt.Fprintf(w, "Invalid output format: %s\n", output)
 			continue
 		}
+		s := printResults(results, showEmpty, showTags)
 		if s != "" {
-			fmt.Println(s)
+			fmt.Fprintln(w, s)
 		}
 	}
 	done <- true
 }
 
+// Bold is the function used to bold text.
+//
+// We use this var to allow tests to mock the function.
+var Bold = toBold
+
+// toBold returns a string in bold.
+func toBold(s string) string {
+	if s == "" {
+		return ""
+	}
+	return fmt.Sprintf("\033[1m%s\033[0m", s)
+}
+
 // toJSON returns the results in JSON format.
 //
-// If pretty is true, the JSON is formatted.
-func toJSON(r Results, pretty, showEmpty bool) (string, error) {
-	var b []byte
-	var err error
-	if r.Len() > 0 || showEmpty {
-		if pretty {
-			b, err = json.MarshalIndent(r, "", "  ")
-		} else {
-			b, err = json.Marshal(r)
-		}
-		if err != nil {
-			return "", err
-		}
-		return string(b), nil
+// showEmpty indicates if empty results should be shown.
+// showTags indicates if the tags should be shown. It is ignored for json format.
+func toJSON(r Results, showEmpty, showTags bool) string {
+	_ = showTags // ignored for json format
+	b, err := json.Marshal(r)
+	if err != nil {
+		return ""
 	}
-	return "", nil
+	if r.Len() == 0 && !showEmpty {
+		return ""
+	}
+	return string(b)
+}
+
+// toJSONPretty returns the results in JSON format.
+//
+// showEmpty indicates if empty results should be shown.
+// showTags indicates if the tags should be shown. It is ignored for json format.
+func toJSONPretty(r Results, showEmpty, showTags bool) string {
+	_ = showTags // ignored for json format
+	b, err := json.MarshalIndent(r, "", "  ")
+	if err != nil {
+		return ""
+	}
+	if r.Len() == 0 && !showEmpty {
+		return ""
+	}
+	return string(b)
 }
 
 // toTable returns the results in table format.
 //
-// If showEmpty is true, the table is shown even if there are no results.
-func toTable(r Results, showEmpty, showTags bool) (string, error) {
+// showEmpty indicates if empty results should be shown.
+// showTags indicates if the tags should be shown.
+func toTable(r Results, showEmpty, showTags bool) string {
 	if r.Len() == 0 && !showEmpty {
-		return "", nil
+		return ""
 	}
 
 	tableStyle := table.StyleDefault
 	tableStyle.Format.Header = text.FormatDefault
-	tableStyle.Color.Header = text.Colors{text.Bold}
 	tableStyle.Title.Align = text.AlignLeft
-	tableStyle.Title.Colors = text.Colors{text.Bold}
 
 	t := table.NewWriter()
 	t.SetStyle(tableStyle)
-	t.SetAllowedRowLength(TermWidth)
+	t.SetAllowedRowLength(TerminalSize().Width)
 	t.Style().Options.SeparateRows = true
 
 	errors := r.GetErrors()
@@ -111,11 +153,19 @@ func toTable(r Results, showEmpty, showTags bool) (string, error) {
 	}
 
 	showSort := ""
-	if sort := r.GetSortField(); sort != "" {
-		showSort = fmt.Sprintf("[Sort] %s", sort)
+	if s := r.GetSortField(); s != "" {
+		showSort = fmt.Sprintf("%s %s", Bold("[Sort]"), s)
 	}
 
-	t.SetTitle(fmt.Sprintf("[Profile] %s [Region] %s %s %s", r.GetProfile(), r.GetRegion(), showSort, showErrors))
+	t.SetTitle(
+		fmt.Sprintf("%s %s %s %s %s %s",
+			Bold("[Profile]"),
+			r.GetProfile(),
+			Bold("[Region]"),
+			r.GetRegion(),
+			showSort,
+			showErrors),
+	)
 
 	t.AppendHeader(r.GetHeaders())
 
@@ -129,7 +179,7 @@ func toTable(r Results, showEmpty, showTags bool) (string, error) {
 		},
 	)
 
-	return fmt.Sprintf("%s\n", t.Render()), nil
+	return fmt.Sprintf("%s\n", t.Render())
 }
 
 // RowsFromStruct returns a table.Row from a struct.
@@ -168,18 +218,18 @@ func rowFromStruct(i interface{}) table.Row {
 // <header>: <value>
 // ...
 func headerStructFieldsToString(i interface{}) string {
-	var s string
+	var s []string
 
 	v := reflect.ValueOf(i)
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 
 		if header, ok := v.Type().Field(i).Tag.Lookup("header"); ok && field.Interface() != "" {
-			s += fmt.Sprintf("%s: %s\n", text.Bold.Sprint(header), v.Field(i).Interface())
+			s = append(s, fmt.Sprintf("%s: %s", Bold(header), v.Field(i).Interface()))
 		}
 	}
 
-	return s
+	return StringSliceToString(s, "\n")
 }
 
 // sortedStringMapToString returns a string from a map.
@@ -193,12 +243,12 @@ func sortedStringMapToString(m map[string]string) string {
 	var s []string
 
 	for k, v := range m {
-		s = append(s, fmt.Sprintf("%s: %s\n", text.Bold.Sprint(k), v))
+		s = append(s, fmt.Sprintf("%s: %s", Bold(k), v))
 	}
 
 	sort.Strings(s)
 
-	return StringSliceToString(s, "")
+	return StringSliceToString(s, "\n")
 }
 
 // sortedStringSliceToString returns a string from a slice.

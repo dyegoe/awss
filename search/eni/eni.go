@@ -57,10 +57,10 @@ type dataRow struct {
 	InterfaceInfo eniInfo `json:"interface_info,omitempty" header:"Interface Info"`
 
 	// PrivateIPAddresses are the private IP addresses assigned to the network interface.
-	PrivateIPAddresses []string `json:"private_ip_addresses,omitempty" header:"Private IPs" sort:"private-ips"`
+	PrivateIPAddresses []string `json:"private_ips,omitempty" header:"Private IPs"`
 
 	// PublicIPAddresses are the public IP addresses or Elastic IP addresses bound to the network interface.
-	PublicIPAddresses []string `json:"public_ip_addresses,omitempty" header:"Public IPs" sort:"public-ips"`
+	PublicIPAddresses []string `json:"public_ips,omitempty" header:"Public IPs"`
 
 	// Tags are the tags assigned to the network interface.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
@@ -69,22 +69,22 @@ type dataRow struct {
 // eniInfo represents the network interface info.
 type eniInfo struct {
 	// NetworkInterfaceID is the ID of the network interface.
-	NetworkInterfaceID string `json:"network_interface_id,omitempty" header:"ID"`
+	NetworkInterfaceID string `json:"id,omitempty" header:"ID"`
 
 	// InterfaceType is the interface type.
-	InterfaceType string `json:"interface_type,omitempty" header:"Type"`
+	InterfaceType string `json:"type,omitempty" header:"Type"`
 
 	// AvailabilityZone is the AZ of the network interface.
-	AvailabilityZone string `json:"availability_zone,omitempty" header:"AZ"`
+	AvailabilityZone string `json:"az,omitempty" header:"AZ"`
 
 	// Status is the status of the network interface.
 	Status string `json:"status,omitempty" header:"Status"`
 
 	// SubnetID is the ID of the subnet that the network interface is in.
-	SubnetID string `json:"subnet_id,omitempty" header:"Subnet"`
+	SubnetID string `json:"subnet_id,omitempty" header:"Subnet ID"`
 
 	// InstanceID is the ID of the instance that this interface is associate.
-	InstanceID string `json:"instance_id,omitempty" header:"Instance"`
+	InstanceID string `json:"instance_id,omitempty" header:"Instance ID"`
 
 	// InstanceName is the name of the instance that this interface is associate.
 	InstanceName string `json:"instance_name,omitempty" header:"Instance Name"`
@@ -96,6 +96,8 @@ func New(profile, region string, filters map[string][]string, sortField string) 
 		Profile:   profile,
 		Region:    region,
 		Filters:   filters,
+		Errors:    []string{},
+		Data:      []dataRow{},
 		SortField: sortField,
 	}
 }
@@ -123,7 +125,7 @@ func (r *Results) Search() {
 	}
 
 	// Parse response.
-	for _, eni := range response.NetworkInterfaces {
+	for _, eni := range response.NetworkInterfaces { //nolint:gocritic
 		row := dataRow{
 			InterfaceInfo: eniInfo{
 				NetworkInterfaceID: *eni.NetworkInterfaceId,
@@ -156,29 +158,19 @@ func (r *Results) Search() {
 }
 
 // Len returns the length of the results.
-func (r *Results) Len() int {
-	return len(r.Data)
-}
+func (r *Results) Len() int { return len(r.Data) }
 
 // GetProfile returns the profile used to search.
-func (r *Results) GetProfile() string {
-	return r.Profile
-}
+func (r *Results) GetProfile() string { return r.Profile }
 
 // GetRegion returns the region used to search.
-func (r *Results) GetRegion() string {
-	return r.Region
-}
+func (r *Results) GetRegion() string { return r.Region }
 
 // GetErrors returns the errors found during the search.
-func (r *Results) GetErrors() []string {
-	return r.Errors
-}
+func (r *Results) GetErrors() []string { return r.Errors }
 
 // GetSortField returns the field used to sort the results.
-func (r *Results) GetSortField() string {
-	return r.SortField
-}
+func (r *Results) GetSortField() string { return r.SortField }
 
 // GetHeaders returns the the tag `header` of the struct fields.
 func (r *Results) GetHeaders() []interface{} {
@@ -200,7 +192,7 @@ func (r *Results) GetHeaders() []interface{} {
 func (r *Results) GetRows() []interface{} {
 	rows := []interface{}{}
 
-	for _, row := range r.Data {
+	for _, row := range r.Data { //nolint:gocritic
 		rows = append(rows, row)
 	}
 	return rows

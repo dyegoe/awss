@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+<!-- markdownlint-disable MD024 -->
+### Added
+
+- Initial tests for several packages. [#65](https://github.com/dyegoe/awss/issues/65)
+- Tests to github actions. [#65](https://github.com/dyegoe/awss/issues/65)
+- Pre-commit and improve github action [#84](https://github.com/dyegoe/awss/issues/84)
+
+<!-- markdownlint-disable MD024 -->
+### Changed
+
+- Refactor a few functions to make them more testable. [#65](https://github.com/dyegoe/awss/issues/65)
+- Refactor a few functions to make them less nested. [#65](https://github.com/dyegoe/awss/issues/65)
+- Refactor a few functions to handle empty values. [#65](https://github.com/dyegoe/awss/issues/65)
+- Outputs are now constants. [#83](https://github.com/dyegoe/awss/issues/83)
+- Upgrade dependencies. [#75](https://github.com/dyegoe/awss/issues/75)
+
+### Fixed
+
+- Function order, since the filter were applied before all checks. [#81](https://github.com/dyegoe/awss/issues/81)
+- Struct description for `cmd/ec2.go`. [#80](https://github.com/dyegoe/awss/issues/80)
+
 ## [v0.7.2] - 2022-12-12
 
 <!-- markdownlint-disable MD024 -->

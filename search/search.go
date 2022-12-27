@@ -17,12 +17,13 @@ limitations under the License.
 // Package search provides the entry point for the search command.
 //
 // It implements a search command that searches for resources in AWS.
-// The searchs are done in parallel and the results are printed in the
+// The searches are done in parallel and the results are printed in the
 // specified format.
 package search
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/dyegoe/awss/common"
@@ -36,7 +37,7 @@ import (
 // The filters are used to filter the results.
 // The output is the format of the output.
 // The showEmpty flag indicates if empty results should be shown.
-func Execute(cmd string, profiles, regions []string, filters map[string][]string, sortField string, output string, showEmpty, showTags bool) error {
+func Execute(cmd string, profiles, regions []string, filters map[string][]string, sortField, output string, showEmpty, showTags bool) error { //nolint:lll
 	wg := sync.WaitGroup{}
 
 	numInteractions := len(profiles) * len(regions)
@@ -45,7 +46,7 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 
 	done := make(chan bool)
 
-	go common.PrintResults(resultsChan, done, output, showEmpty, showTags)
+	go common.PrintResults(os.Stdout, resultsChan, done, output, showEmpty, showTags)
 
 	runOnce := true
 
@@ -91,17 +92,27 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 	return nil
 }
 
+// getSortFieldsCMDlist is a map of functions that return the sort fields for the given command.
+//
+// The key is the command name.
+// The value is the function that returns the sort fields.
+// We use a map to avoid a switch case and mock the functions in the tests.
+var getSortFieldsCMDList = map[string]func(string) (map[string]string, error){
+	"ec2": searchEC2.GetSortFields,
+}
+
 // CheckSortField checks if the given sort field is valid for the given command.
 //
 // It returns an error if the sort field is not valid.
 func CheckSortField(cmd, f string) error {
-	switch cmd {
-	case "ec2":
-		if _, err := searchEC2.GetSortFields(f); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("command %s not found for sort field %s", cmd, f)
+	execute, ok := getSortFieldsCMDList[cmd]
+	if !ok {
+		return fmt.Errorf("command %s not found", cmd)
 	}
+
+	if _, err := execute(f); err != nil {
+		return err
+	}
+
 	return nil
 }

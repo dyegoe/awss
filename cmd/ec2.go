@@ -20,6 +20,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/dyegoe/awss/common"
@@ -29,7 +30,11 @@ import (
 	"github.com/spf13/viper"
 )
 
-// ec2Filters represents the filters for the eni command.
+const (
+	labelEc2Sort = "ec2.sort"
+)
+
+// ec2Filters represents the filters for the ec2 command.
 //
 // The filters are used to filter the results.
 // common.StructToFilters is used to convert the struct to a map[string][]string.
@@ -54,7 +59,8 @@ var ec2Cmd = &cobra.Command{
 	Short: "Search for EC2 instances.",
 	Long: `
 Search for EC2 instances.
-You can search EC2 instances using the following filters: ids, names, tags, instance-types, availability-zones, instance-states, private-ips and public-ips.
+You can search EC2 instances using the following filters:
+  ids, names, tags, instance-types, availability-zones, instance-states, private-ips and public-ips.
 You can use multiple values for each filter, separated by comma. Example: --names 'Name1,Name2'
 
 You can use multiple filters at same time, for example:
@@ -62,50 +68,73 @@ You can use multiple filters at same time, for example:
 
 (You can use the wildcard '*' to search for all values in a filter)
 `,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check if the availability zones are valid
-		if err := checkAvailabilityZones(ec2F.AvailabilityZones); err != nil {
-			return err
-		}
-
-		// Convert the struct to a map[string][]string to be used as filters
-		filters, err := common.StructToFilters(ec2F)
-		if err != nil {
-			return err
-		}
-
-		// Check if the tags are valid
-		if _, err := common.ParseTags(ec2F.Tags); err != nil {
-			return err
-		}
-
-		// Check if the sort is valid
-		if err := search.CheckSortField(cmd.Name(), viper.GetString("ec2.sort")); err != nil {
-			return err
-		}
-
-		// Execute the search
-		err = search.Execute(cmd.Name(), viper.GetStringSlice("profiles"), viper.GetStringSlice("regions"), filters, viper.GetString("ec2.sort"), viper.GetString("output"), viper.GetBool("show.empty"), viper.GetBool("show.tags"))
-		if err != nil {
-			return err
-		}
-		return nil
-	},
+	RunE: ec2RunE,
 }
 
-func init() {
+func ec2RunE(cmd *cobra.Command, args []string) error {
+	err := checkAvailabilityZones(ec2F.AvailabilityZones)
+	if err != nil && err.Error() != "no availability zone selected" {
+		return err
+	}
+
+	if _, err := common.ParseTags(ec2F.Tags); err != nil {
+		return err
+	}
+
+	if err := search.CheckSortField(cmd.Name(), viper.GetString(labelEc2Sort)); err != nil {
+		return err
+	}
+
+	filters, err := common.StructToFilters(ec2F)
+	if err != nil {
+		return err
+	}
+
+	err = search.Execute(
+		cmd.Name(),
+		viper.GetStringSlice(labelProfiles),
+		viper.GetStringSlice(labelRegions),
+		filters,
+		viper.GetString(labelEc2Sort),
+		viper.GetString(labelOutput),
+		viper.GetBool(labelShowEmpty),
+		viper.GetBool(labelShowTags),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ec2InitFlags() {
 	rootCmd.AddCommand(ec2Cmd)
 
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.Ids, "ids", "i", []string{}, "Filter EC2 instances by ids. `i-1230456078901,i-1230456078902`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.Names, "names", "n", []string{}, "Filter EC2 instances by names. It searchs using the 'tag:Name'. `instance-1,instance-2`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.Tags, "tags", "t", []string{}, "Filter EC2 instances by tags. `'Key=Value1:Value2,Environment=Production'`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.TagsKey, "tags-key", "k", []string{}, "Filter EC2 instances by tags key. `Key,Environment`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.InstanceTypes, "instance-types", "T", []string{}, "Filter EC2 instances by instance type. `t2.micro,t2.small`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.AvailabilityZones, "availability-zones", "z", []string{}, "Filter EC2 instances by availability zones. It will append to current region. `a,b`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.InstanceStates, "instance-states", "s", []string{}, "Filter EC2 instances by instance state. `running,stopped`")
-	ec2Cmd.Flags().IPSliceVarP(&ec2F.PrivateIPs, "private-ips", "p", []net.IP{}, "Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
-	ec2Cmd.Flags().IPSliceVarP(&ec2F.PublicIPs, "public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
-	ec2Cmd.Flags().String("sort", "name", "Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
-	// Bind flags to viper
-	viper.BindPFlag("ec2.sort", ec2Cmd.Flags().Lookup("sort"))
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.Ids, "ids", "i", []string{},
+		"Filter EC2 instances by ids. `i-1230456078901,i-1230456078902`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.Names, "names", "n", []string{},
+		"Filter EC2 instances by names. It searches using the 'tag:Name'. `instance-1,instance-2`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.Tags, "tags", "t", []string{},
+		"Filter EC2 instances by tags. `'Key=Value1:Value2,Environment=Production'`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.TagsKey, "tags-key", "k", []string{},
+		"Filter EC2 instances by tags key. `Key,Environment`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.InstanceTypes, "instance-types", "T", []string{},
+		"Filter EC2 instances by instance type. `t2.micro,t2.small`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.AvailabilityZones, "availability-zones", "z", []string{},
+		"Filter EC2 instances by availability zones. It will append to current region. `a,b`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.InstanceStates, "instance-states", "s", []string{},
+		"Filter EC2 instances by instance state. `running,stopped`")
+	ec2Cmd.Flags().IPSliceVarP(&ec2F.PrivateIPs, "private-ips", "p", []net.IP{},
+		"Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
+	ec2Cmd.Flags().IPSliceVarP(&ec2F.PublicIPs, "public-ips", "P", []net.IP{},
+		"Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
+	ec2Cmd.Flags().String("sort", "name",
+		"Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
+}
+
+func ec2InitViper() error {
+	if err := viper.BindPFlag(labelEc2Sort, ec2Cmd.Flags().Lookup("sort")); err != nil {
+		return fmt.Errorf("error binding flag: %w", err)
+	}
+	return nil
 }

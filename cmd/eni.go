@@ -60,40 +60,55 @@ You can use multiple filters at same time, for example:
 	
 (You can use the wildcard '*' to search for all values in a filter)
 `,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check if the availability zones are valid
-		if err := checkAvailabilityZones(eniF.AvailabilityZones); err != nil {
-			return err
-		}
-
-		// Convert the struct to a map[string][]string to be used as filters
-		filters, err := common.StructToFilters(eniF)
-		if err != nil {
-			return err
-		}
-
-		// Check if the tags are valid
-		if _, err := common.ParseTags(ec2F.Tags); err != nil {
-			return err
-		}
-
-		// Execute the search
-		err = search.Execute(cmd.Name(), viper.GetStringSlice("profiles"), viper.GetStringSlice("regions"), filters, "", viper.GetString("output"), viper.GetBool("show-empty"), viper.GetBool("show-tags"))
-		if err != nil {
-			return err
-		}
-		return nil
-	},
+	RunE: eniRunE,
 }
 
-func init() {
+func eniRunE(cmd *cobra.Command, args []string) error {
+	if err := checkAvailabilityZones(eniF.AvailabilityZones); err != nil {
+		return err
+	}
+
+	if _, err := common.ParseTags(eniF.Tags); err != nil {
+		return err
+	}
+
+	filters, err := common.StructToFilters(eniF)
+	if err != nil {
+		return err
+	}
+
+	err = search.Execute(
+		cmd.Name(),
+		viper.GetStringSlice(labelProfiles),
+		viper.GetStringSlice(labelRegions),
+		filters,
+		"",
+		viper.GetString(labelOutput),
+		viper.GetBool(labelShowEmpty),
+		viper.GetBool(labelShowTags),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func eniInitFlags() {
 	rootCmd.AddCommand(eniCmd)
 
-	eniCmd.Flags().StringSliceVarP(&eniF.Ids, "ids", "i", []string{}, "Filter ENIs by ids. `eni-1230456078901,eni-1230456078902`")
-	eniCmd.Flags().StringSliceVarP(&eniF.Tags, "tags", "t", []string{}, "Filter ENIs by tags. `'Key=Value1:Value2,Environment=Production'`")
-	eniCmd.Flags().StringSliceVarP(&eniF.TagsKey, "tags-key", "k", []string{}, "Filter ENIs by tags key. `Key,Environment`")
-	eniCmd.Flags().StringSliceVarP(&eniF.InstanceIDs, "instance-ids", "I", []string{}, "Filter ENIs by instance IDs. `i-1230456078901,i-1230456078902`")
-	eniCmd.Flags().StringSliceVarP(&eniF.AvailabilityZones, "availability-zones", "z", []string{}, "Filter ENIs by availability zones. It will append to current region. `a,b`")
-	eniCmd.Flags().IPSliceVarP(&eniF.PrivateIPs, "private-ips", "p", []net.IP{}, "Filter ENIs by private IPs. `172.16.0.1,172.17.1.254`")
-	eniCmd.Flags().IPSliceVarP(&eniF.PublicIPs, "public-ips", "P", []net.IP{}, "Filter ENIs by public IPs. `52.28.19.20,52.30.31.32`")
+	eniCmd.Flags().StringSliceVarP(&eniF.Ids, "ids", "i", []string{},
+		"Filter ENIs by ids. `eni-1230456078901,eni-1230456078902`")
+	eniCmd.Flags().StringSliceVarP(&eniF.Tags, "tags", "t", []string{},
+		"Filter ENIs by tags. `'Key=Value1:Value2,Environment=Production'`")
+	eniCmd.Flags().StringSliceVarP(&eniF.TagsKey, "tags-key", "k", []string{},
+		"Filter ENIs by tags key. `Key,Environment`")
+	eniCmd.Flags().StringSliceVarP(&eniF.InstanceIDs, "instance-ids", "I", []string{},
+		"Filter ENIs by instance IDs. `i-1230456078901,i-1230456078902`")
+	eniCmd.Flags().StringSliceVarP(&eniF.AvailabilityZones, "availability-zones", "z", []string{},
+		"Filter ENIs by availability zones. It will append to current region. `a,b`")
+	eniCmd.Flags().IPSliceVarP(&eniF.PrivateIPs, "private-ips", "p", []net.IP{},
+		"Filter ENIs by private IPs. `172.16.0.1,172.17.1.254`")
+	eniCmd.Flags().IPSliceVarP(&eniF.PublicIPs, "public-ips", "P", []net.IP{},
+		"Filter ENIs by public IPs. `52.28.19.20,52.30.31.32`")
 }
