@@ -64,7 +64,8 @@ You can use multiple filters at same time, for example:
 }
 
 func eniRunE(cmd *cobra.Command, args []string) error {
-	if err := checkAvailabilityZones(eniF.AvailabilityZones); err != nil {
+	err := checkAvailabilityZones(eniF.AvailabilityZones)
+	if err != nil && err.Error() != "no availability zone selected" {
 		return err
 	}
 

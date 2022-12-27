@@ -28,6 +28,7 @@ import (
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
 // Results describes results of the ENIs search.
@@ -53,6 +54,9 @@ type Results struct {
 
 // dataRow represents a row of the ENIs search results.
 type dataRow struct {
+	// NetworkInterfaceID is the ID of the network interface.
+	NetworkInterfaceID string `json:"id,omitempty" header:"ID"`
+
 	// InterfaceInfo are the network interface infos (ID, type, AZ, status, subnet, instance).
 	InterfaceInfo eniInfo `json:"interface_info,omitempty" header:"Interface Info"`
 
@@ -68,9 +72,6 @@ type dataRow struct {
 
 // eniInfo represents the network interface info.
 type eniInfo struct {
-	// NetworkInterfaceID is the ID of the network interface.
-	NetworkInterfaceID string `json:"id,omitempty" header:"ID"`
-
 	// InterfaceType is the interface type.
 	InterfaceType string `json:"type,omitempty" header:"Type"`
 
@@ -106,17 +107,14 @@ func New(profile, region string, filters map[string][]string, sortField string) 
 //
 // results are stored in the Data field.
 func (r *Results) Search() {
-	// Get search filters.
 	input := r.getFilters()
 
-	// Get AWS config.
 	cfg, err := common.AwsConfig(r.Profile, r.Region)
 	if err != nil {
 		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %s", err))
 		return
 	}
 
-	// Get AWS client and describe network interfaces.
 	client := ec2.NewFromConfig(cfg)
 	response, err := client.DescribeNetworkInterfaces(context.TODO(), input)
 	if err != nil {
@@ -124,37 +122,39 @@ func (r *Results) Search() {
 		return
 	}
 
-	// Parse response.
 	for _, eni := range response.NetworkInterfaces { //nolint:gocritic
-		row := dataRow{
-			InterfaceInfo: eniInfo{
-				NetworkInterfaceID: *eni.NetworkInterfaceId,
-				InterfaceType:      string(eni.InterfaceType),
-				AvailabilityZone:   *eni.AvailabilityZone,
-				SubnetID:           *eni.SubnetId,
-				Status:             string(eni.Status),
-			},
-			Tags: common.TagsToMap(eni.TagSet),
-		}
-		if eni.Attachment != nil {
-			if eni.Attachment.InstanceId != nil {
-				row.InterfaceInfo.InstanceID = *eni.Attachment.InstanceId
-				row.InterfaceInfo.InstanceName, err = searchEC2.SearchInstanceName(r.Profile, r.Region, *eni.Attachment.InstanceId)
-				if err != nil {
-					r.Errors = append(r.Errors, err.Error())
-				}
+		info := eniInfo{}
+		info.InterfaceType = string(eni.InterfaceType)
+		info.AvailabilityZone = *eni.AvailabilityZone
+		info.SubnetID = *eni.SubnetId
+		info.Status = string(eni.Status)
+		row := dataRow{}
+		row.NetworkInterfaceID = *eni.NetworkInterfaceId
+		row.InterfaceInfo = info
+		row.Tags = common.TagsToMap(eni.TagSet)
+		if ok := eni.Attachment.InstanceId; ok != nil {
+			row.InterfaceInfo.InstanceID = *eni.Attachment.InstanceId
+			row.InterfaceInfo.InstanceName, err = searchEC2.SearchInstanceName(r.Profile, r.Region, *eni.Attachment.InstanceId)
+			if err != nil {
+				r.Errors = append(r.Errors, err.Error())
 			}
 		}
 		if eni.PrivateIpAddresses != nil {
-			for _, ip := range eni.PrivateIpAddresses {
-				row.PrivateIPAddresses = append(row.PrivateIPAddresses, *ip.PrivateIpAddress)
-				if ip.Association != nil {
-					row.PublicIPAddresses = append(row.PublicIPAddresses, *ip.Association.PublicIp)
-				}
-			}
+			row.PrivateIPAddresses, row.PublicIPAddresses = parseIPAddresses(eni.PrivateIpAddresses)
 		}
 		r.Data = append(r.Data, row)
 	}
+}
+
+// parseIPAddresses parses the IP addresses and returns the private and public IPs.
+func parseIPAddresses(ipAddresses []types.NetworkInterfacePrivateIpAddress) (privateIPs, publicIPs []string) {
+	for _, ip := range ipAddresses {
+		privateIPs = append(privateIPs, *ip.PrivateIpAddress)
+		if ip.Association != nil {
+			publicIPs = append(publicIPs, *ip.Association.PublicIp)
+		}
+	}
+	return privateIPs, publicIPs
 }
 
 // Len returns the length of the results.
@@ -204,9 +204,8 @@ func (r *Results) GetRows() []interface{} {
 // This function expects the filters to be in the format used by the AWS SDK.
 // Except for "ids", "tags" and "availability-zones", all other filters are passed as it is.
 // If no filters are given, it returns an empty list.
-func (r *Results) getFilters() *ec2.DescribeNetworkInterfacesInput {
-	input := ec2.DescribeNetworkInterfacesInput{}
-
+func (r *Results) getFilters() (input *ec2.DescribeNetworkInterfacesInput) {
+	input = &ec2.DescribeNetworkInterfacesInput{}
 	for key, values := range r.Filters {
 		switch key {
 		case "network-interface-id":
@@ -219,5 +218,5 @@ func (r *Results) getFilters() *ec2.DescribeNetworkInterfacesInput {
 			input.Filters = append(input.Filters, common.FilterDefault(key, values)...)
 		}
 	}
-	return &input
+	return input
 }

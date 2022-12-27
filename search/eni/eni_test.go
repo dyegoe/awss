@@ -23,10 +23,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dyegoe/awss/common"
-
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/dyegoe/awss/common"
 )
 
 // TestNew tests the New function.
@@ -100,6 +99,7 @@ var mockResults = &Results{
 }
 
 var mockDataRow1 = &dataRow{
+	NetworkInterfaceID: "eni-1234567890abcdef0",
 	InterfaceInfo:      *mockENIInfo1,
 	PrivateIPAddresses: []string{"172.16.0.1", "172.16.0.2"},
 	PublicIPAddresses:  []string{"51.52.53.54", "51.52.53.55"},
@@ -110,6 +110,7 @@ var mockDataRow1 = &dataRow{
 }
 
 var mockDataRow2 = &dataRow{
+	NetworkInterfaceID: "eni-1234567890abcdef1",
 	InterfaceInfo:      *mockENIInfo2,
 	PrivateIPAddresses: []string{"172.16.1.1", "172.16.1.2"},
 	PublicIPAddresses:  []string{"51.52.54.54", "51.52.54.55"},
@@ -120,23 +121,21 @@ var mockDataRow2 = &dataRow{
 }
 
 var mockENIInfo1 = &eniInfo{
-	NetworkInterfaceID: "eni-1234567890abcdef0",
-	InterfaceType:      "interface-type-1",
-	AvailabilityZone:   "us-east-1a",
-	Status:             "status-1",
-	SubnetID:           "subnet-1234567890abcdef0",
-	InstanceID:         "i-1234567890abcdef0",
-	InstanceName:       "instance-name-1",
+	InterfaceType:    "interface-type-1",
+	AvailabilityZone: "us-east-1a",
+	Status:           "status-1",
+	SubnetID:         "subnet-1234567890abcdef0",
+	InstanceID:       "i-1234567890abcdef0",
+	InstanceName:     "instance-name-1",
 }
 
 var mockENIInfo2 = &eniInfo{
-	NetworkInterfaceID: "eni-1234567890abcdef1",
-	InterfaceType:      "interface-type-2",
-	AvailabilityZone:   "us-east-1b",
-	Status:             "status-2",
-	SubnetID:           "subnet-1234567890abcdef1",
-	InstanceID:         "i-1234567890abcdef1",
-	InstanceName:       "instance-name-2",
+	InterfaceType:    "interface-type-2",
+	AvailabilityZone: "us-east-1b",
+	Status:           "status-2",
+	SubnetID:         "subnet-1234567890abcdef1",
+	InstanceID:       "i-1234567890abcdef1",
+	InstanceName:     "instance-name-2",
 }
 
 // // TestResults_Search tests the Search function.
@@ -153,6 +152,66 @@ var mockENIInfo2 = &eniInfo{
 // 		})
 // 	}
 // }
+
+// Test_parseIPAddresses tests the parseIPAddresses function.
+func Test_parseIPAddresses(t *testing.T) {
+	type args struct {
+		ipAddresses []types.NetworkInterfacePrivateIpAddress
+	}
+	tests := []struct {
+		name           string
+		args           args
+		wantPrivateIPs []string
+		wantPublicIPs  []string
+	}{
+		{
+			name: "empty",
+			args: args{
+				ipAddresses: []types.NetworkInterfacePrivateIpAddress{},
+			},
+			wantPrivateIPs: nil,
+			wantPublicIPs:  nil,
+		},
+		{
+			name: "private",
+			args: args{
+				ipAddresses: []types.NetworkInterfacePrivateIpAddress{
+					{
+						PrivateIpAddress: common.String("172.16.0.1"),
+					},
+				},
+			},
+			wantPrivateIPs: []string{"172.16.0.1"},
+			wantPublicIPs:  nil,
+		},
+		{
+			name: "private with public association",
+			args: args{
+				ipAddresses: []types.NetworkInterfacePrivateIpAddress{
+					{
+						PrivateIpAddress: common.String("172.16.0.2"),
+						Association: &types.NetworkInterfaceAssociation{
+							PublicIp: common.String("51.52.53.54"),
+						},
+					},
+				},
+			},
+			wantPrivateIPs: []string{"172.16.0.2"},
+			wantPublicIPs:  []string{"51.52.53.54"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotPrivateIPs, gotPublicIPs := parseIPAddresses(tt.args.ipAddresses)
+			if !reflect.DeepEqual(gotPrivateIPs, tt.wantPrivateIPs) {
+				t.Errorf("parseIPAddresses() gotPrivateIPs\n%#v\nwant\n%#v", gotPrivateIPs, tt.wantPrivateIPs)
+			}
+			if !reflect.DeepEqual(gotPublicIPs, tt.wantPublicIPs) {
+				t.Errorf("parseIPAddresses() gotPublicIPs\n%#v\nwant\n%#v", gotPublicIPs, tt.wantPublicIPs)
+			}
+		})
+	}
+}
 
 // TestResults_Len tests the Len function.
 func TestResults_Len(t *testing.T) {
@@ -299,7 +358,7 @@ func TestResults_GetHeaders(t *testing.T) {
 		{
 			name:    "TestResults_GetHeaders",
 			results: mockResults,
-			want:    []interface{}{"Interface Info", "Private IPs", "Public IPs", "Tags"},
+			want:    []interface{}{"ID", "Interface Info", "Private IPs", "Public IPs", "Tags"},
 		},
 	}
 	for _, tt := range tests {
