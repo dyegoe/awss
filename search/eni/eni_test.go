@@ -418,8 +418,16 @@ func TestResults_getFilters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.results.getFilters(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Results.getFilters()\n%#v\nwant\n%#v", got, tt.want)
+			got := tt.results.getFilters()
+			for _, i := range got.Filters {
+				for _, j := range tt.want.Filters {
+					if *i.Name != *j.Name {
+						continue
+					}
+					if !reflect.DeepEqual(i.Values, j.Values) {
+						t.Errorf("Results.getFilters()\n%#v\nwant\n%#v", got, tt.want)
+					}
+				}
 			}
 		})
 	}
