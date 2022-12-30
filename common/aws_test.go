@@ -228,6 +228,8 @@ func TestFilterNames(t *testing.T) {
 }
 
 // TestFilterTags tests the FilterTags function.
+//
+//nolint:funlen
 func TestFilterTags(t *testing.T) {
 	type args struct {
 		tags []string
@@ -281,8 +283,16 @@ func TestFilterTags(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := FilterTags(tt.args.tags); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("FilterTags()\n%#v\nwant\n%#v", got, tt.want)
+			got := FilterTags(tt.args.tags)
+			for _, i := range got {
+				for _, j := range tt.want {
+					if *i.Name != *j.Name {
+						continue
+					}
+					if !reflect.DeepEqual(i.Values, j.Values) {
+						t.Errorf("FilterTags()\n%#v\nwant\n%#v", got, tt.want)
+					}
+				}
 			}
 		})
 	}
