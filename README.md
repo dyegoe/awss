@@ -57,14 +57,16 @@ And you can combine these filters together.
 
 ## Installation
 
+You can download the binary from the [releases](https://github.com/dyegoe/awss/releases) page.
+
+Or you can build it from source:
+
 ```txt
 git clone http://github.com/dyegoe/awss
 cd awss
 go build
 cp awss /usr/local/bin
 ```
-
-Or you can download the binary from the [releases](https://github.com/dyegoe/awss/releases) page.
 
 ## Configuration
 
