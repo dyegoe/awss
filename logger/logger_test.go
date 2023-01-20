@@ -53,8 +53,7 @@ func TestLogger_Debug(t *testing.T) {
 	output := bytes.Buffer{}
 	log := NewLogger(&output, map[string]string{"key": "value"})
 	log.Debug("test")
-	//nolint:lll
-	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[33mDBG\x1b[0m test \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen))
+	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[33mDBG\x1b[0m test \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen)) //nolint:lll
 	if got := output.String(); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -67,8 +66,7 @@ func TestLogger_Debugf(t *testing.T) {
 	output := bytes.Buffer{}
 	log := NewLogger(&output, map[string]string{"key": "value"})
 	log.Debugf("test %s", "format")
-	//nolint:lll
-	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[33mDBG\x1b[0m test format \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen))
+	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[33mDBG\x1b[0m test format \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen)) //nolint:lll
 	if got := output.String(); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -81,8 +79,7 @@ func TestLogger_Info(t *testing.T) {
 	output := bytes.Buffer{}
 	log := NewLogger(&output, map[string]string{"key": "value"})
 	log.Info("test")
-	//nolint:lll
-	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[32mINF\x1b[0m test \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen))
+	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[32mINF\x1b[0m test \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen)) //nolint:lll
 	if got := output.String(); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -95,8 +92,7 @@ func TestLogger_Infof(t *testing.T) {
 	output := bytes.Buffer{}
 	log := NewLogger(&output, map[string]string{"key": "value"})
 	log.Infof("test %s", "format")
-	//nolint:lll
-	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[32mINF\x1b[0m test format \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen))
+	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[32mINF\x1b[0m test format \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen)) //nolint:lll
 	if got := output.String(); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -109,8 +105,7 @@ func TestLogger_Warn(t *testing.T) {
 	output := bytes.Buffer{}
 	log := NewLogger(&output, map[string]string{"key": "value"})
 	log.Warn("test", fmt.Errorf("error"))
-	//nolint:lll
-	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[31mWRN\x1b[0m test \x1b[36merror=\x1b[0m\x1b[31merror\x1b[0m \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen))
+	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[31mWRN\x1b[0m test \x1b[36merror=\x1b[0m\x1b[31merror\x1b[0m \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen)) //nolint:lll
 	if got := output.String(); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -123,8 +118,7 @@ func TestLogger_Warnf(t *testing.T) {
 	output := bytes.Buffer{}
 	log := NewLogger(&output, map[string]string{"key": "value"})
 	log.Warnf("test %s", fmt.Errorf("error"), "format")
-	//nolint:lll
-	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[31mWRN\x1b[0m test format \x1b[36merror=\x1b[0m\x1b[31merror\x1b[0m \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen))
+	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[31mWRN\x1b[0m test format \x1b[36merror=\x1b[0m\x1b[31merror\x1b[0m \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen)) //nolint:lll
 	if got := output.String(); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -137,8 +131,7 @@ func TestLogger_Error(t *testing.T) {
 	output := bytes.Buffer{}
 	log := NewLogger(&output, map[string]string{"key": "value"})
 	log.Error("test", fmt.Errorf("error"))
-	//nolint:lll
-	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[1m\x1b[31mERR\x1b[0m\x1b[0m test \x1b[36merror=\x1b[0m\x1b[31merror\x1b[0m \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen))
+	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[1m\x1b[31mERR\x1b[0m\x1b[0m test \x1b[36merror=\x1b[0m\x1b[31merror\x1b[0m \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen)) //nolint:lll
 	if got := output.String(); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -151,8 +144,7 @@ func TestLogger_Errorf(t *testing.T) {
 	output := bytes.Buffer{}
 	log := NewLogger(&output, map[string]string{"key": "value"})
 	log.Errorf("test %s", fmt.Errorf("error"), "format")
-	//nolint:lll
-	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[1m\x1b[31mERR\x1b[0m\x1b[0m test format \x1b[36merror=\x1b[0m\x1b[31merror\x1b[0m \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen))
+	want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[1m\x1b[31mERR\x1b[0m\x1b[0m test format \x1b[36merror=\x1b[0m\x1b[31merror\x1b[0m \x1b[36mkey=\x1b[0mvalue\n", time.Now().Format(time.Kitchen)) //nolint:lll
 	if got := output.String(); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

@@ -89,4 +89,5 @@ Before you submit a pull request, check that it meets these guidelines:
 
 The source code is organized as follows:
 
+* `cmd` - contains the main application entry point. It is responsible for parsing the command line arguments and import the subcommands.
 * `logger` - contains the logger implementation.

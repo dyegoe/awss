@@ -16,3 +16,18 @@ limitations under the License.
 
 // Package main contains the main function.
 package main
+
+import (
+	"os"
+
+	"github.com/dyegoe/awss/cmd"
+	"github.com/dyegoe/awss/logger"
+)
+
+func main() {
+	log := logger.NewLogger(os.Stdout, map[string]string{"pkg": "main"})
+
+	if err := cmd.Initialize(); err != nil {
+		log.Error("error initializing the awss command", err)
+	}
+}
