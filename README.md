@@ -11,47 +11,47 @@ The current version is 0.7.2
 
 ## Features
 
-- Specify a configuration file `--config`
-- Search AWS resources
-  - in parallel (default)
-  - using all profiles, multiple profiles or a single profile. `--profiles all` or `--profiles default,dev`
-  - in all regions, multiple regions or a single region. `--regions all` or `--regions us-east-1,us-east-2`
-- Select the output format
-  - table `--output table` (default)
-  - json `--output json`
-  - json-pretty `--output json-pretty`
-- Show empty results `--show-empty`
-- Show tags `--show-tags` (it works only with `--output table` and it is ignored when using another output format)
-- Search AWS ec2 instances `awss ec2`
-  - Filter by:
-    - instance ids `--instance-ids|-i i-1234567890abcdef0,i-0987654321fedcba0`
-    - names `--names|-n my-instance-1,my-instance-2`
-    - tags `--tags|-t Name:my-instance-1,Name:my-instance-2`
-    - tag keys `--tag-keys|-k Name,Environment`
-    - instance types `--instance-types|-T t2.micro,t3.micro`
-    - availability zones `--availability-zones|-z a,b`
-    - instance states `--instance-states|-s running,stopped`
-    - private ips `--private-ips|-p 172.16.0.1,172.17.1.254`
-    - public ips `--public-ips|-P 52.28.19.20,52.30.31.32`
-  - Sort by:
-    - id `--sort id`
-    - name `--sort name`
-    - type `--sort type`
-    - az `--sort az`
-    - state `--sort state`
-    - private ip `--sort private_ip`
-    - public ip `--sort public_ip`
-    - enis `--sort enis`
-- Search AWS ENIs
-  - Filter by:
-    - network interface ids `--network-interface-ids|-i eni-1234567890abcdef0,eni-0987654321fedcba0`
-    - tags `--tags|-t Name:my-eni-1,Name:my-eni-2`
-    - tag keys `--tag-keys|-k Name,Environment`
-    - instance ids `--instance-ids|-I i-1234567890abcdef0,i-0987654321fedcba0`
-    - availability zones `--availability-zones|-z a,b`
-    - private ips `--private-ips|-p 172.16.0.1,172.17.1.254`
-    - public ips `--public-ips|-P 52.28.19.20,52.30.31.32`
-  - ENIs doesn't support sort at the moment
+* Specify a configuration file `--config`
+* Search AWS resources
+  * in parallel (default)
+  * using all profiles, multiple profiles or a single profile. `--profiles all` or `--profiles default,dev`
+  * using all regions, multiple regions or a single region. `--regions all` or `--regions us-east-1,us-east-2`
+* Select the output format
+  * table `--output table` (default)
+  * json `--output json`
+  * json-pretty `--output json-pretty`
+* Show empty results `--show-empty`
+* Show tags `--show-tags` (it works only with `--output table` and it is ignored when using another output format)
+* Search AWS ec2 instances `awss ec2`
+  * Filter by:
+    * instance ids `--instance-ids|-i i-1234567890abcdef0,i-0987654321fedcba0`
+    * names `--names|-n my-instance-1,my-instance-2`
+    * tags `--tags|-t Name:my-instance-1,Name:my-instance-2`
+    * tag keys `--tag-keys|-k Name,Environment`
+    * instance types `--instance-types|-T t2.micro,t3.micro`
+    * availability zones `--availability-zones|-z a,b`
+    * instance states `--instance-states|-s running,stopped`
+    * private ips `--private-ips|-p 172.16.0.1,172.17.1.254`
+    * public ips `--public-ips|-P 52.28.19.20,52.30.31.32`
+  * Sort by:
+    * id `--sort id`
+    * name `--sort name`
+    * type `--sort type`
+    * az `--sort az`
+    * state `--sort state`
+    * private ip `--sort private_ip`
+    * public ip `--sort public_ip`
+    * enis `--sort enis`
+* Search AWS ENIs
+  * Filter by:
+    * network interface ids `--network-interface-ids|-i eni-1234567890abcdef0,eni-0987654321fedcba0`
+    * tags `--tags|-t Name:my-eni-1,Name:my-eni-2`
+    * tag keys `--tag-keys|-k Name,Environment`
+    * instance ids `--instance-ids|-I i-1234567890abcdef0,i-0987654321fedcba0`
+    * availability zones `--availability-zones|-z a,b`
+    * private ips `--private-ips|-p 172.16.0.1,172.17.1.254`
+    * public ips `--public-ips|-P 52.28.19.20,52.30.31.32`
+  * ENIs doesn't support sort at the moment
 
 And you can combine these filters together.
 
@@ -70,13 +70,13 @@ Or you can download the binary from the [releases](https://github.com/dyegoe/aws
 
 AWSS uses a configuration file to set the default:
 
-- profiles
-- regions
-- output format
-- show empty results
-- show tags
-- all regions to search
-- sort field for ec2 instances
+* profiles
+* regions
+* output format
+* show empty results
+* show tags
+* all regions to search
+* sort field for ec2 instances
 
 The default configuration file is `~/.awss/config.yaml` but you can specify another one using `--config` flag.
 
@@ -157,8 +157,8 @@ Apache 2.0
 
 ## Thanks
 
-- [AWS SDK Go v2](https://github.com/aws/aws-sdk-go-v2)
-- [Cobra](https://github.com/spf13/cobra)
-- [Viper](https://github.com/spf13/viper)
-- [Go-Pretty](https://github.com/jedib0t/go-pretty)
-- [Go release binaries](https://github.com/marketplace/actions/go-release-binaries)
+* [AWS SDK Go v2](https://github.com/aws/aws-sdk-go-v2)
+* [Cobra](https://github.com/spf13/cobra)
+* [Viper](https://github.com/spf13/viper)
+* [Go-Pretty](https://github.com/jedib0t/go-pretty)
+* [Go release binaries](https://github.com/marketplace/actions/go-release-binaries)
