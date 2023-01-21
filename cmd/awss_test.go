@@ -24,18 +24,29 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
+
+func TestInitialize(t *testing.T) {
+
+}
 
 func Test_initPersistentFlags(t *testing.T) {
 	testCmd := &cobra.Command{}
 	initPersistentFlags(testCmd)
 
-	if testCmd.PersistentFlags().HasFlags() == false {
-		t.Error("initPersistentFlags() has no flags")
-	}
+	t.Run("has flags", func(t *testing.T) {
+		if testCmd.PersistentFlags().HasFlags() == false {
+			t.Error("initPersistentFlags() has no flags")
+		}
+	})
 
 	tests := []struct {
 		flag  string
@@ -49,11 +60,127 @@ func Test_initPersistentFlags(t *testing.T) {
 		{"show-tags", "false"},
 	}
 	for _, tt := range tests {
-		if testCmd.PersistentFlags().Lookup(tt.flag) == nil {
-			t.Errorf("initPersistentFlags() has no %s flag", tt.flag)
+		t.Run(fmt.Sprintf("has %s flag", tt.flag), func(t *testing.T) {
+			if testCmd.PersistentFlags().Lookup(tt.flag) == nil {
+				t.Errorf("initPersistentFlags() has no %s flag", tt.flag)
+			}
+		})
+		t.Run(fmt.Sprintf("has %s flag with default value", tt.flag), func(t *testing.T) {
+			if got := testCmd.PersistentFlags().Lookup(tt.flag).DefValue; got != tt.value {
+				t.Errorf("initPersistentFlags() flag: %s has wrong default value: got %s, want %s", tt.flag, got, tt.value)
+			}
+		})
+	}
+}
+
+func Test_initViperBind(t *testing.T) {
+	testCmd := &cobra.Command{}
+	initPersistentFlags(testCmd)
+
+	t.Run("bind viper to initialized cobra flags", func(t *testing.T) {
+		if err := initViperBind(testCmd); err != nil {
+			t.Errorf("initViperBind() error: %v", err)
 		}
-		if testCmd.PersistentFlags().Lookup(tt.flag).DefValue != tt.value {
-			t.Errorf("initPersistentFlags() flag: %s has wrong default value: %s", tt.flag, tt.value)
+	})
+
+	testCmd.ResetFlags()
+
+	t.Run("bind viper to uninitialized cobra flags", func(t *testing.T) {
+		if err := initViperBind(testCmd); err == nil {
+			t.Error("initViperBind() should return an error")
 		}
+	})
+}
+
+//nolint:funlen
+func Test_initViperConfig(t *testing.T) {
+	oldFilePathAbs := filepathAbs
+	oldOsStat := osStat
+	filepathAbs = func(path string) (string, error) {
+		if path == "invalid-path" {
+			return "", fmt.Errorf("invalid-path")
+		}
+		return filepath.Abs(path)
+	}
+	osStat = func(name string) (os.FileInfo, error) {
+		if strings.HasSuffix(name, "invalid-os-stat") {
+			return nil, fmt.Errorf("invalid-os-stat")
+		}
+		return os.Stat(name)
+	}
+
+	defer func() {
+		filepathAbs = oldFilePathAbs
+		osStat = oldOsStat
+	}()
+
+	type args struct {
+		cfg string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "file path abs error",
+			args:    args{cfg: "invalid-path"},
+			wantErr: true,
+		},
+		{
+			name:    "os stat error",
+			args:    args{cfg: "invalid-os-stat"},
+			wantErr: true,
+		},
+		{
+			name:    "existent directory but no config file",
+			args:    args{cfg: "testdata/dirNoConfig/"},
+			wantErr: true,
+		},
+		{
+			name:    "existent directory with config file",
+			args:    args{cfg: "testdata/dirWithConfig/"},
+			wantErr: false,
+		},
+		{
+			name:    "non-existent-file",
+			args:    args{cfg: "non-existent-file"},
+			wantErr: true,
+		},
+		{
+			name:    "non-dir/non-existent-file",
+			args:    args{cfg: "non-dir/non-existent-file"},
+			wantErr: true,
+		},
+		{
+			name:    "existent file",
+			args:    args{cfg: "testdata/dirNoConfig/another-config.yaml"},
+			wantErr: false,
+		},
+		{
+			name:    "existent file same directory without extension",
+			args:    args{cfg: "test-file-current-directory"},
+			wantErr: false,
+		},
+		{
+			name:    "existent file same directory with extension",
+			args:    args{cfg: "test-file-current-directory.yaml"},
+			wantErr: false,
+		},
+		{
+			name:    "empty",
+			args:    args{cfg: ""},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			err := initViperConfig(tt.args.cfg)
+			t.Logf("using '%v' config file", viper.ConfigFileUsed())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("initViperConfig() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
