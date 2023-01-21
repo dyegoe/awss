@@ -35,7 +35,6 @@ import (
 )
 
 func TestInitialize(t *testing.T) {
-
 }
 
 func Test_initPersistentFlags(t *testing.T) {

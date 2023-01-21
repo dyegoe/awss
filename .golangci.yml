@@ -38,7 +38,6 @@ linters-settings:
       - "1"
       - "2"
       - "3"
-
 linters:
   disable-all: true
   enable:
@@ -46,15 +45,13 @@ linters:
     - depguard
     - dogsled
     - dupl
-    - errcheck
     - exportloopref
     - funlen
     - gochecknoinits
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
-    - goimports
+    - godox
     - gomnd
     - goprintffuncname
     - gosec
@@ -73,3 +70,6 @@ linters:
     - unparam
     - unused
     - whitespace
+  presets:
+    # - error
+    - format

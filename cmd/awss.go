@@ -108,8 +108,10 @@ func initViperBind(c *cobra.Command) error {
 	return nil
 }
 
-var filepathAbs = filepath.Abs
-var osStat = os.Stat
+var (
+	filepathAbs = filepath.Abs
+	osStat      = os.Stat
+)
 
 // initViperConfig initializes the viper config.
 //
