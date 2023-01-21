@@ -45,6 +45,7 @@ linters:
     - depguard
     - dogsled
     - dupl
+    - errname
     - exportloopref
     - funlen
     - gochecknoinits
@@ -71,5 +72,5 @@ linters:
     - unused
     - whitespace
   presets:
-    # - error
+    - error
     - format

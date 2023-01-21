@@ -61,9 +61,18 @@ func SetLogLevel(level string) error {
 	case "disabled":
 		zerolog.SetGlobalLevel(zerolog.Disabled)
 	default:
-		return fmt.Errorf("invalid log level: %s", level)
+		return InvalidLogLevelError{level}
 	}
 	return nil
+}
+
+// InvalidLogLevelError represents an error if the log level is invalid
+type InvalidLogLevelError struct {
+	level string
+}
+
+func (e InvalidLogLevelError) Error() string {
+	return fmt.Sprintf("invalid log level: %s", e.level)
 }
 
 // Debug logs a debug message.

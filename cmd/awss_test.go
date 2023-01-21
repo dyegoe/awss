@@ -91,7 +91,7 @@ func Test_initViperBind(t *testing.T) {
 	})
 }
 
-//nolint:funlen
+//nolint:funlen,goerr113,wrapcheck
 func Test_initViperConfig(t *testing.T) {
 	oldFilePathAbs := filepathAbs
 	oldOsStat := osStat

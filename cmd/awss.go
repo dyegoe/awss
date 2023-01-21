@@ -24,6 +24,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,25 +43,41 @@ func Initialize() error {
 		Short:             "Search resources in AWS.",
 		Long:              `AWSS (AWS Search) is a command line tool to search resources in AWS.`,
 		Version:           "0.8.0",
-		RunE:              func(c *cobra.Command, args []string) error { return c.Help() },
+		RunE:              runE,
 		PersistentPreRunE: func(c *cobra.Command, args []string) error { return nil },
 	}
 
 	initPersistentFlags(awssCmd)
 	if err := initViperBind(awssCmd); err != nil {
-		return err
+		return fmt.Errorf("failed to bind viper flags: %w", err)
 	}
 
-	return awssCmd.Execute()
+	if err := awssCmd.Execute(); err != nil {
+		return fmt.Errorf("failed to execute root command: %w", err)
+	}
+
+	return nil
+}
+
+// runE is the root command function.
+//
+// It prints the help message.
+func runE(c *cobra.Command, args []string) error {
+	if err := c.Help(); err != nil {
+		return fmt.Errorf("failed to print help: %w", err)
+	}
+	return nil
 }
 
 // initPersistentFlags initializes the persistent flags.
+//
+//nolint:lll
 func initPersistentFlags(c *cobra.Command) {
 	validOutputs := "table, json, json-pretty"
 	pflags := c.PersistentFlags()
-	pflags.String("config", "", "config file or directory either absolute or relative path. (default is $HOME/.awss/config.yaml)")                                              //nolint:lll
-	pflags.StringSlice("profiles", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. e.g. `profile1,profile2`")   //nolint:lll
-	pflags.StringSlice("regions", []string{"us-east-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. e.g. `region1,region2`") //nolint:lll
+	pflags.String("config", "", "config file or directory either absolute or relative path. (default is $HOME/.awss/config.yaml)")
+	pflags.StringSlice("profiles", []string{"default"}, "Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. e.g. `profile1,profile2`")
+	pflags.StringSlice("regions", []string{"us-east-1"}, "Select a region to perform your API calls. You can pass multiple regions separated by comma. e.g. `region1,region2`")
 	pflags.String("output", "table", fmt.Sprintf("Select the output format. Valid outputs are: %s", validOutputs))
 	pflags.Bool("show-empty", false, "Show empty resources. Default is false.")
 	pflags.Bool("show-tags", false, "Show tags for resources. Default is false.")
@@ -156,8 +173,8 @@ func initViperConfig(cfg string) error {
 	if err == nil {
 		return nil
 	}
-	if _, ok := err.(viper.ConfigFileNotFoundError); ok && cfg == "" {
+	if errors.As(err, &viper.ConfigFileNotFoundError{}) && cfg == "" {
 		return nil
 	}
-	return err
+	return fmt.Errorf("failed to read config: %w", err)
 }
