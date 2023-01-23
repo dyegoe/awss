@@ -31,9 +31,8 @@ type Logger struct {
 
 // NewLogger returns a new Logger.
 //
-// The output is the output file.
+// The output might be any io.Writer, like os.Stdout or os.Stderr.
 // The cmds are pairs of key and value to be added to the logger as string field.
-// The key is the name of the field and the value is the value of the field.
 func NewLogger(output io.Writer, cmds ...map[string]string) *Logger {
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: output}).With().Timestamp().Logger()
 	for _, cmd := range cmds {
