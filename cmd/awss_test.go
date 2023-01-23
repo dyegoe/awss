@@ -57,6 +57,7 @@ func Test_initPersistentFlags(t *testing.T) {
 		{"output", "table"},
 		{"show-empty", "false"},
 		{"show-tags", "false"},
+		{"log-level", "info"},
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("has %s flag", tt.flag), func(t *testing.T) {

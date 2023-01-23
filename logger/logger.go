@@ -20,9 +20,12 @@ package logger
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/rs/zerolog"
 )
+
+var DefaultOutput = os.Stdout
 
 // Logger is a wrapper for zerolog.Logger.
 type Logger struct {

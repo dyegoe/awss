@@ -29,6 +29,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dyegoe/awss/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -44,7 +45,7 @@ func Initialize() error {
 		Long:              `AWSS (AWS Search) is a command line tool to search resources in AWS.`,
 		Version:           "0.8.0",
 		RunE:              runE,
-		PersistentPreRunE: func(c *cobra.Command, args []string) error { return nil },
+		PersistentPreRunE: persistentPreRunE,
 	}
 
 	initPersistentFlags(awssCmd)
@@ -69,6 +70,42 @@ func runE(c *cobra.Command, args []string) error {
 	return nil
 }
 
+// persistentPreRunE is the persistent pre-run function.
+//
+// It does sanity checks, initializes the viper config and set log level.
+func persistentPreRunE(c *cobra.Command, args []string) error {
+	log := logger.NewLogger(logger.DefaultOutput,
+		map[string]string{"pkg": "cmd"},
+		map[string]string{"cmd": "awss"},
+		map[string]string{"func": "persistentPreRunE"},
+	)
+
+	cfg, err := c.PersistentFlags().GetString("config")
+	if err != nil {
+		return fmt.Errorf("failed to get config flag: %w", err)
+	}
+
+	if err := initViperConfig(cfg); err != nil {
+		return fmt.Errorf("failed to initialize viper config: %w", err)
+	}
+
+	logLevel := viper.GetString("log.level")
+	if err := logger.SetLogLevel(logLevel); err != nil {
+		return fmt.Errorf("failed to set log level: %w", err)
+	}
+
+	log.Debugf("[Config]: %s", cfg)
+	log.Debugf("[Log Level]: %s", logLevel)
+	log.Debugf("[Profiles]: %v", viper.GetStringSlice("profiles"))
+	log.Debugf("[Regions]: %v", viper.GetStringSlice("regions"))
+	log.Debugf("[Output]: %s", viper.GetString("output"))
+	log.Debugf("[Show Empty]: %v", viper.GetBool("show.empty"))
+	log.Debugf("[Show Tags]: %v", viper.GetBool("show.tags"))
+	log.Debugf("[Viper Config]: %v", viper.AllSettings())
+
+	return nil
+}
+
 // initPersistentFlags initializes the persistent flags.
 //
 //nolint:lll
@@ -81,6 +118,7 @@ func initPersistentFlags(c *cobra.Command) {
 	pflags.String("output", "table", fmt.Sprintf("Select the output format. Valid outputs are: %s", validOutputs))
 	pflags.Bool("show-empty", false, "Show empty resources. Default is false.")
 	pflags.Bool("show-tags", false, "Show tags for resources. Default is false.")
+	pflags.String("log-level", "info", "Set the log level. Valid levels are: debug, info, warn, error, fatal, panic")
 }
 
 // initViperBind binds the viper flags to the cobra flags.
@@ -91,6 +129,7 @@ func initViperBind(c *cobra.Command) error {
 		{"output", "output"},
 		{"show.empty", "show-empty"},
 		{"show.tags", "show-tags"},
+		{"log.level", "log-level"},
 	}
 
 	pflags := c.PersistentFlags()
