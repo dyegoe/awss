@@ -78,8 +78,8 @@ func TestLogger_AddFields(t *testing.T) {
 	})
 	t.Run("test output", func(t *testing.T) {
 		output := bytes.Buffer{}
-		log := NewLogger(&output, map[string]string{"key": "value"})
-		log.AddFields(map[string]string{"key2": "value2"})
+		log := NewLogger(&output, nil)
+		log.AddFields(map[string]string{"key": "value", "key2": "value2"})
 		log.Info("test")
 		want := fmt.Sprintf("\x1b[90m%s\x1b[0m \x1b[32mINF\x1b[0m test \x1b[36mkey=\x1b[0mvalue \x1b[36mkey2=\x1b[0mvalue2\n", time.Now().Format(time.Kitchen))
 		if got := output.String(); got != want {
