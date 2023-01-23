@@ -29,6 +29,7 @@ import (
 	"os"
 	"path/filepath"
 
+	enginesEc2Cmd "github.com/dyegoe/awss/engines/ec2/cmd"
 	"github.com/dyegoe/awss/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -39,20 +40,41 @@ import (
 // It creates the root command, initializes the persistent flags and binds the viper flags to the cobra flags.
 // By the end, it executes the root command.
 func Initialize() error {
+	log := logger.NewLogger(logger.DefaultOutput, map[string]string{
+		"pkg":  "cmd",
+		"cmd":  "awss",
+		"func": "execute",
+	})
+
 	awssCmd := &cobra.Command{
-		Use:               "awss",
-		Short:             "Search resources in AWS.",
-		Long:              `AWSS (AWS Search) is a command line tool to search resources in AWS.`,
-		Version:           "0.8.0",
-		RunE:              runE,
-		PersistentPreRunE: persistentPreRunE,
+		Use:           "awss",
+		Short:         "Search resources in AWS.",
+		Long:          `AWSS (AWS Search) is a command line tool to search resources in AWS.`,
+		Version:       "0.8.0",
+		SilenceErrors: true,
+		RunE:          func(cmd *cobra.Command, args []string) error { return &NoSubcommandError{} },
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if err := execute(cmd, log); err != nil {
+				return fmt.Errorf("failed to execute root command: %w", err)
+			}
+			return nil
+		},
 	}
 
+	// Initialize the persistent flags
 	initPersistentFlags(awssCmd)
 	if err := initViperBind(awssCmd); err != nil {
 		return fmt.Errorf("failed to bind viper flags: %w", err)
 	}
 
+	// Add subcommands
+	ec2Cmd, err := enginesEc2Cmd.Command()
+	if err != nil {
+		return fmt.Errorf("failed to create ec2 command: %w", err)
+	}
+	awssCmd.AddCommand(ec2Cmd)
+
+	// Execute the root command
 	if err := awssCmd.Execute(); err != nil {
 		return fmt.Errorf("failed to execute root command: %w", err)
 	}
@@ -60,27 +82,20 @@ func Initialize() error {
 	return nil
 }
 
-// runE is the root command function.
-//
-// It prints the help message.
-func runE(c *cobra.Command, args []string) error {
-	if err := c.Help(); err != nil {
-		return fmt.Errorf("failed to print help: %w", err)
-	}
-	return nil
+// NoSubcommandError is the error returned when no subcommand is provided.
+type NoSubcommandError struct{}
+
+func (e *NoSubcommandError) Error() string {
+	return "no subcommand was provided"
 }
 
-// persistentPreRunE is the persistent pre-run function.
+// execute is the persistent pre-run function of the root command.
 //
-// It does sanity checks, initializes the viper config and set log level.
-func persistentPreRunE(c *cobra.Command, args []string) error {
-	log := logger.NewLogger(logger.DefaultOutput,
-		map[string]string{"pkg": "cmd"},
-		map[string]string{"cmd": "awss"},
-		map[string]string{"func": "persistentPreRunE"},
-	)
+// It initializes the viper config, sets the log level and prints the flags.
+func execute(c *cobra.Command, log *logger.Logger) error {
+	log.AddFields(map[string]string{"func": "execute"})
 
-	cfg, err := c.PersistentFlags().GetString("config")
+	cfg, err := c.Flags().GetString("config")
 	if err != nil {
 		return fmt.Errorf("failed to get config flag: %w", err)
 	}
@@ -94,14 +109,16 @@ func persistentPreRunE(c *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to set log level: %w", err)
 	}
 
-	log.Debugf("[Config]: %s", cfg)
-	log.Debugf("[Log Level]: %s", logLevel)
-	log.Debugf("[Profiles]: %v", viper.GetStringSlice("profiles"))
-	log.Debugf("[Regions]: %v", viper.GetStringSlice("regions"))
-	log.Debugf("[Output]: %s", viper.GetString("output"))
-	log.Debugf("[Show Empty]: %v", viper.GetBool("show.empty"))
-	log.Debugf("[Show Tags]: %v", viper.GetBool("show.tags"))
-	log.Debugf("[Viper Config]: %v", viper.AllSettings())
+	log.Debugf("Config -> %s", cfg)
+	log.Debugf("Log Level -> %s", logLevel)
+	log.Debugf("Profiles -> %v", viper.GetStringSlice("profiles"))
+	log.Debugf("Regions -> %v", viper.GetStringSlice("regions"))
+	log.Debugf("Output -> %s", viper.GetString("output"))
+	log.Debugf("Show.Empty -> %v", viper.GetBool("show.empty"))
+	log.Debugf("Show.Tags -> %v", viper.GetBool("show.tags"))
+	for k, v := range viper.AllSettings() {
+		log.Debugf("ViperConfig: %s -> %v", k, v)
+	}
 
 	return nil
 }

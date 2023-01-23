@@ -91,6 +91,9 @@ The source code is organized as follows:
 
 * `cmd` - contains the main application entry point. It is responsible for parsing the command line arguments and import the subcommands.
 * `logger` - contains the logger implementation.
+* `engines` - contains the AWS Search Engine implementations.
+  * `engines/<name>` - contains the AWS Search Engine `<name>`.
+  * `engines/<name>/cmd` - contains the AWS Search Engine `<name>` command line arguments for the given engine.
 
 ## Logging
 
@@ -102,11 +105,7 @@ To use the logger, import the `logger` package and create a new logger instance:
 import "github.com/dyegoe/awss/logger"
 
 func main() {
-    log := logger.NewLogger(logger.DefaultOutput,
-        map[string]string{"pkg": "cmd"},
-        map[string]string{"cmd": "awss"},
-        map[string]string{"func": "persistentPreRunE"},
-    )
+    log := logger.NewLogger(logger.DefaultOutput, map[string]string{"pkg": "main", "func": "main"})
     log.Info("Hello World!")
 }
 ```

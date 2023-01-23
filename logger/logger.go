@@ -25,6 +25,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// DefaultOutput is the default output for the logger.
 var DefaultOutput = os.Stdout
 
 // Logger is a wrapper for zerolog.Logger.
@@ -35,13 +36,11 @@ type Logger struct {
 // NewLogger returns a new Logger.
 //
 // The output might be any io.Writer, like os.Stdout or os.Stderr.
-// The cmds are pairs of key and value to be added to the logger as string field.
-func NewLogger(output io.Writer, cmds ...map[string]string) *Logger {
+// The fields are pairs of key and value to be added to the logger as string field.
+func NewLogger(output io.Writer, fields map[string]string) *Logger {
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: output}).With().Timestamp().Logger()
-	for _, cmd := range cmds {
-		for k, v := range cmd {
-			logger = logger.With().Str(k, v).Logger()
-		}
+	for k, v := range fields {
+		logger = logger.With().Str(k, v).Logger()
 	}
 	return &Logger{logger}
 }
@@ -75,6 +74,15 @@ type InvalidLogLevelError struct {
 
 func (e InvalidLogLevelError) Error() string {
 	return fmt.Sprintf("invalid log level: %s", e.level)
+}
+
+// AddFields adds a pair of fields to the logger.
+//
+// The fields are pairs of key and value to be added to the logger as string field.
+func (l *Logger) AddFields(fields map[string]string) {
+	for k, v := range fields {
+		l.Logger = l.Logger.With().Str(k, v).Logger()
+	}
 }
 
 // Debug logs a debug message.
