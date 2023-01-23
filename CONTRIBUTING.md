@@ -91,3 +91,29 @@ The source code is organized as follows:
 
 * `cmd` - contains the main application entry point. It is responsible for parsing the command line arguments and import the subcommands.
 * `logger` - contains the logger implementation.
+
+## Logging
+
+The application uses its own logger wrapper, which is based on the [Zerolog](https://github.com/rs/zerolog) library.
+
+To use the logger, import the `logger` package and create a new logger instance:
+
+```go
+import "github.com/dyegoe/awss/logger"
+
+func main() {
+    log := logger.NewLogger(logger.DefaultOutput,
+        map[string]string{"pkg": "cmd"},
+        map[string]string{"cmd": "awss"},
+        map[string]string{"func": "persistentPreRunE"},
+    )
+    log.Info("Hello World!")
+}
+```
+
+The `NewLogger` function receives two parameters:
+
+* `output` - the output writer. It can be `os.Stdout`, `os.Stderr`, or a file.
+* `map[string]string` - a list of key-value pairs that will be added to the log message.
+    It can be used to add context to the log message. For example, the `pkg` key can be used to
+    add the package name to the log message. It can be empty or `n` key-value pairs.
