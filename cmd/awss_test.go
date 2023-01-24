@@ -34,7 +34,15 @@ import (
 	"github.com/spf13/viper"
 )
 
-func TestInitialize(t *testing.T) {
+func TestNoSubcommandError_Error(t *testing.T) {
+	name := "no subcommand error"
+	err := &NoSubcommandError{}
+	want := "no subcommand was provided"
+	t.Run(name, func(t *testing.T) {
+		if got := err.Error(); got != want {
+			t.Errorf("NoSubcommandError.Error() = %v, want %v", got, want)
+		}
+	})
 }
 
 func Test_initPersistentFlags(t *testing.T) {

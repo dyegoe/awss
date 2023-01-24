@@ -53,20 +53,14 @@ func TestSetLogLevel(t *testing.T) {
 }
 
 func TestInvalidLogLevelError_Error(t *testing.T) {
-	tests := []struct {
-		name string
-		err  InvalidLogLevelError
-		want string
-	}{
-		{"test", InvalidLogLevelError{"invalid"}, "invalid log level: invalid"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.err.Error(); got != tt.want {
-				t.Errorf("InvalidLogLevelError.Error() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	name := "invalid log level error"
+	err := &InvalidLogLevelError{"invalid"}
+	want := "invalid log level: invalid"
+	t.Run(name, func(t *testing.T) {
+		if got := err.Error(); got != want {
+			t.Errorf("InvalidLogLevelError.Error() = %v, want %v", got, want)
+		}
+	})
 }
 
 //nolint:lll

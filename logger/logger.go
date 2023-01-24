@@ -62,7 +62,7 @@ func SetLogLevel(level string) error {
 	case "disabled":
 		zerolog.SetGlobalLevel(zerolog.Disabled)
 	default:
-		return InvalidLogLevelError{level}
+		return &InvalidLogLevelError{level}
 	}
 	return nil
 }
@@ -72,7 +72,7 @@ type InvalidLogLevelError struct {
 	level string
 }
 
-func (e InvalidLogLevelError) Error() string {
+func (e *InvalidLogLevelError) Error() string {
 	return fmt.Sprintf("invalid log level: %s", e.level)
 }
 
