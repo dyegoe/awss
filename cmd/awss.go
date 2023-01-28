@@ -52,7 +52,7 @@ func Initialize() error {
 		Long:          `AWSS (AWS Search) is a command line tool to search resources in AWS.`,
 		Version:       "0.8.0",
 		SilenceErrors: true,
-		RunE:          func(cmd *cobra.Command, args []string) error { return &NoSubcommandError{} },
+		RunE:          func(cmd *cobra.Command, args []string) error { return ErrNoSubcommand },
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := execute(cmd, log); err != nil {
 				return fmt.Errorf("failed to execute root command: %w", err)
@@ -82,12 +82,8 @@ func Initialize() error {
 	return nil
 }
 
-// NoSubcommandError is the error returned when no subcommand is provided.
-type NoSubcommandError struct{}
-
-func (e *NoSubcommandError) Error() string {
-	return "no subcommand was provided"
-}
+// ErrNoSubcommand is the error returned when no subcommand is provided.
+var ErrNoSubcommand = errors.New("no subcommand provided")
 
 // execute is the persistent pre-run function of the root command.
 //
