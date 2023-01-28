@@ -31,6 +31,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -46,39 +47,30 @@ func TestNoSubcommandError_Error(t *testing.T) {
 }
 
 func Test_initPersistentFlags(t *testing.T) {
+	flags := map[string]string{
+		"config":     "",
+		"profiles":   "[default]",
+		"regions":    "[us-east-1]",
+		"output":     "table",
+		"show-empty": "false",
+		"show-tags":  "false",
+		"log-level":  "info",
+	}
+
 	testCmd := &cobra.Command{}
 	initPersistentFlags(testCmd)
-
-	t.Run("has flags", func(t *testing.T) {
-		if testCmd.PersistentFlags().HasFlags() == false {
-			t.Error("initPersistentFlags() has no flags")
-		}
+	testCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
+		t.Run(f.Name, func(t *testing.T) {
+			want, ok := flags[f.Name]
+			if !ok {
+				t.Errorf("initPersistentFlags() flag %v not found", f.Name)
+				return
+			}
+			if got := f.Value.String(); want != got {
+				t.Errorf("initPersistentFlags() %v = %v, want %v", f.Name, got, want)
+			}
+		})
 	})
-
-	tests := []struct {
-		flag  string
-		value string
-	}{
-		{"config", ""},
-		{"profiles", "[default]"},
-		{"regions", "[us-east-1]"},
-		{"output", "table"},
-		{"show-empty", "false"},
-		{"show-tags", "false"},
-		{"log-level", "info"},
-	}
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("has %s flag", tt.flag), func(t *testing.T) {
-			if testCmd.PersistentFlags().Lookup(tt.flag) == nil {
-				t.Errorf("initPersistentFlags() has no %s flag", tt.flag)
-			}
-		})
-		t.Run(fmt.Sprintf("has %s flag with default value", tt.flag), func(t *testing.T) {
-			if got := testCmd.PersistentFlags().Lookup(tt.flag).DefValue; got != tt.value {
-				t.Errorf("initPersistentFlags() flag: %s has wrong default value: got %s, want %s", tt.flag, got, tt.value)
-			}
-		})
-	}
 }
 
 func Test_initViperBind(t *testing.T) {

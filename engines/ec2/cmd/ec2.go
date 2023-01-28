@@ -26,7 +26,7 @@ import (
 )
 
 // EngineName is the name of the engine.
-const EngineName = "ec2"
+const EngineName string = "ec2"
 
 // filters is the struct that holds the filter flags content.
 type filters struct {

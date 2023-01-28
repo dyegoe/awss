@@ -16,3 +16,5 @@ limitations under the License.
 
 // Package ec2 contains the search engine EC2 instances.
 package ec2
+
+const EngineName string = "ec2"
