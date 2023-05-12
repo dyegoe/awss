@@ -176,11 +176,9 @@ func initViper() error {
 // initConfig reads the config file.
 //
 // It will search for the config file in the following order:
-// 1. The --config flag absolute path. Either a directory or a file.
-// 2. The --config flag relative path. Either a directory or a file.
-// 3. The --config flag file name. It will search for the file in the current directory or `$HOME/.awss/`
-// 4. The config.yaml file in the current directory
-// 5. The $HOME/.awss/config.yaml file
+// 1. --config flag absolute/relative path to a file.
+// 2. --config flag absolute/relative path to a directory. (It will search for the default `config.yaml` file name)
+// 3. $HOME/.awss/config.yaml file
 func initConfig(cfg string) error {
 	if cfg != "" {
 		abs, err := filepath.Abs(cfg)
@@ -202,7 +200,6 @@ func initConfig(cfg string) error {
 		viper.SetConfigName(viperConfigName)
 	}
 	viper.SetConfigType(viperConfigType)
-	viper.AddConfigPath(viperConfigPathCurrent)
 	viper.AddConfigPath(viperConfigPathHome)
 
 	if err := viper.ReadInConfig(); err != nil {
