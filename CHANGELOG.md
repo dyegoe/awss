@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Change ubuntu version to 22.04 in github actions. [#68](https://github.com/dyegoe/awss/issues/68)
 - Stop looking up for `config.yaml` on the current directoy [#91](https://github.com/dyegoe/awss/issues/91)
 
+<!-- markdownlint-disable MD024 -->
 ### Fixed
 
 - Function order, since the filter were applied before all checks. [#81](https://github.com/dyegoe/awss/issues/81)
