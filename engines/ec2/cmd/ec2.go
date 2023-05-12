@@ -19,29 +19,27 @@ package cmd
 
 import (
 	"net"
-	"reflect"
 
 	"github.com/dyegoe/awss/logger"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // EngineName is the name of the engine.
 const EngineName string = "ec2"
 
-// filters is the struct that holds the filter flags content.
-type filters struct {
-	Ids               []string `filter:"instance-id"`
-	Names             []string `filter:"tag:Name"`
-	Tags              []string `filter:"tag"`
-	TagsKey           []string `filter:"tag-key"`
-	InstanceTypes     []string `filter:"instance-type"`
-	InstanceStates    []string `filter:"instance-state-name"`
-	AvailabilityZones []string `filter:"availability-zone"`
-	PrivateIPs        []net.IP `filter:"network-interface.addresses.private-ip-address"`
-	PublicIPs         []net.IP `filter:"network-interface.addresses.association.public-ip"`
-}
-
-var f filters
+// // filters is the struct that holds the filter flags content.
+// type filters struct {
+// 	Ids               []string `filter:"instance-id"`
+// 	Names             []string `filter:"tag:Name"`
+// 	Tags              []string `filter:"tag"`
+// 	TagsKey           []string `filter:"tag-key"`
+// 	InstanceTypes     []string `filter:"instance-type"`
+// 	InstanceStates    []string `filter:"instance-state-name"`
+// 	AvailabilityZones []string `filter:"availability-zone"`
+// 	PrivateIPs        []net.IP `filter:"network-interface.addresses.private-ip-address"`
+// 	PublicIPs         []net.IP `filter:"network-interface.addresses.association.public-ip"`
+// }
 
 // Command returns the initialized ec2 command.
 func Command() (*cobra.Command, error) {
@@ -75,15 +73,15 @@ You can use multiple filters at same time, for example:
 //nolint:lll
 func initFlags(c *cobra.Command) {
 	flags := c.Flags()
-	flags.StringSliceVarP(&f.Ids, "ids", "i", []string{}, "Filter EC2 instances by ids. `i-1230456078901,i-1230456078902`")
-	flags.StringSliceVarP(&f.Names, "names", "n", []string{}, "Filter EC2 instances by names. It searches using the 'tag:Name'. `instance-1,instance-2`")
-	flags.StringSliceVarP(&f.Tags, "tags", "t", []string{}, "Filter EC2 instances by tags. `'Key=Value1:Value2,Environment=Production'`")
-	flags.StringSliceVarP(&f.TagsKey, "tags-key", "k", []string{}, "Filter EC2 instances by tags key. `Key,Environment`")
-	flags.StringSliceVarP(&f.InstanceTypes, "instance-types", "T", []string{}, "Filter EC2 instances by instance type. `t2.micro,t2.small`")
-	flags.StringSliceVarP(&f.AvailabilityZones, "availability-zones", "z", []string{}, "Filter EC2 instances by availability zones. It will append to current region. `a,b`")
-	flags.StringSliceVarP(&f.InstanceStates, "instance-states", "s", []string{}, "Filter EC2 instances by instance state. `running,stopped`")
-	flags.IPSliceVarP(&f.PrivateIPs, "private-ips", "p", []net.IP{}, "Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
-	flags.IPSliceVarP(&f.PublicIPs, "public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
+	flags.StringSliceP("ids", "i", []string{}, "Filter EC2 instances by ids. `i-1230456078901,i-1230456078902`")
+	flags.StringSliceP("names", "n", []string{}, "Filter EC2 instances by names. It searches using the 'tag:Name'. `instance-1,instance-2`")
+	flags.StringSliceP("tags", "t", []string{}, "Filter EC2 instances by tags. `'Key=Value1:Value2,Environment=Production'`")
+	flags.StringSliceP("tags-key", "k", []string{}, "Filter EC2 instances by tags key. `Key,Environment`")
+	flags.StringSliceP("instance-types", "T", []string{}, "Filter EC2 instances by instance type. `t2.micro,t2.small`")
+	flags.StringSliceP("availability-zones", "z", []string{}, "Filter EC2 instances by availability zones. It will append to current region. `a,b`")
+	flags.StringSliceP("instance-states", "s", []string{}, "Filter EC2 instances by instance state. `running,stopped`")
+	flags.IPSliceP("private-ips", "p", []net.IP{}, "Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
+	flags.IPSliceP("public-ips", "P", []net.IP{}, "Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
 	flags.String("sort", "name", "Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
 }
 
@@ -93,14 +91,9 @@ func execute(c *cobra.Command, log *logger.Logger) error {
 
 	_ = c
 
-	v := reflect.ValueOf(f)
-	for i := 0; i < v.NumField(); i++ {
-		f := v.Field(i)
-		if f.Len() == 0 {
-			continue
-		}
-		log.Debugf("Filter: %s -> %v", v.Type().Field(i).Tag.Get("filter"), f.Interface())
-	}
+	c.Flags().VisitAll(func(f *pflag.Flag) {
+		log.Debugf("Filter: %s -> %v", f.Name, f.Value.String())
+	})
 
 	return nil
 }
