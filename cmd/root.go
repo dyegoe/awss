@@ -174,28 +174,30 @@ func initViper() error {
 // 1. --config flag absolute/relative path to a file.
 // 2. $HOME/.awss/config.yaml file
 func initConfig(cfg string) error {
-	if cfg != "" {
-		info, err := os.Stat(cfg)
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return fmt.Errorf("%s is a directory, please provide a file", cfg)
-		}
-		viper.SetConfigFile(cfg)
-	}
+	var f string
+
 	if cfg == "" {
-		homeDir, err := os.UserHomeDir()
+		home, err := os.UserHomeDir()
 		if err != nil {
 			return err
 		}
-		viperConfigFile := filepath.Join(homeDir, ".awss", "config.yaml")
-		viper.SetConfigFile(viperConfigFile)
+		f = filepath.Join(home, ".awss", "config.yaml")
 	}
+	if cfg != "" {
+		f = cfg
+	}
+
+	_, err := os.Stat(f)
+	if os.IsNotExist(err) && cfg == "" {
+		return nil
+	}
+	if os.IsNotExist(err) && cfg != "" {
+		return fmt.Errorf("config file not found: %s", f)
+	}
+
+	viper.SetConfigFile(f)
+
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok && cfg == "" {
-			return nil
-		}
 		return err
 	}
 	return nil
