@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## [Unreleased]
+## [v0.7.3] - 2023-05-12
 
 <!-- markdownlint-disable MD024 -->
 ### Added
@@ -21,6 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Refactor a few functions to handle empty values. [#65](https://github.com/dyegoe/awss/issues/65)
 - Outputs are now constants. [#83](https://github.com/dyegoe/awss/issues/83)
 - Upgrade dependencies. [#75](https://github.com/dyegoe/awss/issues/75)
+- Change ubuntu version to 22.04 in github actions. [#68](https://github.com/dyegoe/awss/issues/68)
+- Stop looking up for `config.yaml` on the current directoy [#91](https://github.com/dyegoe/awss/issues/91)
 
 ### Fixed
 

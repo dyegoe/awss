@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/dyegoe/awss/common"
 
@@ -32,20 +31,16 @@ import (
 )
 
 const (
-	labelConfig            = "config"
-	labelProfiles          = "profiles"
-	labelRegions           = "regions"
-	labelOutput            = "output"
-	labelShowEmptyCobra    = "show-empty"
-	labelShowEmpty         = "show.empty"
-	labelShowTagsCobra     = "show-tags"
-	labelShowTags          = "show.tags"
-	labelAllProfiles       = "all-profiles"
-	labelAllRegions        = "all-regions"
-	viperConfigName        = "config"
-	viperConfigType        = "yaml"
-	viperConfigPathCurrent = "."
-	viperConfigPathHome    = "$HOME/.awss/"
+	labelConfig         = "config"
+	labelProfiles       = "profiles"
+	labelRegions        = "regions"
+	labelOutput         = "output"
+	labelShowEmptyCobra = "show-empty"
+	labelShowEmpty      = "show.empty"
+	labelShowTagsCobra  = "show-tags"
+	labelShowTags       = "show.tags"
+	labelAllProfiles    = "all-profiles"
+	labelAllRegions     = "all-regions"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -118,7 +113,7 @@ func initFlags() {
 	validOutputs, _ := common.ValidOutputs("")
 
 	rootCmd.PersistentFlags().String(labelConfig, "",
-		"config file (default is $HOME/.awss/config.yaml)")
+		"config file path (default is $HOME/.awss/config.yaml)")
 	rootCmd.PersistentFlags().StringSlice(labelProfiles, []string{"default"},
 		"Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. e.g. `profile1,profile2`")
 	rootCmd.PersistentFlags().StringSlice(labelRegions, []string{"us-east-1"},
@@ -177,31 +172,26 @@ func initViper() error {
 //
 // It will search for the config file in the following order:
 // 1. --config flag absolute/relative path to a file.
-// 2. --config flag absolute/relative path to a directory. (It will search for the default `config.yaml` file name)
-// 3. $HOME/.awss/config.yaml file
+// 2. $HOME/.awss/config.yaml file
 func initConfig(cfg string) error {
 	if cfg != "" {
-		abs, err := filepath.Abs(cfg)
+		info, err := os.Stat(cfg)
 		if err != nil {
 			return err
 		}
-
-		fileInfo, err := os.Stat(abs)
-		if err == nil && fileInfo.IsDir() {
-			viper.AddConfigPath(abs)
-		} else {
-			base := strings.TrimSuffix(filepath.Base(abs), filepath.Ext(filepath.Base(abs)))
-			path := filepath.Dir(abs)
-			viper.SetConfigName(base)
-			viper.AddConfigPath(path)
+		if info.IsDir() {
+			return fmt.Errorf("%s is a directory, please provide a file", cfg)
 		}
+		viper.SetConfigFile(cfg)
 	}
 	if cfg == "" {
-		viper.SetConfigName(viperConfigName)
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		viperConfigFile := filepath.Join(homeDir, ".awss", "config.yaml")
+		viper.SetConfigFile(viperConfigFile)
 	}
-	viper.SetConfigType(viperConfigType)
-	viper.AddConfigPath(viperConfigPathHome)
-
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok && cfg == "" {
 			return nil
