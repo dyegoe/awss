@@ -7,7 +7,7 @@ It is a wrapper written in Go using AWS SDK Go v2. The work is still in progress
 ## Version
 
 <!-- Do not forget to update version on cmd/root.go Version -->
-The current version is 0.7.2
+The current version is 0.7.3
 
 ## Features
 
@@ -80,15 +80,7 @@ AWSS uses a configuration file to set the default:
 
 The default configuration file is `~/.awss/config.yaml` but you can specify another one using `--config` flag.
 
-You can create multiple configuration files and use them with the `--config` flag.
-
-AWSS will search for the configuration file in the following order:
-
-1. `--config` flag absolute path. Either a directory or a file. If it is a directory it will search for the `config.yaml` file.
-2. `--config` flag relative path. Either a directory or a file. If it is a directory it will search for the `config.yaml` file.
-3. `--config` flag file name. It will search for the file in the current directory or `$HOME/.awss/`
-4. `config.yaml` file in the current directory
-5. `$HOME/.awss/config.yaml` file
+The `--config` accepts a single file (either relative or absolute path).
 
 The configuration file is a YAML file with the following structure:
 

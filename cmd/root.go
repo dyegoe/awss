@@ -55,7 +55,7 @@ It is a wrapper written in Go using AWS SDK Go v2.
 The work is still in progress and will be updated regularly.
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
-	Version:           "0.7.2", // TODO: Remember to update this version when releasing a new version.
+	Version:           "0.7.3", // TODO: Remember to update this version when releasing a new version.
 	PersistentPreRunE: persistentPreRun,
 }
 
@@ -187,12 +187,16 @@ func initConfig(cfg string) error {
 		f = cfg
 	}
 
-	_, err := os.Stat(f)
+	info, err := os.Stat(f)
 	if os.IsNotExist(err) && cfg == "" {
 		return nil
 	}
 	if os.IsNotExist(err) && cfg != "" {
 		return fmt.Errorf("config file not found: %s", f)
+	}
+	// check if the path is a directory
+	if info.IsDir() {
+		return fmt.Errorf("config file is a directory: %s", f)
 	}
 
 	viper.SetConfigFile(f)

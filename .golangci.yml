@@ -1,8 +1,15 @@
 linters-settings:
   depguard:
-    list-type: denylist
-    packages:
-      - github.com/aws/aws-sdk-go/
+    rules:
+      main:
+        allow:
+          - $gostd
+          - github.com/dyegoe/awss/
+          - github.com/spf13/cobra
+          - github.com/spf13/viper
+          - github.com/aws/aws-sdk-go-v2/
+          - github.com/jedib0t/go-pretty/v6/table
+          - github.com/jedib0t/go-pretty/v6/text
   dupl:
     threshold: 100
   funlen:

@@ -53,7 +53,7 @@ Ready to contribute? Here's how to set up `awss` for local development.
     ```bash
     sudo apt install pre-commit
     go install golang.org/x/tools/cmd/goimports@latest
-    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.50.1
+    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.53.2
     go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
     go install github.com/go-critic/go-critic/cmd/gocritic@latest
     precommit install

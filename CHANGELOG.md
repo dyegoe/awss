@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## [v0.7.3] - 2023-05-12
+## [v0.7.3] - 2023-06-15
 
 <!-- markdownlint-disable MD024 -->
 ### Added
@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Struct description for `cmd/ec2.go`. [#80](https://github.com/dyegoe/awss/issues/80)
 - If there is no config directory `~/.awss` or file, the command does not through an error and runs with the embedded default configuration.
 - Fix tests. The filters were not being compared correctly.
+- Fix version on `cmd/root.go`. [#95](https://github.com/dyegoe/awss/issues/95)
 
 ## [v0.7.2] - 2022-12-12
 
