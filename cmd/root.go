@@ -187,12 +187,16 @@ func initConfig(cfg string) error {
 		f = cfg
 	}
 
-	_, err := os.Stat(f)
+	info, err := os.Stat(f)
 	if os.IsNotExist(err) && cfg == "" {
 		return nil
 	}
 	if os.IsNotExist(err) && cfg != "" {
 		return fmt.Errorf("config file not found: %s", f)
+	}
+	// check if the path is a directory
+	if info.IsDir() {
+		return fmt.Errorf("config file is a directory: %s", f)
 	}
 
 	viper.SetConfigFile(f)
