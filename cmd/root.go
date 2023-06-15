@@ -55,7 +55,7 @@ It is a wrapper written in Go using AWS SDK Go v2.
 The work is still in progress and will be updated regularly.
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
-	Version:           "0.7.2", // TODO: Remember to update this version when releasing a new version.
+	Version:           "0.7.3", // TODO: Remember to update this version when releasing a new version.
 	PersistentPreRunE: persistentPreRun,
 }
 
