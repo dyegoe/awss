@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/dyegoe/awss/common"
 
@@ -32,20 +31,16 @@ import (
 )
 
 const (
-	labelConfig            = "config"
-	labelProfiles          = "profiles"
-	labelRegions           = "regions"
-	labelOutput            = "output"
-	labelShowEmptyCobra    = "show-empty"
-	labelShowEmpty         = "show.empty"
-	labelShowTagsCobra     = "show-tags"
-	labelShowTags          = "show.tags"
-	labelAllProfiles       = "all-profiles"
-	labelAllRegions        = "all-regions"
-	viperConfigName        = "config"
-	viperConfigType        = "yaml"
-	viperConfigPathCurrent = "."
-	viperConfigPathHome    = "$HOME/.awss/"
+	labelConfig         = "config"
+	labelProfiles       = "profiles"
+	labelRegions        = "regions"
+	labelOutput         = "output"
+	labelShowEmptyCobra = "show-empty"
+	labelShowEmpty      = "show.empty"
+	labelShowTagsCobra  = "show-tags"
+	labelShowTags       = "show.tags"
+	labelAllProfiles    = "all-profiles"
+	labelAllRegions     = "all-regions"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -60,7 +55,7 @@ It is a wrapper written in Go using AWS SDK Go v2.
 The work is still in progress and will be updated regularly.
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
-	Version:           "0.7.2", // TODO: Remember to update this version when releasing a new version.
+	Version:           "0.7.3", // TODO: Remember to update this version when releasing a new version.
 	PersistentPreRunE: persistentPreRun,
 }
 
@@ -118,7 +113,7 @@ func initFlags() {
 	validOutputs, _ := common.ValidOutputs("")
 
 	rootCmd.PersistentFlags().String(labelConfig, "",
-		"config file (default is $HOME/.awss/config.yaml)")
+		"config file path (default is $HOME/.awss/config.yaml)")
 	rootCmd.PersistentFlags().StringSlice(labelProfiles, []string{"default"},
 		"Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. e.g. `profile1,profile2`")
 	rootCmd.PersistentFlags().StringSlice(labelRegions, []string{"us-east-1"},
@@ -176,39 +171,37 @@ func initViper() error {
 // initConfig reads the config file.
 //
 // It will search for the config file in the following order:
-// 1. The --config flag absolute path. Either a directory or a file.
-// 2. The --config flag relative path. Either a directory or a file.
-// 3. The --config flag file name. It will search for the file in the current directory or `$HOME/.awss/`
-// 4. The config.yaml file in the current directory
-// 5. The $HOME/.awss/config.yaml file
+// 1. --config flag absolute/relative path to a file.
+// 2. $HOME/.awss/config.yaml file
 func initConfig(cfg string) error {
-	if cfg != "" {
-		abs, err := filepath.Abs(cfg)
+	var f string
+
+	if cfg == "" {
+		home, err := os.UserHomeDir()
 		if err != nil {
 			return err
 		}
+		f = filepath.Join(home, ".awss", "config.yaml")
+	}
+	if cfg != "" {
+		f = cfg
+	}
 
-		fileInfo, err := os.Stat(abs)
-		if err == nil && fileInfo.IsDir() {
-			viper.AddConfigPath(abs)
-		} else {
-			base := strings.TrimSuffix(filepath.Base(abs), filepath.Ext(filepath.Base(abs)))
-			path := filepath.Dir(abs)
-			viper.SetConfigName(base)
-			viper.AddConfigPath(path)
-		}
+	info, err := os.Stat(f)
+	if os.IsNotExist(err) && cfg == "" {
+		return nil
 	}
-	if cfg == "" {
-		viper.SetConfigName(viperConfigName)
+	if os.IsNotExist(err) && cfg != "" {
+		return fmt.Errorf("config file not found: %s", f)
 	}
-	viper.SetConfigType(viperConfigType)
-	viper.AddConfigPath(viperConfigPathCurrent)
-	viper.AddConfigPath(viperConfigPathHome)
+	// check if the path is a directory
+	if info.IsDir() {
+		return fmt.Errorf("config file is a directory: %s", f)
+	}
+
+	viper.SetConfigFile(f)
 
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok && cfg == "" {
-			return nil
-		}
 		return err
 	}
 	return nil

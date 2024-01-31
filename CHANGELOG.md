@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## [Unreleased]
+## [v0.7.3] - 2023-06-15
 
 <!-- markdownlint-disable MD024 -->
 ### Added
@@ -21,13 +21,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Refactor a few functions to handle empty values. [#65](https://github.com/dyegoe/awss/issues/65)
 - Outputs are now constants. [#83](https://github.com/dyegoe/awss/issues/83)
 - Upgrade dependencies. [#75](https://github.com/dyegoe/awss/issues/75)
+- Change ubuntu version to 22.04 in github actions. [#68](https://github.com/dyegoe/awss/issues/68)
+- Stop looking up for `config.yaml` on the current directoy [#91](https://github.com/dyegoe/awss/issues/91)
 
+<!-- markdownlint-disable MD024 -->
 ### Fixed
 
 - Function order, since the filter were applied before all checks. [#81](https://github.com/dyegoe/awss/issues/81)
 - Struct description for `cmd/ec2.go`. [#80](https://github.com/dyegoe/awss/issues/80)
 - If there is no config directory `~/.awss` or file, the command does not through an error and runs with the embedded default configuration.
 - Fix tests. The filters were not being compared correctly.
+- Fix version on `cmd/root.go`. [#95](https://github.com/dyegoe/awss/issues/95)
 
 ## [v0.7.2] - 2022-12-12
 
