@@ -31,3 +31,8 @@ jobs:
 
       - name: Run test
         run: go test -timeout 30s -short $(go list ./...)
+
+      - name: Smoke test version injection
+        run: |
+          go build -ldflags="-X github.com/dyegoe/awss/cmd.version=ci-test" -o awss .
+          ./awss --version | grep -q "ci-test"
