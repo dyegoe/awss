@@ -20,6 +20,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/dyegoe/awss/common"
@@ -27,6 +28,10 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+)
+
+const (
+	labelEniSort = "eni.sort"
 )
 
 // eniFilters represents the filters for the eni command.
@@ -63,12 +68,18 @@ You can use multiple filters at same time, for example:
 	RunE: eniRunE,
 }
 
+//nolint:dupl // parallel command handler structure, not extractable without over-abstracting
 func eniRunE(cmd *cobra.Command, args []string) error {
-	if err := checkAvailabilityZones(eniF.AvailabilityZones); err != nil {
+	err := checkAvailabilityZones(eniF.AvailabilityZones)
+	if err != nil && err.Error() != "no availability zone selected" {
 		return err
 	}
 
 	if _, err := common.ParseTags(eniF.Tags); err != nil {
+		return err
+	}
+
+	if err := search.CheckSortField(cmd.Name(), viper.GetString(labelEniSort)); err != nil {
 		return err
 	}
 
@@ -82,7 +93,7 @@ func eniRunE(cmd *cobra.Command, args []string) error {
 		viper.GetStringSlice(labelProfiles),
 		viper.GetStringSlice(labelRegions),
 		filters,
-		"",
+		viper.GetString(labelEniSort),
 		viper.GetString(labelOutput),
 		viper.GetBool(labelShowEmpty),
 		viper.GetBool(labelShowTags),
@@ -111,4 +122,13 @@ func eniInitFlags() {
 		"Filter ENIs by private IPs. `172.16.0.1,172.17.1.254`")
 	eniCmd.Flags().IPSliceVarP(&eniF.PublicIPs, "public-ips", "P", []net.IP{},
 		"Filter ENIs by public IPs. `52.28.19.20,52.30.31.32`")
+	eniCmd.Flags().String("sort", "id",
+		"Sort ENIs by id, type, az, status, subnet-id, instance-id or instance-name. `id`")
+}
+
+func eniInitViper() error {
+	if err := viper.BindPFlag(labelEniSort, eniCmd.Flags().Lookup("sort")); err != nil {
+		return fmt.Errorf("error binding flag: %w", err)
+	}
+	return nil
 }

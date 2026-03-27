@@ -28,27 +28,18 @@ import (
 	"github.com/dyegoe/awss/common"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
 // Results describes results of the EC2 instances search.
 type Results struct {
-	// Profile is the profile used to search.
-	Profile string `json:"profile"`
-
-	// Region is the region used to search.
-	Region string `json:"region"`
-
-	// Errors contains the erros found during the search.
-	Errors []string `json:"errors,omitempty"`
+	common.BaseResults
 
 	// Data contains the instances found.
 	Data []dataRow `json:"data"`
 
 	// Filters is a map of strings used to search.
 	Filters map[string][]string `json:"-"`
-
-	// SortField is the field used to sort the results.
-	SortField string `json:"-"`
 }
 
 // dataRow represents a row of the EC2 instances search results.
@@ -84,21 +75,27 @@ type dataRow struct {
 // New initiates and returns a new instance of EC2 results.
 func New(profile, region string, filters map[string][]string, sortField string) *Results {
 	return &Results{
-		Profile:   profile,
-		Region:    region,
-		Filters:   filters,
-		Errors:    []string{},
-		Data:      []dataRow{},
-		SortField: sortField,
+		BaseResults: common.BaseResults{
+			Profile:   profile,
+			Region:    region,
+			Errors:    []string{},
+			SortField: sortField,
+		},
+		Data:    []dataRow{},
+		Filters: filters,
 	}
 }
 
 // Search performs the EC2s search.
 //
 // results are stored in the Data field.
-func (r *Results) Search() {
+func (r *Results) Search(ctx context.Context) {
 	// Get search filters.
-	input := r.getFilters()
+	input, err := r.getFilters()
+	if err != nil {
+		r.Errors = append(r.Errors, fmt.Sprintf("error building filters: %v", err))
+		return
+	}
 
 	// Get AWS config.
 	cfg, err := common.AwsConfig(r.Profile, r.Region)
@@ -109,7 +106,7 @@ func (r *Results) Search() {
 
 	// Get AWS client and describe instances.
 	client := ec2.NewFromConfig(cfg)
-	response, err := client.DescribeInstances(context.TODO(), input)
+	response, err := client.DescribeInstances(ctx, input)
 	if err != nil {
 		r.Errors = append(r.Errors, err.Error())
 		return
@@ -118,43 +115,43 @@ func (r *Results) Search() {
 	// Parse response.
 	for _, i := range response.Reservations {
 		for _, inst := range i.Instances { //nolint:gocritic
-			enis := []string{}
-			for _, eni := range inst.NetworkInterfaces { //nolint:gocritic
-				enis = append(enis, *eni.NetworkInterfaceId)
-			}
-			r.Data = append(r.Data, dataRow{
-				InstanceID:        *inst.InstanceId,
-				InstanceName:      common.TagName(inst.Tags),
-				InstanceType:      string(inst.InstanceType),
-				AvailabilityZone:  *inst.Placement.AvailabilityZone,
-				InstanceState:     string(inst.State.Name),
-				PrivateIPAddress:  common.StringValue(inst.PrivateIpAddress),
-				PublicIPAddress:   common.StringValue(inst.PublicIpAddress),
-				NetworkInterfaces: enis,
-				Tags:              common.TagsToMap(inst.Tags),
-			})
+			r.Data = append(r.Data, parseInstance(&inst))
 		}
 	}
-	err = r.sortResults(r.SortField)
-	if err != nil {
+	if err = r.sortResults(r.SortField); err != nil {
 		r.Errors = append(r.Errors, err.Error())
+	}
+}
+
+// parseInstance converts a single EC2 Instance into a dataRow.
+func parseInstance(inst *types.Instance) dataRow {
+	enis := make([]string, 0, len(inst.NetworkInterfaces))
+	for _, eni := range inst.NetworkInterfaces { //nolint:gocritic
+		enis = append(enis, common.StringValue(eni.NetworkInterfaceId))
+	}
+	var az string
+	if inst.Placement != nil {
+		az = common.StringValue(inst.Placement.AvailabilityZone)
+	}
+	var state string
+	if inst.State != nil {
+		state = string(inst.State.Name)
+	}
+	return dataRow{
+		InstanceID:        common.StringValue(inst.InstanceId),
+		InstanceName:      common.TagName(inst.Tags),
+		InstanceType:      string(inst.InstanceType),
+		AvailabilityZone:  az,
+		InstanceState:     state,
+		PrivateIPAddress:  common.StringValue(inst.PrivateIpAddress),
+		PublicIPAddress:   common.StringValue(inst.PublicIpAddress),
+		NetworkInterfaces: enis,
+		Tags:              common.TagsToMap(inst.Tags),
 	}
 }
 
 // Len returns the length of the results.
 func (r *Results) Len() int { return len(r.Data) }
-
-// GetProfile returns the profile used to search.
-func (r *Results) GetProfile() string { return r.Profile }
-
-// GetRegion returns the region used to search.
-func (r *Results) GetRegion() string { return r.Region }
-
-// GetErrors returns the errors found during the search.
-func (r *Results) GetErrors() []string { return r.Errors }
-
-// GetSortField returns the field used to sort the results.
-func (r *Results) GetSortField() string { return r.SortField }
 
 // GetHeaders returns the the tag `header` of the struct fields.
 func (r *Results) GetHeaders() []interface{} {
@@ -188,7 +185,7 @@ func (r *Results) GetRows() []interface{} {
 // This function expects the filters to be in the format used by the AWS SDK.
 // Except for "ids", "names", "tags" and "availability-zones", all other filters are passed as it is.
 // If no filters are given, it returns an empty list.
-func (r *Results) getFilters() *ec2.DescribeInstancesInput {
+func (r *Results) getFilters() (*ec2.DescribeInstancesInput, error) {
 	input := ec2.DescribeInstancesInput{}
 
 	for key, values := range r.Filters {
@@ -198,14 +195,18 @@ func (r *Results) getFilters() *ec2.DescribeInstancesInput {
 		case "tag:Name":
 			input.Filters = append(input.Filters, common.FilterNames(values)...)
 		case "tag":
-			input.Filters = append(input.Filters, common.FilterTags(values)...)
+			tagFilters, err := common.FilterTags(values)
+			if err != nil {
+				return nil, fmt.Errorf("building tag filters: %w", err)
+			}
+			input.Filters = append(input.Filters, tagFilters...)
 		case "availability-zone":
 			input.Filters = append(input.Filters, common.FilterAvailabilityZones(values, r.Region)...)
 		default:
 			input.Filters = append(input.Filters, common.FilterDefault(key, values)...)
 		}
 	}
-	return &input
+	return &input, nil
 }
 
 // sortResults sorts the results by the given field.
@@ -255,7 +256,7 @@ func GetSortFields(f string) (map[string]string, error) {
 // It returns the value of the tag:Name or empty string in case that the instance has no name.
 func SearchInstanceName(profile, region, instanceID string) (string, error) {
 	r := New(profile, region, map[string][]string{"instance-id": {instanceID}}, "id")
-	r.Search()
+	r.Search(context.Background())
 	if len(r.Errors) > 0 {
 		return "", fmt.Errorf("error searching instance name: %v", r.Errors)
 	}
@@ -268,4 +269,22 @@ func SearchInstanceName(profile, region, instanceID string) (string, error) {
 	default:
 		return "", fmt.Errorf("more than one instance found")
 	}
+}
+
+// SearchInstanceNames returns a map of instanceID to instance name for all given IDs.
+// It makes a single DescribeInstances API call instead of one per ID.
+func SearchInstanceNames(profile, region string, instanceIDs []string) (map[string]string, error) {
+	if len(instanceIDs) == 0 {
+		return map[string]string{}, nil
+	}
+	r := New(profile, region, map[string][]string{"instance-id": instanceIDs}, "id")
+	r.Search(context.Background())
+	if len(r.Errors) > 0 {
+		return nil, fmt.Errorf("error searching instance names: %v", r.Errors)
+	}
+	names := make(map[string]string, len(r.Data))
+	for i := range r.Data {
+		names[r.Data[i].InstanceID] = r.Data[i].InstanceName
+	}
+	return names, nil
 }

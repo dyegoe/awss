@@ -51,12 +51,14 @@ func TestNew(t *testing.T) {
 				sortField: "id",
 			},
 			want: &Results{
-				Profile:   "default",
-				Region:    "us-east-1",
-				Errors:    []string{},
-				Data:      []dataRow{},
-				Filters:   map[string][]string{"tag:Name": {"test"}},
-				SortField: "id",
+				BaseResults: common.BaseResults{
+					Profile:   "default",
+					Region:    "us-east-1",
+					Errors:    []string{},
+					SortField: "id",
+				},
+				Data:    []dataRow{},
+				Filters: map[string][]string{"tag:Name": {"test"}},
 			},
 		},
 	}
@@ -71,20 +73,24 @@ func TestNew(t *testing.T) {
 }
 
 var mockResultsEmpty = &Results{
-	Profile:   "",
-	Region:    "",
-	Errors:    []string{},
-	Data:      []dataRow{},
-	Filters:   map[string][]string{},
-	SortField: "",
+	BaseResults: common.BaseResults{
+		Profile: "",
+		Region:  "",
+		Errors:  []string{},
+	},
+	Data:    []dataRow{},
+	Filters: map[string][]string{},
 }
 
 var mockResults = &Results{
-	Profile: "default",
-	Region:  "us-east-1",
-	Errors: []string{
-		"error1",
-		"error2",
+	BaseResults: common.BaseResults{
+		Profile: "default",
+		Region:  "us-east-1",
+		Errors: []string{
+			"error1",
+			"error2",
+		},
+		SortField: "id",
 	},
 	Data: []dataRow{
 		*mockDataRow1,
@@ -97,7 +103,6 @@ var mockResults = &Results{
 		"availability-zone":   {"a", "b"},
 		"instance-state-name": {"running", "stopped"},
 	},
-	SortField: "id",
 }
 
 var mockDataRow1 = &dataRow{
@@ -333,6 +338,7 @@ func TestResults_getFilters(t *testing.T) {
 		name    string
 		results *Results
 		want    *ec2.DescribeInstancesInput
+		wantErr bool
 	}{
 		{
 			name:    "multiple filters",
@@ -351,7 +357,11 @@ func TestResults_getFilters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.results.getFilters()
+			got, err := tt.results.getFilters()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Results.getFilters() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
 			for _, i := range got.Filters {
 				for _, j := range tt.want.Filters {
 					if *i.Name != *j.Name {

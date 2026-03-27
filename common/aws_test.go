@@ -235,9 +235,10 @@ func TestFilterTags(t *testing.T) {
 		tags []string
 	}
 	tests := []struct {
-		name string
-		args args
-		want []types.Filter
+		name    string
+		args    args
+		want    []types.Filter
+		wantErr bool
 	}{
 		{
 			name: "empty",
@@ -271,19 +272,26 @@ func TestFilterTags(t *testing.T) {
 			},
 		},
 		{
-			name: "key",
-			args: args{tags: []string{"key"}},
-			want: []types.Filter{},
+			name:    "malformed tag without equals sign",
+			args:    args{tags: []string{"key"}},
+			wantErr: true,
 		},
 		{
-			name: "key=value:value2,key2",
-			args: args{tags: []string{"key=value:value2", "key2"}},
-			want: []types.Filter{},
+			name:    "mixed valid and malformed tags",
+			args:    args{tags: []string{"key=value:value2", "key2"}},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := FilterTags(tt.args.tags)
+			got, err := FilterTags(tt.args.tags)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("FilterTags() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
+				return
+			}
 			for _, i := range got {
 				for _, j := range tt.want {
 					if *i.Name != *j.Name {
