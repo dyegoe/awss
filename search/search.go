@@ -38,7 +38,7 @@ import (
 // The filters are used to filter the results.
 // The output is the format of the output.
 // The showEmpty flag indicates if empty results should be shown.
-func Execute(cmd string, profiles, regions []string, filters map[string][]string, sortField, output string, showEmpty, showTags bool) error { //nolint:lll
+func Execute(cmd string, profiles, regions []string, filters map[string][]string, sortField, output string, showEmpty, showTags, noInstanceName bool) error { //nolint:lll
 	ctx := context.Background()
 	wg := sync.WaitGroup{}
 
@@ -69,7 +69,7 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 			case "ec2":
 				searchResults = searchEC2.New(profile, region, filters, sortField)
 			case "eni":
-				searchResults = searchENI.New(profile, region, filters, sortField)
+				searchResults = searchENI.New(profile, region, filters, sortField, noInstanceName)
 			default:
 				return fmt.Errorf("command %s not found", cmd)
 			}

@@ -31,6 +31,7 @@ import (
 )
 
 const (
+	labelEc2All  = "ec2.all"
 	labelEc2Sort = "ec2.sort"
 )
 
@@ -66,32 +67,57 @@ You can use multiple values for each filter, separated by comma. Example: --name
 You can use multiple filters at same time, for example:
 	awss ec2 -n '*' -t 'Key=Value1:Value2,Environment=Production' -T t2.micro,t2.small -z a,b -s running,stopped
 
+Use --all to search for all EC2 instances without any filter. This flag cannot be combined with other filters.
+
 (You can use the wildcard '*' to search for all values in a filter)
 `,
 	RunE: ec2RunE,
 }
 
-//nolint:dupl // parallel command handler structure, not extractable without over-abstracting
+// ec2FilterFlags lists all EC2 filter flag names for mutual exclusivity with --all.
+var ec2FilterFlags = []string{
+	"ids", "names", "tags", "tags-key", "instance-types",
+	"availability-zones", "instance-states", "private-ips", "public-ips",
+}
+
 func ec2RunE(cmd *cobra.Command, args []string) error {
-	err := checkAvailabilityZones(ec2F.AvailabilityZones)
-	if err != nil && err.Error() != "no availability zone selected" {
-		return err
-	}
-
-	if _, err := common.ParseTags(ec2F.Tags); err != nil {
-		return err
-	}
-
 	if err := search.CheckSortField(cmd.Name(), viper.GetString(labelEc2Sort)); err != nil {
 		return err
 	}
 
-	filters, err := common.StructToFilters(ec2F)
-	if err != nil {
-		return err
+	allFlag := viper.GetBool(labelEc2All)
+
+	if allFlag {
+		for _, f := range ec2FilterFlags {
+			if cmd.Flags().Changed(f) {
+				return fmt.Errorf("--all cannot be combined with --%s", f)
+			}
+		}
 	}
 
-	err = search.Execute(
+	var filters map[string][]string
+
+	if allFlag {
+		filters = map[string][]string{}
+	} else {
+		if err := checkAvailabilityZones(ec2F.AvailabilityZones); err != nil {
+			if err.Error() != "no availability zone selected" {
+				return err
+			}
+		}
+
+		if _, err := common.ParseTags(ec2F.Tags); err != nil {
+			return err
+		}
+
+		f, err := common.StructToFilters(ec2F)
+		if err != nil {
+			return err
+		}
+		filters = f
+	}
+
+	err := search.Execute(
 		cmd.Name(),
 		viper.GetStringSlice(labelProfiles),
 		viper.GetStringSlice(labelRegions),
@@ -100,6 +126,7 @@ func ec2RunE(cmd *cobra.Command, args []string) error {
 		viper.GetString(labelOutput),
 		viper.GetBool(labelShowEmpty),
 		viper.GetBool(labelShowTags),
+		false,
 	)
 	if err != nil {
 		return err
@@ -111,6 +138,8 @@ func ec2RunE(cmd *cobra.Command, args []string) error {
 func ec2InitFlags() {
 	rootCmd.AddCommand(ec2Cmd)
 
+	ec2Cmd.Flags().BoolP("all", "a", false,
+		"Search for all EC2 instances without any filter. Cannot be combined with other filters.")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.Ids, "ids", "i", []string{},
 		"Filter EC2 instances by ids. `i-1230456078901,i-1230456078902`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.Names, "names", "n", []string{},
@@ -134,6 +163,9 @@ func ec2InitFlags() {
 }
 
 func ec2InitViper() error {
+	if err := viper.BindPFlag(labelEc2All, ec2Cmd.Flags().Lookup("all")); err != nil {
+		return fmt.Errorf("error binding flag: %w", err)
+	}
 	if err := viper.BindPFlag(labelEc2Sort, ec2Cmd.Flags().Lookup("sort")); err != nil {
 		return fmt.Errorf("error binding flag: %w", err)
 	}

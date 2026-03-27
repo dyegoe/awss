@@ -31,7 +31,9 @@ import (
 )
 
 const (
-	labelEniSort = "eni.sort"
+	labelEniAll            = "eni.all"
+	labelEniSort           = "eni.sort"
+	labelEniNoInstanceName = "eni.no-instance-name"
 )
 
 // eniFilters represents the filters for the eni command.
@@ -62,33 +64,52 @@ You can use multiple values for each filter, separated by comma. Example: --ids 
 
 You can use multiple filters at same time, for example:
 	awss eni -I i-1230456078901,i-1230456078902 -z a,b
-	
+
+Use --all to search for all ENIs without any filter. This flag cannot be combined with other filters.
+
 (You can use the wildcard '*' to search for all values in a filter)
 `,
 	RunE: eniRunE,
 }
 
-//nolint:dupl // parallel command handler structure, not extractable without over-abstracting
 func eniRunE(cmd *cobra.Command, args []string) error {
-	err := checkAvailabilityZones(eniF.AvailabilityZones)
-	if err != nil && err.Error() != "no availability zone selected" {
-		return err
-	}
-
-	if _, err := common.ParseTags(eniF.Tags); err != nil {
-		return err
-	}
-
 	if err := search.CheckSortField(cmd.Name(), viper.GetString(labelEniSort)); err != nil {
 		return err
 	}
 
-	filters, err := common.StructToFilters(eniF)
-	if err != nil {
-		return err
+	allFlag := viper.GetBool(labelEniAll)
+
+	if allFlag {
+		for _, f := range eniFilterFlags {
+			if cmd.Flags().Changed(f) {
+				return fmt.Errorf("--all cannot be combined with --%s", f)
+			}
+		}
 	}
 
-	err = search.Execute(
+	var filters map[string][]string
+
+	if allFlag {
+		filters = map[string][]string{}
+	} else {
+		if err := checkAvailabilityZones(eniF.AvailabilityZones); err != nil {
+			if err.Error() != "no availability zone selected" {
+				return err
+			}
+		}
+
+		if _, err := common.ParseTags(eniF.Tags); err != nil {
+			return err
+		}
+
+		f, err := common.StructToFilters(eniF)
+		if err != nil {
+			return err
+		}
+		filters = f
+	}
+
+	err := search.Execute(
 		cmd.Name(),
 		viper.GetStringSlice(labelProfiles),
 		viper.GetStringSlice(labelRegions),
@@ -97,6 +118,7 @@ func eniRunE(cmd *cobra.Command, args []string) error {
 		viper.GetString(labelOutput),
 		viper.GetBool(labelShowEmpty),
 		viper.GetBool(labelShowTags),
+		viper.GetBool(labelEniNoInstanceName),
 	)
 	if err != nil {
 		return err
@@ -105,9 +127,17 @@ func eniRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// eniFilterFlags lists all ENI filter flag names for mutual exclusivity with --all.
+var eniFilterFlags = []string{
+	"ids", "tags", "tags-key", "instance-ids",
+	"availability-zones", "private-ips", "public-ips",
+}
+
 func eniInitFlags() {
 	rootCmd.AddCommand(eniCmd)
 
+	eniCmd.Flags().BoolP("all", "a", false,
+		"Search for all ENIs without any filter. Cannot be combined with other filters.")
 	eniCmd.Flags().StringSliceVarP(&eniF.Ids, "ids", "i", []string{},
 		"Filter ENIs by ids. `eni-1230456078901,eni-1230456078902`")
 	eniCmd.Flags().StringSliceVarP(&eniF.Tags, "tags", "t", []string{},
@@ -124,10 +154,18 @@ func eniInitFlags() {
 		"Filter ENIs by public IPs. `52.28.19.20,52.30.31.32`")
 	eniCmd.Flags().String("sort", "id",
 		"Sort ENIs by id, type, az, status, subnet-id, instance-id or instance-name. `id`")
+	eniCmd.Flags().Bool("no-instance-name", false,
+		"Skip the instance name lookup to speed up the ENI search.")
 }
 
 func eniInitViper() error {
+	if err := viper.BindPFlag(labelEniAll, eniCmd.Flags().Lookup("all")); err != nil {
+		return fmt.Errorf("error binding flag: %w", err)
+	}
 	if err := viper.BindPFlag(labelEniSort, eniCmd.Flags().Lookup("sort")); err != nil {
+		return fmt.Errorf("error binding flag: %w", err)
+	}
+	if err := viper.BindPFlag(labelEniNoInstanceName, eniCmd.Flags().Lookup("no-instance-name")); err != nil {
 		return fmt.Errorf("error binding flag: %w", err)
 	}
 	return nil

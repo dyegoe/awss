@@ -32,10 +32,11 @@ import (
 // TestNew tests the New function.
 func TestNew(t *testing.T) {
 	type args struct {
-		profile   string
-		region    string
-		filters   map[string][]string
-		sortField string
+		profile        string
+		region         string
+		filters        map[string][]string
+		sortField      string
+		noInstanceName bool
 	}
 	tests := []struct {
 		name string
@@ -64,7 +65,7 @@ func TestNew(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := New(tt.args.profile, tt.args.region, tt.args.filters, tt.args.sortField)
+			got := New(tt.args.profile, tt.args.region, tt.args.filters, tt.args.sortField, tt.args.noInstanceName)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("New()\n%#v\nwant\n%#v", got, tt.want)
 			}
