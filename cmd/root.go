@@ -43,6 +43,9 @@ const (
 	labelAllRegions     = "all-regions"
 )
 
+// version is overridden at build time via -ldflags.
+var version = "dev"
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "awss",
@@ -55,7 +58,7 @@ It is a wrapper written in Go using AWS SDK Go v2.
 The work is still in progress and will be updated regularly.
 You can find the source code on GitHub:
 https://github.com/dyegoe/awss`,
-	Version:           "0.7.3", // TODO: Remember to update this version when releasing a new version.
+	Version:           version,
 	PersistentPreRunE: persistentPreRun,
 }
 
@@ -73,6 +76,11 @@ func Execute() {
 	}
 
 	if err := ec2InitViper(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	if err := eniInitViper(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -104,6 +112,12 @@ func persistentPreRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	viper.Set(labelRegions, regions)
+
+	if _, valid := common.ValidOutputs(viper.GetString(labelOutput)); !valid {
+		validList, _ := common.ValidOutputs("")
+		return fmt.Errorf("invalid output format: %s. Valid outputs are: %s",
+			viper.GetString(labelOutput), validList)
+	}
 
 	return nil
 }

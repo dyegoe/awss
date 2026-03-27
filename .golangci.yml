@@ -1,82 +1,102 @@
-linters-settings:
-  depguard:
-    rules:
-      main:
-        allow:
-          - $gostd
-          - github.com/dyegoe/awss/
-          - github.com/spf13/cobra
-          - github.com/spf13/viper
-          - github.com/aws/aws-sdk-go-v2/
-          - github.com/jedib0t/go-pretty/v6/table
-          - github.com/jedib0t/go-pretty/v6/text
-  dupl:
-    threshold: 100
-  funlen:
-    lines: 60
-    statements: 50
-  goconst:
-    min-len: 2
-    min-occurrences: 3
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - dupImport # https://github.com/go-critic/go-critic/issues/845
-      - ifElseChain
-      - octalLiteral
-      - whyNoLint
-  gocyclo:
-    min-complexity: 15
-  goimports:
-    local-prefixes: github.com/golangci/golangci-lint
-  gomnd:
-    checks:
-      - argument
-      - case
-      - condition
-      - return
-    ignored-numbers:
-      - "0"
-      - "1"
-      - "2"
-      - "3"
-
+version: "2"
 linters:
-  disable-all: true
+  default: none
   enable:
     - bodyclose
+    - copyloopvar
     - depguard
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
     - funlen
     - gochecknoinits
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
-    - goimports
-    - gomnd
     - goprintffuncname
     - gosec
-    - gosimple
     - govet
     - ineffassign
     - lll
     - misspell
+    - mnd
     - nakedret
     - noctx
     - nolintlint
     - staticcheck
-    - stylecheck
-    - typecheck
     - unconvert
     - unparam
     - unused
     - whitespace
+  settings:
+    depguard:
+      rules:
+        main:
+          allow:
+            - $gostd
+            - github.com/dyegoe/awss/
+            - github.com/spf13/cobra
+            - github.com/spf13/viper
+            - github.com/aws/aws-sdk-go-v2/
+            - github.com/jedib0t/go-pretty/v6/table
+            - github.com/jedib0t/go-pretty/v6/text
+            - golang.org/x/term
+            - gopkg.in/ini.v1
+    dupl:
+      threshold: 100
+    funlen:
+      lines: 60
+      statements: 50
+    goconst:
+      min-len: 2
+      min-occurrences: 3
+    gocritic:
+      disabled-checks:
+        - dupImport
+        - ifElseChain
+        - octalLiteral
+        - whyNoLint
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+    gocyclo:
+      min-complexity: 15
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - return
+      ignored-numbers:
+        - "0"
+        - "1"
+        - "2"
+        - "3"
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/golangci/golangci-lint
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

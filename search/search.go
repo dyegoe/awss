@@ -22,6 +22,7 @@ limitations under the License.
 package search
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -38,6 +39,7 @@ import (
 // The output is the format of the output.
 // The showEmpty flag indicates if empty results should be shown.
 func Execute(cmd string, profiles, regions []string, filters map[string][]string, sortField, output string, showEmpty, showTags bool) error { //nolint:lll
+	ctx := context.Background()
 	wg := sync.WaitGroup{}
 
 	numInteractions := len(profiles) * len(regions)
@@ -77,7 +79,7 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 			go func() {
 				defer wg.Done()
 
-				searchResults.Search()
+				searchResults.Search(ctx)
 
 				resultsChan <- searchResults
 			}()
@@ -99,6 +101,7 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 // We use a map to avoid a switch case and mock the functions in the tests.
 var getSortFieldsCMDList = map[string]func(string) (map[string]string, error){
 	"ec2": searchEC2.GetSortFields,
+	"eni": searchENI.GetSortFields,
 }
 
 // CheckSortField checks if the given sort field is valid for the given command.

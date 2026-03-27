@@ -22,6 +22,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -36,8 +37,8 @@ type terminalSize struct {
 	Height int
 }
 
-func TerminalSize() terminalSize {
-	w, h, err := term.GetSize(int(os.Stdout.Fd()))
+func getTerminalSize() terminalSize {
+	w, h, err := term.GetSize(int(os.Stdout.Fd())) //nolint:gosec // fd is a valid file descriptor, overflow not possible
 	if err != nil {
 		return terminalSize{Width: 80, Height: 24}
 	}
@@ -46,7 +47,7 @@ func TerminalSize() terminalSize {
 
 // Results is an interface that defines the methods that a result must implement.
 type Results interface {
-	Search()
+	Search(ctx context.Context)
 	Len() int
 	GetProfile() string
 	GetRegion() string

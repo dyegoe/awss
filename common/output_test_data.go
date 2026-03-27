@@ -20,7 +20,10 @@ limitations under the License.
 // It also has functions to print the results in different formats.
 package common
 
-import "reflect"
+import (
+	"context"
+	"reflect"
+)
 
 // testResults is a struct used for testing.
 //
@@ -35,12 +38,12 @@ type testResults struct {
 // Results interface is implemented by testResults.
 // Using the functions below, testResults will be able to be printed in different formats.
 
-func (tr *testResults) Search()              {}
-func (tr *testResults) Len() int             { return len(tr.Data) }
-func (tr *testResults) GetProfile() string   { return tr.Profile }
-func (tr *testResults) GetRegion() string    { return tr.Region }
-func (tr *testResults) GetErrors() []string  { return tr.Errors }
-func (tr *testResults) GetSortField() string { return "field" }
+func (tr *testResults) Search(_ context.Context) {}
+func (tr *testResults) Len() int                 { return len(tr.Data) }
+func (tr *testResults) GetProfile() string       { return tr.Profile }
+func (tr *testResults) GetRegion() string        { return tr.Region }
+func (tr *testResults) GetErrors() []string      { return tr.Errors }
+func (tr *testResults) GetSortField() string     { return "field" }
 func (tr *testResults) GetHeaders() []interface{} {
 	headers := []interface{}{}
 

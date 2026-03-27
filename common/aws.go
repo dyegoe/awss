@@ -35,7 +35,7 @@ import (
 // AwsConfig returns a AWS config for the specific profile and region.
 func AwsConfig(profile, region string) (aws.Config, error) {
 	cfg, err := config.LoadDefaultConfig(
-		context.TODO(),
+		context.Background(),
 		config.WithSharedConfigProfile(profile),
 		config.WithRegion(region),
 	)
@@ -56,7 +56,7 @@ func WhoAmI(profile, region string) (string, error) {
 		return "", err
 	}
 	client := sts.NewFromConfig(cfg)
-	resp, err := client.GetCallerIdentity(context.TODO(), &sts.GetCallerIdentityInput{})
+	resp, err := client.GetCallerIdentity(context.Background(), &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return "", err
 	}
@@ -119,22 +119,23 @@ func FilterNames(names []string) []types.Filter {
 }
 
 // FilterTags returns a list of types.Filter by tag:Key=Value1,Value2,Value3...
-func FilterTags(tags []string) []types.Filter {
-	filters := []types.Filter{}
+// It returns an error if any tag string is malformed.
+func FilterTags(tags []string) ([]types.Filter, error) {
 	if len(tags) == 0 {
-		return filters
+		return []types.Filter{}, nil
 	}
 	parsed, err := ParseTags(tags)
 	if err != nil {
-		return filters
+		return nil, fmt.Errorf("parsing tag filters: %w", err)
 	}
+	filters := []types.Filter{}
 	for key, values := range parsed {
 		filters = append(filters, types.Filter{
 			Name:   String(fmt.Sprintf("tag:%s", key)),
 			Values: values,
 		})
 	}
-	return filters
+	return filters, nil
 }
 
 // FilterAvailabilityZones returns a list of types.Filter by availability-zone.

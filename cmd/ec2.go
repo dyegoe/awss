@@ -71,6 +71,7 @@ You can use multiple filters at same time, for example:
 	RunE: ec2RunE,
 }
 
+//nolint:dupl // parallel command handler structure, not extractable without over-abstracting
 func ec2RunE(cmd *cobra.Command, args []string) error {
 	err := checkAvailabilityZones(ec2F.AvailabilityZones)
 	if err != nil && err.Error() != "no availability zone selected" {
