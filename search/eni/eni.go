@@ -41,6 +41,9 @@ type Results struct {
 
 	// Filters is a map of strings used to search.
 	Filters map[string][]string `json:"-"`
+
+	// NoInstanceName skips the instance name lookup when true.
+	NoInstanceName bool `json:"-"`
 }
 
 // dataRow represents a row of the ENIs search results.
@@ -83,7 +86,7 @@ type eniInfo struct {
 }
 
 // New initiates and returns a new instance of ENI results.
-func New(profile, region string, filters map[string][]string, sortField string) *Results {
+func New(profile, region string, filters map[string][]string, sortField string, noInstanceName bool) *Results {
 	return &Results{
 		BaseResults: common.BaseResults{
 			Profile:   profile,
@@ -91,8 +94,9 @@ func New(profile, region string, filters map[string][]string, sortField string) 
 			Errors:    []string{},
 			SortField: sortField,
 		},
-		Data:    []dataRow{},
-		Filters: filters,
+		Data:           []dataRow{},
+		Filters:        filters,
+		NoInstanceName: noInstanceName,
 	}
 }
 
@@ -132,7 +136,7 @@ func (r *Results) Search(ctx context.Context) {
 	}
 
 	// Batch lookup instance names in a single API call.
-	if len(instanceIDs) > 0 {
+	if len(instanceIDs) > 0 && !r.NoInstanceName {
 		names, err := searchEC2.SearchInstanceNames(r.Profile, r.Region, instanceIDs)
 		if err != nil {
 			r.Errors = append(r.Errors, err.Error())
