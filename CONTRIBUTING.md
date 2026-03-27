@@ -42,45 +42,67 @@ If you are proposing a feature:
 Ready to contribute? Here's how to set up `awss` for local development.
 
 1. Fork the `awss` repo on GitHub.
+
 2. Clone your fork locally:
 
     ```bash
     git clone git@github.com:your_name_here/awss.git
     ```
 
-3. Setup `pre-commit`:
+3. Install development tools:
 
     ```bash
-    sudo apt install pre-commit
-    go install golang.org/x/tools/cmd/goimports@latest
-    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.53.2
-    go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
-    go install github.com/go-critic/go-critic/cmd/gocritic@latest
-    precommit install
+    pip install pre-commit
+    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
+    pre-commit install
     ```
 
 4. Create a branch for local development:
 
-      ```bash
-      git checkout -b name-of-your-bugfix-or-feature
-      ```
+    ```bash
+    git checkout -b name-of-your-bugfix-or-feature
+    ```
 
-    Now you can make your changes locally. Remember to change the version in `cmd/root.go` and `README.md` files.
-
-5. Commit your changes and push your branch to GitHub::
+5. Make your changes. Before committing, verify everything passes:
 
     ```bash
-    git add .
-    git commit -m "Your detailed description of your changes."
+    make build
+    make test
+    make lint
+    ```
+
+    Or equivalently:
+
+    ```bash
+    go build ./...
+    go test ./...
+    golangci-lint run
+    ```
+
+6. Commit your changes following the commit message format:
+
+    ```text
+    <type>(<scope>): <short description>
+
+    Types: fix, feat, refactor, test, docs, chore
+    Scope: cmd, search/ec2, search/eni, common, search
+    ```
+
+    Example:
+
+    ```bash
+    git add search/ec2/ec2.go search/ec2/ec2_test.go
+    git commit -m "fix(search/ec2): nil-check SubnetId before dereference"
     git push origin name-of-your-bugfix-or-feature
     ```
-  
-6. Submit a pull request through the GitHub website.
+
+7. Submit a pull request through the GitHub website.
 
 ## Pull Request Guidelines
 
 Before you submit a pull request, check that it meets these guidelines:
 
-1. If the pull request adds functionality, the docs should be updated. Put
-   your new functionality into a function with a docstring, and add the
-   feature to the list in README.md.
+1. All three verify commands must pass: `make build`, `make test`, `make lint`.
+2. If the pull request adds functionality, update the docs and add tests.
+3. New exported symbols must have doc comments (see `docs/CODESTYLE.md`).
+4. Follow the coding conventions described in `docs/CODESTYLE.md`.
