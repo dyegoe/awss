@@ -464,6 +464,78 @@ func TestResults_sortResults_sizeNumeric(t *testing.T) {
 	}
 }
 
+func parseVolumeBaseVol() types.Volume {
+	strPtr := func(s string) *string { return &s }
+	b, i := true, int32(50)
+	return types.Volume{
+		VolumeId:         strPtr("vol-abc123"),
+		VolumeType:       types.VolumeTypeGp3,
+		State:            types.VolumeStateInUse,
+		AvailabilityZone: strPtr("us-east-1a"),
+		Size:             &i,
+		Encrypted:        &b,
+	}
+}
+
+func parseVolumeBaseRow() dataRow {
+	return dataRow{
+		VolumeID: "vol-abc123", VolumeType: "gp3", State: "in-use",
+		AvailabilityZone: "us-east-1a", Size: 50, Encrypted: "true",
+		Tags: map[string]string{},
+	}
+}
+
+// TestParseVolume_noAttachments tests parseVolume when the volume has no attachments.
+func TestParseVolume_noAttachments(t *testing.T) {
+	vol := parseVolumeBaseVol()
+	got := parseVolume(&vol)
+	if len(got) != 1 {
+		t.Fatalf("parseVolume() len = %d, want 1", len(got))
+	}
+	if !reflect.DeepEqual(got[0], parseVolumeBaseRow()) {
+		t.Errorf("parseVolume()\n%#v\nwant\n%#v", got[0], parseVolumeBaseRow())
+	}
+}
+
+// TestParseVolume_singleAttachment tests parseVolume when the volume has one attachment.
+func TestParseVolume_singleAttachment(t *testing.T) {
+	s := func(v string) *string { return &v }
+	vol := parseVolumeBaseVol()
+	vol.Attachments = []types.VolumeAttachment{
+		{InstanceId: s("i-111"), Device: s("/dev/sda1")},
+	}
+	got := parseVolume(&vol)
+	if len(got) != 1 {
+		t.Fatalf("parseVolume() len = %d, want 1", len(got))
+	}
+	want := parseVolumeBaseRow()
+	want.InstanceID, want.Device = "i-111", "/dev/sda1"
+	if !reflect.DeepEqual(got[0], want) {
+		t.Errorf("parseVolume()\n%#v\nwant\n%#v", got[0], want)
+	}
+}
+
+// TestParseVolume_multiAttach tests parseVolume for Multi-Attach volumes (one row per attachment).
+func TestParseVolume_multiAttach(t *testing.T) {
+	s := func(v string) *string { return &v }
+	vol := parseVolumeBaseVol()
+	vol.Attachments = []types.VolumeAttachment{
+		{InstanceId: s("i-111"), Device: s("/dev/sda1")},
+		{InstanceId: s("i-222"), Device: s("/dev/sdb1")},
+	}
+	got := parseVolume(&vol)
+	if len(got) != 2 {
+		t.Fatalf("parseVolume() len = %d, want 2", len(got))
+	}
+	for i, tc := range []struct{ id, dev string }{{"i-111", "/dev/sda1"}, {"i-222", "/dev/sdb1"}} {
+		want := parseVolumeBaseRow()
+		want.InstanceID, want.Device = tc.id, tc.dev
+		if !reflect.DeepEqual(got[i], want) {
+			t.Errorf("parseVolume() row[%d]\n%#v\nwant\n%#v", i, got[i], want)
+		}
+	}
+}
+
 // TestGetSortFields tests the GetSortFields function.
 func TestGetSortFields(t *testing.T) {
 	tests := []struct {

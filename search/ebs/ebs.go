@@ -122,10 +122,12 @@ func (r *Results) Search(ctx context.Context) {
 			return
 		}
 		for _, vol := range page.Volumes { //nolint:gocritic
-			row := parseVolume(&vol)
-			r.Data = append(r.Data, row)
-			if row.InstanceID != "" {
-				instanceIDSet[row.InstanceID] = struct{}{}
+			rows := parseVolume(&vol)
+			for i := range rows {
+				r.Data = append(r.Data, rows[i])
+				if rows[i].InstanceID != "" {
+					instanceIDSet[rows[i].InstanceID] = struct{}{}
+				}
 			}
 		}
 	}
@@ -154,9 +156,13 @@ func (r *Results) Search(ctx context.Context) {
 	}
 }
 
-// parseVolume converts a single Volume into a dataRow.
-func parseVolume(vol *types.Volume) dataRow {
-	row := dataRow{
+// parseVolume converts a Volume into one dataRow per attachment.
+//
+// Volumes with no attachments produce a single row with empty InstanceID and Device.
+// Multi-Attach volumes (io1/io2) produce one row per attachment so that each row
+// contains a single, sortable InstanceID and Device value.
+func parseVolume(vol *types.Volume) []dataRow {
+	base := dataRow{
 		VolumeID:         common.StringValue(vol.VolumeId),
 		VolumeType:       string(vol.VolumeType),
 		State:            string(vol.State),
@@ -164,17 +170,22 @@ func parseVolume(vol *types.Volume) dataRow {
 		Tags:             common.TagsToMap(vol.Tags),
 	}
 	if vol.Size != nil {
-		row.Size = *vol.Size
+		base.Size = *vol.Size
 	}
 	if vol.Encrypted != nil {
-		row.Encrypted = strconv.FormatBool(*vol.Encrypted)
+		base.Encrypted = strconv.FormatBool(*vol.Encrypted)
 	}
-	if len(vol.Attachments) > 0 {
-		att := vol.Attachments[0]
+	if len(vol.Attachments) == 0 {
+		return []dataRow{base}
+	}
+	rows := make([]dataRow, 0, len(vol.Attachments))
+	for _, att := range vol.Attachments {
+		row := base
 		row.InstanceID = common.StringValue(att.InstanceId)
 		row.Device = common.StringValue(att.Device)
+		rows = append(rows, row)
 	}
-	return row
+	return rows
 }
 
 // Len returns the length of the results.
