@@ -53,7 +53,7 @@ type dataRow struct {
 	VolumeID string `json:"id,omitempty" header:"ID" sort:"id"`
 
 	// Size is the size of the volume in GiB.
-	Size string `json:"size,omitempty" header:"Size (GiB)" sort:"size"`
+	Size int32 `json:"size,omitempty" header:"Size (GiB)" sort:"size"`
 
 	// VolumeType is the type of the volume.
 	VolumeType string `json:"type,omitempty" header:"Type" sort:"type"`
@@ -157,7 +157,7 @@ func parseVolume(vol *types.Volume) dataRow {
 		Tags:             common.TagsToMap(vol.Tags),
 	}
 	if vol.Size != nil {
-		row.Size = strconv.FormatInt(int64(*vol.Size), 10)
+		row.Size = *vol.Size
 	}
 	if vol.Encrypted != nil {
 		row.Encrypted = strconv.FormatBool(*vol.Encrypted)
@@ -232,10 +232,14 @@ func (r *Results) sortResults(field string) error {
 		return err
 	}
 
+	fieldName := sortFields[field]
 	sort.Slice(r.Data, func(p, q int) bool {
-		pVal := reflect.ValueOf(r.Data[p]).FieldByName(sortFields[field]).String()
-		qVal := reflect.ValueOf(r.Data[q]).FieldByName(sortFields[field]).String()
-		return pVal < qVal
+		pField := reflect.ValueOf(r.Data[p]).FieldByName(fieldName)
+		qField := reflect.ValueOf(r.Data[q]).FieldByName(fieldName)
+		if pField.Kind() == reflect.Int32 {
+			return pField.Int() < qField.Int()
+		}
+		return pField.String() < qField.String()
 	})
 	return nil
 }

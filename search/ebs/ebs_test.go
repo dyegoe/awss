@@ -107,7 +107,7 @@ var mockResults = &Results{
 
 var mockDataRow1 = &dataRow{
 	VolumeID:         "vol-1234567890abcdef0",
-	Size:             "100",
+	Size:             100,
 	VolumeType:       "gp3",
 	State:            "in-use",
 	AvailabilityZone: "us-east-1a",
@@ -123,7 +123,7 @@ var mockDataRow1 = &dataRow{
 
 var mockDataRow2 = &dataRow{
 	VolumeID:         "vol-1234567890abcdef1",
-	Size:             "200",
+	Size:             200,
 	VolumeType:       "io2",
 	State:            "available",
 	AvailabilityZone: "us-east-1b",
@@ -386,6 +386,75 @@ func TestResults_getFilters_malformedTag(t *testing.T) {
 	_, err := r.getFilters()
 	if err == nil {
 		t.Error("Results.getFilters() expected error for malformed tag, got nil")
+	}
+}
+
+// TestResults_sortResults tests the sortResults function.
+func TestResults_sortResults(t *testing.T) {
+	tests := []struct {
+		name      string
+		field     string
+		wantErr   bool
+		wantFirst string // expected VolumeID of first row after sort
+	}{
+		{
+			name:      "sort by id ascending",
+			field:     "id",
+			wantFirst: "vol-1234567890abcdef0",
+		},
+		{
+			name:      "sort by size ascending (numeric)",
+			field:     "size",
+			wantFirst: "vol-1234567890abcdef0",
+		},
+		{
+			name:      "sort by state ascending",
+			field:     "state",
+			wantFirst: "vol-1234567890abcdef1",
+		},
+		{
+			name:    "invalid field",
+			field:   "invalid",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &Results{
+				Data: []dataRow{
+					{VolumeID: "vol-1234567890abcdef1", Size: 200, State: "available"},
+					{VolumeID: "vol-1234567890abcdef0", Size: 100, State: "in-use"},
+				},
+			}
+			err := r.sortResults(tt.field)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("sortResults(%q) error = %v, wantErr %v", tt.field, err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && r.Data[0].VolumeID != tt.wantFirst {
+				t.Errorf("sortResults(%q) first row = %s, want %s", tt.field, r.Data[0].VolumeID, tt.wantFirst)
+			}
+		})
+	}
+}
+
+// TestResults_sortResults_sizeNumeric verifies size sorts numerically, not lexicographically.
+func TestResults_sortResults_sizeNumeric(t *testing.T) {
+	r := &Results{
+		Data: []dataRow{
+			{VolumeID: "vol-a", Size: 100},
+			{VolumeID: "vol-b", Size: 20},
+			{VolumeID: "vol-c", Size: 1000},
+		},
+	}
+	if err := r.sortResults("size"); err != nil {
+		t.Fatalf("sortResults(size) unexpected error: %v", err)
+	}
+	want := []int32{20, 100, 1000}
+	for i, w := range want {
+		if r.Data[i].Size != w {
+			t.Errorf("sortResults(size) index %d = %d, want %d", i, r.Data[i].Size, w)
+		}
 	}
 }
 
