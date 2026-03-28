@@ -45,7 +45,6 @@ const (
 	labelShowEmpty      = "show.empty"
 	labelShowTagsCobra  = "show-tags"
 	labelShowTags       = "show.tags"
-	labelAllProfiles    = "all-profiles"
 	labelAllRegions     = "all-regions"
 )
 
@@ -371,6 +370,6 @@ func runSearch(
 		viper.GetString(labelOutput),
 		viper.GetBool(labelShowEmpty),
 		viper.GetBool(labelShowTags),
-		viper.GetBool(noInstanceNameLabel),
+		noInstanceNameLabel != "" && viper.GetBool(noInstanceNameLabel),
 	)
 }
