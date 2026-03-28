@@ -23,9 +23,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/dyegoe/awss/common"
-	"github.com/dyegoe/awss/search"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -73,58 +70,10 @@ Use --all to search for all ENIs without any filter. This flag cannot be combine
 }
 
 func eniRunE(cmd *cobra.Command, args []string) error {
-	if err := search.CheckSortField(cmd.Name(), viper.GetString(labelEniSort)); err != nil {
-		return err
-	}
-
-	allFlag := viper.GetBool(labelEniAll)
-
-	if allFlag {
-		for _, f := range eniFilterFlags {
-			if cmd.Flags().Changed(f) {
-				return fmt.Errorf("--all cannot be combined with --%s", f)
-			}
-		}
-	}
-
-	var filters map[string][]string
-
-	if allFlag {
-		filters = map[string][]string{}
-	} else {
-		if err := checkAvailabilityZones(eniF.AvailabilityZones); err != nil {
-			if err.Error() != "no availability zone selected" {
-				return err
-			}
-		}
-
-		if _, err := common.ParseTags(eniF.Tags); err != nil {
-			return err
-		}
-
-		f, err := common.StructToFilters(eniF)
-		if err != nil {
-			return err
-		}
-		filters = f
-	}
-
-	err := search.Execute(
-		cmd.Name(),
-		viper.GetStringSlice(labelProfiles),
-		viper.GetStringSlice(labelRegions),
-		filters,
-		viper.GetString(labelEniSort),
-		viper.GetString(labelOutput),
-		viper.GetBool(labelShowEmpty),
-		viper.GetBool(labelShowTags),
-		viper.GetBool(labelEniNoInstanceName),
+	return runSearch(
+		cmd, labelEniAll, labelEniSort, labelEniNoInstanceName,
+		eniFilterFlags, eniF.AvailabilityZones, eniF.Tags, eniF,
 	)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // eniFilterFlags lists all ENI filter flag names for mutual exclusivity with --all.

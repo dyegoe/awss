@@ -28,6 +28,7 @@ import (
 	"sync"
 
 	"github.com/dyegoe/awss/common"
+	searchEBS "github.com/dyegoe/awss/search/ebs"
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
 	searchENI "github.com/dyegoe/awss/search/eni"
 )
@@ -70,6 +71,8 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 				searchResults = searchEC2.New(profile, region, filters, sortField)
 			case "eni":
 				searchResults = searchENI.New(profile, region, filters, sortField, noInstanceName)
+			case "ebs":
+				searchResults = searchEBS.New(profile, region, filters, sortField, noInstanceName)
 			default:
 				return fmt.Errorf("command %s not found", cmd)
 			}
@@ -102,6 +105,7 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 var getSortFieldsCMDList = map[string]func(string) (map[string]string, error){
 	"ec2": searchEC2.GetSortFields,
 	"eni": searchENI.GetSortFields,
+	"ebs": searchEBS.GetSortFields,
 }
 
 // CheckSortField checks if the given sort field is valid for the given command.

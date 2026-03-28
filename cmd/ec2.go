@@ -23,9 +23,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/dyegoe/awss/common"
-	"github.com/dyegoe/awss/search"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -81,58 +78,10 @@ var ec2FilterFlags = []string{
 }
 
 func ec2RunE(cmd *cobra.Command, args []string) error {
-	if err := search.CheckSortField(cmd.Name(), viper.GetString(labelEc2Sort)); err != nil {
-		return err
-	}
-
-	allFlag := viper.GetBool(labelEc2All)
-
-	if allFlag {
-		for _, f := range ec2FilterFlags {
-			if cmd.Flags().Changed(f) {
-				return fmt.Errorf("--all cannot be combined with --%s", f)
-			}
-		}
-	}
-
-	var filters map[string][]string
-
-	if allFlag {
-		filters = map[string][]string{}
-	} else {
-		if err := checkAvailabilityZones(ec2F.AvailabilityZones); err != nil {
-			if err.Error() != "no availability zone selected" {
-				return err
-			}
-		}
-
-		if _, err := common.ParseTags(ec2F.Tags); err != nil {
-			return err
-		}
-
-		f, err := common.StructToFilters(ec2F)
-		if err != nil {
-			return err
-		}
-		filters = f
-	}
-
-	err := search.Execute(
-		cmd.Name(),
-		viper.GetStringSlice(labelProfiles),
-		viper.GetStringSlice(labelRegions),
-		filters,
-		viper.GetString(labelEc2Sort),
-		viper.GetString(labelOutput),
-		viper.GetBool(labelShowEmpty),
-		viper.GetBool(labelShowTags),
-		false,
+	return runSearch(
+		cmd, labelEc2All, labelEc2Sort, "",
+		ec2FilterFlags, ec2F.AvailabilityZones, ec2F.Tags, ec2F,
 	)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func ec2InitFlags() {
