@@ -114,7 +114,7 @@ func (r *Results) Search(ctx context.Context) {
 	client := ec2.NewFromConfig(cfg)
 	paginator := ec2.NewDescribeVolumesPaginator(client, input)
 
-	var instanceIDs []string
+	instanceIDSet := make(map[string]struct{})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -125,12 +125,16 @@ func (r *Results) Search(ctx context.Context) {
 			row := parseVolume(&vol)
 			r.Data = append(r.Data, row)
 			if row.InstanceID != "" {
-				instanceIDs = append(instanceIDs, row.InstanceID)
+				instanceIDSet[row.InstanceID] = struct{}{}
 			}
 		}
 	}
 
-	if len(instanceIDs) > 0 && !r.NoInstanceName {
+	if len(instanceIDSet) > 0 && !r.NoInstanceName {
+		instanceIDs := make([]string, 0, len(instanceIDSet))
+		for id := range instanceIDSet {
+			instanceIDs = append(instanceIDs, id)
+		}
 		names, err := searchEC2.SearchInstanceNames(r.Profile, r.Region, instanceIDs)
 		if err != nil {
 			r.Errors = append(r.Errors, err.Error())
