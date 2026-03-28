@@ -325,6 +325,24 @@ func TestStructToFilters(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "pointer to struct",
+			args: args{
+				s: &testFilters{
+					SliceOfStringField: []string{"value1"},
+				},
+			},
+			want: map[string][]string{
+				"slice-of-string-field": {"value1"},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "non-struct value",
+			args:    args{s: "not a struct"},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

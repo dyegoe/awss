@@ -117,9 +117,13 @@ func IPtoString(i []net.IP) []string {
 // StructToFilters returns a map of filters from a struct.
 //
 // The struct must have the tag "filter" in the fields that should be used as filters.
+// Pointer-to-struct values are automatically dereferenced.
 func StructToFilters(s interface{}) (map[string][]string, error) {
 	filters := map[string][]string{}
-	v := reflect.ValueOf(s)
+	v := reflect.Indirect(reflect.ValueOf(s))
+	if v.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("StructToFilters: expected struct or pointer to struct, got %s", v.Kind())
+	}
 	for i := 0; i < v.NumField(); i++ {
 		if v.Field(i).Len() == 0 {
 			continue
