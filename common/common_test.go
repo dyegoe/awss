@@ -27,6 +27,61 @@ import (
 	"testing"
 )
 
+type testStructToFilters struct {
+	SliceOfStringField []string `filter:"slice-of-string-field"`
+	NetIPField         []net.IP `filter:"net-ip-field"`
+	StringField        string   `filter:"string-field"`
+	FieldNotTagged     string
+}
+
+type testStructToFiltersCase struct {
+	name    string
+	input   interface{}
+	want    map[string][]string
+	wantErr bool
+}
+
+func getStructToFiltersCases() []testStructToFiltersCase {
+	return []testStructToFiltersCase{
+		{
+			name: "slice of string and net.IP",
+			input: testStructToFilters{
+				SliceOfStringField: []string{"value1", "value2"},
+				StringField:        "value3",
+				NetIPField:         []net.IP{net.ParseIP("172.16.0.1"), net.ParseIP("172.17.1.254")},
+				FieldNotTagged:     "value4",
+			},
+			want: map[string][]string{
+				"slice-of-string-field": {"value1", "value2"},
+				"net-ip-field":          {"172.16.0.1", "172.17.1.254"},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "empty struct",
+			input:   testStructToFilters{},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "pointer to struct",
+			input: &testStructToFilters{
+				SliceOfStringField: []string{"value1"},
+			},
+			want: map[string][]string{
+				"slice-of-string-field": {"value1"},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "non-struct value",
+			input:   "not a struct",
+			want:    nil,
+			wantErr: true,
+		},
+	}
+}
+
 // TestParseTags tests the ParseTags function.
 //
 //nolint:funlen
@@ -284,69 +339,9 @@ func TestIPtoString(t *testing.T) {
 
 // TestStructToFilters tests the StructToFilters function.
 func TestStructToFilters(t *testing.T) {
-	// This is a struct that will be used to test the StructToFilters function
-	type testFilters struct {
-		SliceOfStringField []string `filter:"slice-of-string-field"`
-		NetIPField         []net.IP `filter:"net-ip-field"`
-		StringField        string   `filter:"string-field"`
-		FieldNotTagged     string
-	}
-
-	type args struct {
-		s interface{}
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    map[string][]string
-		wantErr bool
-	}{
-		{
-			name: "slice of string and net.IP",
-			args: args{
-				s: testFilters{
-					SliceOfStringField: []string{"value1", "value2"},
-					StringField:        "value3",
-					NetIPField:         []net.IP{net.ParseIP("172.16.0.1"), net.ParseIP("172.17.1.254")},
-					FieldNotTagged:     "value4",
-				},
-			},
-			want: map[string][]string{
-				"slice-of-string-field": {"value1", "value2"},
-				"net-ip-field":          {"172.16.0.1", "172.17.1.254"},
-			},
-			wantErr: false,
-		},
-		{
-			name: "empty struct",
-			args: args{
-				s: testFilters{},
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "pointer to struct",
-			args: args{
-				s: &testFilters{
-					SliceOfStringField: []string{"value1"},
-				},
-			},
-			want: map[string][]string{
-				"slice-of-string-field": {"value1"},
-			},
-			wantErr: false,
-		},
-		{
-			name:    "non-struct value",
-			args:    args{s: "not a struct"},
-			want:    nil,
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
+	for _, tt := range getStructToFiltersCases() {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := StructToFilters(tt.args.s)
+			got, err := StructToFilters(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("StructToFilters() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -105,54 +105,92 @@ func (r *Results) Search(ctx context.Context) {
 		return
 	}
 
-	cfg, err := common.AwsConfig(r.Profile, r.Region)
+	client, err := r.newEC2Client()
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %s", err))
+		r.Errors = append(r.Errors, err.Error())
 		return
 	}
 
-	client := ec2.NewFromConfig(cfg)
-	paginator := ec2.NewDescribeVolumesPaginator(client, input)
+	instanceIDSet, err := r.collectVolumeRows(ctx, client, input)
+	if err != nil {
+		r.Errors = append(r.Errors, err.Error())
+		return
+	}
 
+	r.enrichInstanceNames(instanceIDSet)
+	r.sortIfRequested()
+}
+
+func (r *Results) newEC2Client() (*ec2.Client, error) {
+	cfg, err := common.AwsConfig(r.Profile, r.Region)
+	if err != nil {
+		return nil, fmt.Errorf("error getting aws config: %w", err)
+	}
+
+	return ec2.NewFromConfig(cfg), nil
+}
+
+func (r *Results) collectVolumeRows(
+	ctx context.Context,
+	client *ec2.Client,
+	input *ec2.DescribeVolumesInput,
+) (map[string]struct{}, error) {
+	paginator := ec2.NewDescribeVolumesPaginator(client, input)
 	instanceIDSet := make(map[string]struct{})
+
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			r.Errors = append(r.Errors, fmt.Sprintf("error describing volumes: %v", err))
-			return
+			return nil, fmt.Errorf("error describing volumes: %w", err)
 		}
-		for _, vol := range page.Volumes { //nolint:gocritic
-			rows := parseVolume(&vol)
-			for i := range rows {
-				r.Data = append(r.Data, rows[i])
-				if rows[i].InstanceID != "" {
-					instanceIDSet[rows[i].InstanceID] = struct{}{}
-				}
+		r.appendVolumeRows(page.Volumes, instanceIDSet)
+	}
+
+	return instanceIDSet, nil
+}
+
+func (r *Results) appendVolumeRows(volumes []types.Volume, instanceIDSet map[string]struct{}) {
+	for _, vol := range volumes { //nolint:gocritic
+		rows := parseVolume(&vol)
+		for i := range rows {
+			r.Data = append(r.Data, rows[i])
+			if rows[i].InstanceID != "" {
+				instanceIDSet[rows[i].InstanceID] = struct{}{}
 			}
 		}
 	}
+}
 
-	if len(instanceIDSet) > 0 && !r.NoInstanceName {
-		instanceIDs := make([]string, 0, len(instanceIDSet))
-		for id := range instanceIDSet {
-			instanceIDs = append(instanceIDs, id)
-		}
-		names, err := searchEC2.SearchInstanceNames(r.Profile, r.Region, instanceIDs)
-		if err != nil {
-			r.Errors = append(r.Errors, err.Error())
-		} else {
-			for i := range r.Data {
-				if id := r.Data[i].InstanceID; id != "" {
-					r.Data[i].InstanceName = names[id]
-				}
-			}
-		}
+func (r *Results) enrichInstanceNames(instanceIDSet map[string]struct{}) {
+	if len(instanceIDSet) == 0 || r.NoInstanceName {
+		return
 	}
 
-	if r.SortField != "" {
-		if err := r.sortResults(r.SortField); err != nil {
-			r.Errors = append(r.Errors, err.Error())
+	instanceIDs := make([]string, 0, len(instanceIDSet))
+	for id := range instanceIDSet {
+		instanceIDs = append(instanceIDs, id)
+	}
+
+	names, err := searchEC2.SearchInstanceNames(r.Profile, r.Region, instanceIDs)
+	if err != nil {
+		r.Errors = append(r.Errors, err.Error())
+		return
+	}
+
+	for i := range r.Data {
+		if id := r.Data[i].InstanceID; id != "" {
+			r.Data[i].InstanceName = names[id]
 		}
+	}
+}
+
+func (r *Results) sortIfRequested() {
+	if r.SortField == "" {
+		return
+	}
+
+	if err := r.sortResults(r.SortField); err != nil {
+		r.Errors = append(r.Errors, err.Error())
 	}
 }
 
