@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [v0.8.0] - 2026-03-28
+
+<!-- markdownlint-disable MD024 -->
+### Added
+
+- Initial support for EBS volumes search with the new `ebs` command, dedicated filters, and sort fields. [#73](https://github.com/dyegoe/awss/issues/73) [#104](https://github.com/dyegoe/awss/pull/104)
+- `--all` flag support for EC2, ENI, and EBS commands to run searches without filters. [#101](https://github.com/dyegoe/awss/pull/101) [#104](https://github.com/dyegoe/awss/pull/104)
+- `--no-instance-name` flag to skip instance name lookup on ENI and EBS searches for faster execution. [#77](https://github.com/dyegoe/awss/issues/77) [#103](https://github.com/dyegoe/awss/pull/103) [#104](https://github.com/dyegoe/awss/pull/104)
+- CI smoke test to verify `--version` is correctly injected at build time. [#96](https://github.com/dyegoe/awss/issues/96) [#102](https://github.com/dyegoe/awss/pull/102)
+
+<!-- markdownlint-disable MD024 -->
+### Changed
+
+- Refactored command execution to a shared `runSearch` flow and consolidated filter validation behavior.
+- Refactored resource result structs to use shared `common.BaseResults` and context-aware `Search(ctx context.Context)` implementations. [#100](https://github.com/dyegoe/awss/pull/100)
+- Improved ENI and EBS instance name resolution by batching lookups instead of per-item calls. [#100](https://github.com/dyegoe/awss/pull/100) [#104](https://github.com/dyegoe/awss/pull/104)
+- Updated CI and local checks to `golangci-lint` v2 and simplified pre-commit hooks/workflows. [#98](https://github.com/dyegoe/awss/issues/98) [#99](https://github.com/dyegoe/awss/issues/99) [#100](https://github.com/dyegoe/awss/pull/100) [#103](https://github.com/dyegoe/awss/pull/103)
+- Updated project documentation and contribution guidance, including new code style, fix plan, and code review docs. [#98](https://github.com/dyegoe/awss/issues/98) [#100](https://github.com/dyegoe/awss/pull/100)
+
+<!-- markdownlint-disable MD024 -->
+### Fixed
+
+- Release version mismatch risk by injecting `cmd.version` through `-ldflags` and validating it in CI. [#96](https://github.com/dyegoe/awss/issues/96) [#102](https://github.com/dyegoe/awss/pull/102)
+- EBS search scalability by switching to paginated volume listing for large result sets. [#104](https://github.com/dyegoe/awss/pull/104)
+- `StructToFilters` now accepts pointer-to-struct values and returns errors for non-struct inputs. [#104](https://github.com/dyegoe/awss/pull/104)
+
 ## [v0.7.3] - 2023-06-15
 
 <!-- markdownlint-disable MD024 -->
