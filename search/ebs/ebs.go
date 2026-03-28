@@ -112,18 +112,21 @@ func (r *Results) Search(ctx context.Context) {
 	}
 
 	client := ec2.NewFromConfig(cfg)
-	response, err := client.DescribeVolumes(ctx, input)
-	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error describing volumes: %v", err))
-		return
-	}
+	paginator := ec2.NewDescribeVolumesPaginator(client, input)
 
 	var instanceIDs []string
-	for _, vol := range response.Volumes { //nolint:gocritic
-		row := parseVolume(&vol)
-		r.Data = append(r.Data, row)
-		if row.InstanceID != "" {
-			instanceIDs = append(instanceIDs, row.InstanceID)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			r.Errors = append(r.Errors, fmt.Sprintf("error describing volumes: %v", err))
+			return
+		}
+		for _, vol := range page.Volumes { //nolint:gocritic
+			row := parseVolume(&vol)
+			r.Data = append(r.Data, row)
+			if row.InstanceID != "" {
+				instanceIDs = append(instanceIDs, row.InstanceID)
+			}
 		}
 	}
 
@@ -260,12 +263,12 @@ func GetSortFields(f string) (map[string]string, error) {
 		}
 	}
 
-	options := []string{}
-	for k := range sortFields {
-		options = append(options, k)
-	}
-
 	if _, ok := sortFields[f]; !ok {
+		options := make([]string, 0, len(sortFields))
+		for k := range sortFields {
+			options = append(options, k)
+		}
+		sort.Strings(options)
 		return nil, fmt.Errorf("invalid sort field: %s. The options are: %s", f, common.StringSliceToString(options, ", "))
 	}
 	return sortFields, nil

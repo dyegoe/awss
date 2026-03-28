@@ -356,20 +356,26 @@ func TestResults_getFilters(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.results.getFilters()
 			if err != nil {
-				t.Errorf("Results.getFilters() unexpected error: %v", err)
-				return
+				t.Fatalf("Results.getFilters() unexpected error: %v", err)
 			}
 			if !reflect.DeepEqual(got.VolumeIds, tt.want.VolumeIds) {
-				t.Errorf("Results.getFilters() VolumeIds\n%#v\nwant\n%#v", got.VolumeIds, tt.want.VolumeIds)
+				t.Errorf("VolumeIds = %v, want %v", got.VolumeIds, tt.want.VolumeIds)
 			}
-			for _, i := range got.Filters {
-				for _, j := range tt.want.Filters {
-					if *i.Name != *j.Name {
-						continue
-					}
-					if !reflect.DeepEqual(i.Values, j.Values) {
-						t.Errorf("Results.getFilters()\n%#v\nwant\n%#v", got, tt.want)
-					}
+			if len(got.Filters) != len(tt.want.Filters) {
+				t.Fatalf("Filters count = %d, want %d", len(got.Filters), len(tt.want.Filters))
+			}
+			gotByName := make(map[string][]string, len(got.Filters))
+			for _, f := range got.Filters {
+				gotByName[*f.Name] = f.Values
+			}
+			for _, wf := range tt.want.Filters {
+				gv, ok := gotByName[*wf.Name]
+				if !ok {
+					t.Errorf("missing filter %q", *wf.Name)
+					continue
+				}
+				if !reflect.DeepEqual(gv, wf.Values) {
+					t.Errorf("filter %q values = %v, want %v", *wf.Name, gv, wf.Values)
 				}
 			}
 		})
