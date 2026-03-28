@@ -113,6 +113,7 @@ Formatters (`gofmt`, `goimports`) are configured in the `formatters` section (v2
 
 `//nolint:<linter>` comments are allowed only when there is no clean fix and the suppression has a
 comment explaining why. Example:
+
 ```go
 for _, inst := range i.Instances { //nolint:gocritic // rangeValCopy: AWS SDK struct is not pointer-based
 ```
@@ -121,7 +122,7 @@ for _, inst := range i.Instances { //nolint:gocritic // rangeValCopy: AWS SDK st
 
 ## Commit message format
 
-```
+```text
 <type>(<scope>): <short description>
 
 Types: fix, feat, refactor, test, docs, chore
