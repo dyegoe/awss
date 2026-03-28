@@ -86,8 +86,10 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
 3. Use struct tags `json`, `header`, `sort` on `dataRow` fields — do not add special-case logic to the output layer.
 4. Add a `filter` struct in `cmd/<resource>.go` with `filter:""` tags matching AWS API filter names.
 5. Register the command in `cmd/root.go` via `<resource>InitFlags()` and `<resource>InitViper()`.
-6. Add the new command to the `switch` in `search/search.go`.
-7. Write tests covering: filter building, result parsing, sort validation, edge cases (nil fields, empty results).
+6. Add the new command to the `switch` in `search/search.go` and `getSortFieldsCMDList`.
+7. Wire the `RunE` through `runSearch()` in the command file (see `cmd/ebs.go` as the pattern).
+8. Write tests covering: filter building, result parsing, sort validation, edge cases (nil fields, empty results).
+9. Update `README.md` with the new subcommand, its filters, sort fields, and any additional flags.
 
 ---
 
@@ -111,6 +113,7 @@ Formatters (`gofmt`, `goimports`) are configured in the `formatters` section (v2
 
 `//nolint:<linter>` comments are allowed only when there is no clean fix and the suppression has a
 comment explaining why. Example:
+
 ```go
 for _, inst := range i.Instances { //nolint:gocritic // rangeValCopy: AWS SDK struct is not pointer-based
 ```
@@ -119,7 +122,7 @@ for _, inst := range i.Instances { //nolint:gocritic // rangeValCopy: AWS SDK st
 
 ## Commit message format
 
-```
+```text
 <type>(<scope>): <short description>
 
 Types: fix, feat, refactor, test, docs, chore

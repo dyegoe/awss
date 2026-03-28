@@ -240,12 +240,12 @@ func GetSortFields(f string) (map[string]string, error) {
 		}
 	}
 
-	options := []string{}
-	for k := range sortFields {
-		options = append(options, k)
-	}
-
 	if _, ok := sortFields[f]; !ok {
+		options := make([]string, 0, len(sortFields))
+		for k := range sortFields {
+			options = append(options, k)
+		}
+		sort.Strings(options)
 		return nil, fmt.Errorf("invalid sort field: %s. The options are: %s", f, common.StringSliceToString(options, ", "))
 	}
 	return sortFields, nil

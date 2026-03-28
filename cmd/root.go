@@ -20,15 +20,21 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/dyegoe/awss/common"
+	"github.com/dyegoe/awss/search"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+// errNoAZSelected is returned when no availability zone is selected.
+// It is used as a sentinel to distinguish "no AZ filter" from invalid AZ input.
+var errNoAZSelected = fmt.Errorf("no availability zone selected")
 
 const (
 	labelConfig         = "config"
@@ -39,7 +45,6 @@ const (
 	labelShowEmpty      = "show.empty"
 	labelShowTagsCobra  = "show-tags"
 	labelShowTags       = "show.tags"
-	labelAllProfiles    = "all-profiles"
 	labelAllRegions     = "all-regions"
 )
 
@@ -69,6 +74,7 @@ func Execute() {
 	initFlags()
 	ec2InitFlags()
 	eniInitFlags()
+	ebsInitFlags()
 
 	if err := initViper(); err != nil {
 		fmt.Println(err)
@@ -81,6 +87,11 @@ func Execute() {
 	}
 
 	if err := eniInitViper(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	if err := ebsInitViper(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -281,7 +292,7 @@ func checkRegions(regions, allRegions []string) ([]string, error) {
 // Example: a,b,c,d,e,f for us-east-1
 func checkAvailabilityZones(az []string) error {
 	if len(az) == 0 {
-		return fmt.Errorf("no availability zone selected")
+		return errNoAZSelected
 	}
 
 	for _, zone := range az {
@@ -295,4 +306,70 @@ func checkAvailabilityZones(az []string) error {
 		}
 	}
 	return nil
+}
+
+// buildFilters validates and builds the filter map for a subcommand.
+//
+// When allFlag is true, it checks that no filter flags were set and returns an empty map.
+// Otherwise, it validates availability zones and tags, then converts the filter struct.
+func buildFilters(
+	cmd *cobra.Command,
+	allFlag bool,
+	filterFlags []string,
+	azs, tags []string,
+	filterStruct interface{},
+) (map[string][]string, error) {
+	if allFlag {
+		for _, f := range filterFlags {
+			if cmd.Flags().Changed(f) {
+				return nil, fmt.Errorf("--all cannot be combined with --%s", f)
+			}
+		}
+		return map[string][]string{}, nil
+	}
+
+	if err := checkAvailabilityZones(azs); err != nil && !errors.Is(err, errNoAZSelected) {
+		return nil, err
+	}
+
+	if _, err := common.ParseTags(tags); err != nil {
+		return nil, err
+	}
+
+	return common.StructToFilters(filterStruct)
+}
+
+// runSearch is the common RunE body for ec2, eni, and ebs commands.
+//
+// It validates the sort field, builds filters, and executes the search.
+func runSearch(
+	cmd *cobra.Command,
+	allLabel, sortLabel, noInstanceNameLabel string,
+	filterFlags []string,
+	azs, tags []string,
+	filterStruct interface{},
+) error {
+	if err := search.CheckSortField(cmd.Name(), viper.GetString(sortLabel)); err != nil {
+		return err
+	}
+
+	filters, err := buildFilters(
+		cmd, viper.GetBool(allLabel), filterFlags,
+		azs, tags, filterStruct,
+	)
+	if err != nil {
+		return err
+	}
+
+	return search.Execute(
+		cmd.Name(),
+		viper.GetStringSlice(labelProfiles),
+		viper.GetStringSlice(labelRegions),
+		filters,
+		viper.GetString(sortLabel),
+		viper.GetString(labelOutput),
+		viper.GetBool(labelShowEmpty),
+		viper.GetBool(labelShowTags),
+		noInstanceNameLabel != "" && viper.GetBool(noInstanceNameLabel),
+	)
 }
