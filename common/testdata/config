@@ -1,4 +1,4 @@
-[profile default]
+[default]
 region = eu-central-1
 
 [profile profile1]

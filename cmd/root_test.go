@@ -80,8 +80,8 @@ func Test_checkProfiles(t *testing.T) {
 		{
 			name:    "empty",
 			args:    args{profiles: []string{}},
-			want:    nil,
-			wantErr: true,
+			want:    []string{""},
+			wantErr: false,
 		},
 		{
 			name:    "all",
@@ -124,6 +124,11 @@ func Test_checkProfiles(t *testing.T) {
 
 // Test_checkRegions tests the checkRegions function.
 func Test_checkRegions(t *testing.T) {
+	// save the original variable, defer the restore and mock the variable
+	oldGetAwsRegionEnv := getAwsRegionEnv
+	defer func() { getAwsRegionEnv = oldGetAwsRegionEnv }()
+	getAwsRegionEnv = func() string { return "" }
+
 	allRegions := []string{"us-east-1", "us-east-2"}
 
 	type args struct {
@@ -137,10 +142,10 @@ func Test_checkRegions(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "empty",
+			name:    "empty falls back to defaultRegion",
 			args:    args{regions: []string{}, allRegions: allRegions},
-			want:    nil,
-			wantErr: true,
+			want:    []string{defaultRegion},
+			wantErr: false,
 		},
 		{
 			name:    "us-east-1",
@@ -178,6 +183,23 @@ func Test_checkRegions(t *testing.T) {
 				t.Errorf("checkRegions()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
+	}
+}
+
+// Test_checkRegions_envFallback tests that checkRegions uses AWS_REGION/AWS_DEFAULT_REGION,
+// bypassing the allRegions validation, when no --regions flag is passed.
+func Test_checkRegions_envFallback(t *testing.T) {
+	oldGetAwsRegionEnv := getAwsRegionEnv
+	defer func() { getAwsRegionEnv = oldGetAwsRegionEnv }()
+	getAwsRegionEnv = func() string { return "af-south-1" }
+
+	got, err := checkRegions([]string{}, []string{"us-east-1", "us-east-2"})
+	if err != nil {
+		t.Fatalf("checkRegions() unexpected error = %v", err)
+	}
+	want := []string{"af-south-1"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("checkRegions()\n%#v\nwant\n%#v", got, want)
 	}
 }
 
