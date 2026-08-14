@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [v0.9.0] - 2026-08-15
+
+<!-- markdownlint-disable MD024 -->
+### Changed
+
+- `--profiles` and `--regions` are now optional. When omitted, credentials resolve via the AWS SDK's own chain (`AWS_PROFILE`, static `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` env vars, or the `default` profile) instead of requiring `~/.aws/config` to exist, and the region falls back to `AWS_REGION`/`AWS_DEFAULT_REGION` before `us-east-1`. [#106](https://github.com/dyegoe/awss/pull/106)
+
+<!-- markdownlint-disable MD024 -->
+### Fixed
+
+- `GetAwsProfiles` now matches the bare `[default]` section used by real `~/.aws/config` files, so explicit `--profiles default` works against a normal config file. [#106](https://github.com/dyegoe/awss/pull/106)
+
 ## [v0.8.0] - 2026-03-28
 
 <!-- markdownlint-disable MD024 -->
