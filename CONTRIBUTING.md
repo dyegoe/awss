@@ -52,10 +52,14 @@ Ready to contribute? Here's how to set up `awss` for local development.
 3. Install development tools:
 
     ```bash
-    pip install pre-commit
+    pip install pre-commit commitizen
     go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
     pre-commit install
     ```
+
+    `pre-commit install` installs both the `pre-commit` and `commit-msg` git hooks (see
+    `default_install_hook_types` in `.pre-commit-config.yaml`), so commit messages are validated
+    against the Conventional Commits format automatically.
 
 4. Create a branch for local development:
 
@@ -79,12 +83,12 @@ Ready to contribute? Here's how to set up `awss` for local development.
     golangci-lint run
     ```
 
-6. Commit your changes following the commit message format:
+6. Commit your changes following the [Conventional Commits](https://www.conventionalcommits.org/) format:
 
     ```text
     <type>(<scope>): <short description>
 
-    Types: fix, feat, refactor, test, docs, chore
+    Types: build, bump, chore, ci, docs, feat, fix, perf, refactor, revert, style, test
     Scope: cmd, search/ec2, search/eni, common, search
     ```
 
@@ -96,6 +100,10 @@ Ready to contribute? Here's how to set up `awss` for local development.
     git push origin name-of-your-bugfix-or-feature
     ```
 
+    Or use `make commit` (runs `cz commit`) for an interactive prompt that builds a
+    conventional-commit message for you. The `commit-msg` hook and the `check-commits` CI job
+    both validate the message format, so malformed messages are rejected before they land.
+
 7. Submit a pull request through the GitHub website.
 
 ## Pull Request Guidelines
@@ -106,3 +114,33 @@ Before you submit a pull request, check that it meets these guidelines:
 2. If the pull request adds functionality, update the docs and add tests.
 3. New exported symbols must have doc comments (see `docs/CODESTYLE.md`).
 4. Follow the coding conventions described in `docs/CODESTYLE.md`.
+
+## Releasing (maintainers)
+
+Versioning follows [Semantic Versioning](https://semver.org/) and is derived from the
+Conventional Commits history via [Commitizen](https://commitizen-tools.github.io/commitizen/)
+(`.cz.toml`, `version_provider = "scm"` reads the version straight from git tags).
+
+1. On `main`, with a clean working tree, run:
+
+    ```bash
+    make release
+    ```
+
+    This runs `cz bump --changelog`, which inspects commits since the last tag, picks the next
+    semver version (`feat` → minor, `fix`/`perf` → patch, `!`/`BREAKING CHANGE` → major, or minor
+    while `major_version_zero` is `0.x`), regenerates `CHANGELOG.md`, and creates an annotated
+    `vX.Y.Z` tag.
+
+2. Push the changelog commit and the tag:
+
+    ```bash
+    git push origin main --follow-tags
+    ```
+
+3. Create the GitHub release (this triggers `.github/workflows/release.yml`, which builds and
+   attaches the linux/darwin amd64/arm64 binaries):
+
+    ```bash
+    gh release create vX.Y.Z --notes-file <(cz changelog vX.Y.Z --dry-run)
+    ```

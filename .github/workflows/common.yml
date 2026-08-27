@@ -36,3 +36,17 @@ jobs:
         run: |
           go build -ldflags="-X github.com/dyegoe/awss/cmd.version=ci-test" -o awss .
           ./awss --version | grep -q "ci-test"
+
+  check-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commit messages follow Conventional Commits
+        uses: commitizen-tools/commitizen-action@0.27.1
+        with:
+          check: true
+          push: false
