@@ -6,13 +6,22 @@ repos:
     rev: v2.11.4
     hooks:
       - id: golangci-lint
-  - repo: https://github.com/dnephin/pre-commit-golang
-    rev: v0.5.1
+  - repo: local
     hooks:
-      - id: go-fmt
-      - id: go-vet
       - id: go-mod-tidy
+        name: go mod tidy
+        description: golangci-lint does not check go.mod/go.sum tidiness, so this stays local.
+        entry: bash -c 'go mod tidy && git diff --exit-code -- go.mod go.sum'
+        language: system
+        files: '\.go$|go\.(mod|sum)$'
+        pass_filenames: false
       - id: go-unit-tests
+        name: go test
+        description: golangci-lint only lints, it does not run tests, so this stays local.
+        entry: go test ./...
+        language: system
+        types: [go]
+        pass_filenames: false
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v4.18.0
     hooks:
