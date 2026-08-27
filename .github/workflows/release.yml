@@ -5,21 +5,7 @@ on:
       - published
 
 jobs:
-  releases-matrix:
-    name: Release binaries
-    runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        goos: [linux, darwin]
-        goarch: [amd64, arm64]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: wangyoucao577/go-release-action@v1.55
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          goos: ${{ matrix.goos }}
-          goarch: ${{ matrix.goarch }}
-          goversion: "go.mod"
-          project_path: "."
-          binary_name: "awss"
-          ldflags: "-X github.com/dyegoe/awss/cmd.version=${{ github.event.release.tag_name }}"
+  build-binaries:
+    uses: ./.github/workflows/build-binaries.yml
+    with:
+      tag_name: ${{ github.event.release.tag_name }}

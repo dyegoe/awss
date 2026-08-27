@@ -1,0 +1,31 @@
+name: Build binaries
+on:
+  workflow_call:
+    inputs:
+      tag_name:
+        description: "Git tag of the release to build and attach binaries to."
+        required: true
+        type: string
+
+jobs:
+  releases-matrix:
+    name: Release binaries
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        goos: [linux, darwin]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag_name }}
+      - uses: wangyoucao577/go-release-action@v1.55
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          goos: ${{ matrix.goos }}
+          goarch: ${{ matrix.goarch }}
+          goversion: "go.mod"
+          project_path: "."
+          binary_name: "awss"
+          release_tag: ${{ inputs.tag_name }}
+          ldflags: "-X github.com/dyegoe/awss/cmd.version=${{ inputs.tag_name }}"
