@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.10.0](https://github.com/dyegoe/awss/compare/v0.9.0...v0.10.0) (2026-08-27)
+
+
+### Features
+
+* **release:** adopt commitizen for conventional commits and semver bumps ([#107](https://github.com/dyegoe/awss/issues/107)) ([652a136](https://github.com/dyegoe/awss/commit/652a1367d7ae317dd6383782e3880bcdb5dc0fbe))
+
 ## [v0.9.0] - 2026-08-15
 
 <!-- markdownlint-disable MD024 -->
