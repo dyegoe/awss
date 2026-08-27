@@ -117,30 +117,19 @@ Before you submit a pull request, check that it meets these guidelines:
 
 ## Releasing (maintainers)
 
-Versioning follows [Semantic Versioning](https://semver.org/) and is derived from the
-Conventional Commits history via [Commitizen](https://commitizen-tools.github.io/commitizen/)
-(`.cz.toml`, `version_provider = "scm"` reads the version straight from git tags).
+Releases are fully automated by [release-please](https://github.com/googleapis/release-please)
+(`.github/workflows/release-please.yml`), driven by the Conventional Commits history —
+Commitizen (`.cz.toml`) only enforces that commit messages follow the format; it no longer
+computes releases directly.
 
-1. On `main`, with a clean working tree, run:
+1. Every push to `main` (i.e. every merged PR, since PRs are squash-merged) updates a standing
+   `chore(main): release X.Y.Z` pull request that release-please keeps in sync with `CHANGELOG.md`
+   and the next semver version (`feat` → minor, `fix`/`perf` → patch, `!`/`BREAKING CHANGE` →
+   major, or minor while pre-1.0.0). Nothing is released while this PR sits open.
+2. When you're ready to ship what's accumulated, merge that release PR. Merging it makes
+   release-please tag `vX.Y.Z` and publish the GitHub release.
+3. That tag/release triggers `.github/workflows/build-binaries.yml`, which builds and attaches
+   the linux/darwin amd64/arm64 binaries — no manual build or `gh release create` step needed.
 
-    ```bash
-    make release
-    ```
-
-    This runs `cz bump --changelog`, which inspects commits since the last tag, picks the next
-    semver version (`feat` → minor, `fix`/`perf` → patch, `!`/`BREAKING CHANGE` → major, or minor
-    while `major_version_zero` is `0.x`), regenerates `CHANGELOG.md`, and creates an annotated
-    `vX.Y.Z` tag.
-
-2. Push the changelog commit and the tag:
-
-    ```bash
-    git push origin main --follow-tags
-    ```
-
-3. Create the GitHub release (this triggers `.github/workflows/release.yml`, which builds and
-   attaches the linux/darwin amd64/arm64 binaries):
-
-    ```bash
-    gh release create vX.Y.Z --notes-file <(cz changelog vX.Y.Z --dry-run)
-    ```
+Publishing a release manually (e.g. backfilling an old tag) still works: publishing any GitHub
+release triggers `.github/workflows/release.yml`, which calls the same binary build.
