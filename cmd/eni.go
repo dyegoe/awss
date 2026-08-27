@@ -39,7 +39,7 @@ const (
 // common.StructToFilters is used to convert the struct to a map[string][]string.
 // The AWS filter names must be present in the struct tag `filter:"filter-name"`.
 type eniFilters struct {
-	Ids               []string `filter:"network-interface-id"`
+	IDs               []string `filter:"network-interface-id"`
 	Tags              []string `filter:"tag"`
 	TagsKey           []string `filter:"tag-key"`
 	InstanceIDs       []string `filter:"attachment.instance-id"`
@@ -69,7 +69,7 @@ Use --all to search for all ENIs without any filter. This flag cannot be combine
 	RunE: eniRunE,
 }
 
-func eniRunE(cmd *cobra.Command, args []string) error {
+func eniRunE(cmd *cobra.Command, _ []string) error {
 	return runSearch(
 		cmd, labelEniAll, labelEniSort, labelEniNoInstanceName,
 		eniFilterFlags, eniF.AvailabilityZones, eniF.Tags, eniF,
@@ -78,8 +78,8 @@ func eniRunE(cmd *cobra.Command, args []string) error {
 
 // eniFilterFlags lists all ENI filter flag names for mutual exclusivity with --all.
 var eniFilterFlags = []string{
-	"ids", "tags", "tags-key", "instance-ids",
-	"availability-zones", "private-ips", "public-ips",
+	flagIDs, flagTags, flagTagsKey, "instance-ids",
+	flagAvailabilityZones, "private-ips", "public-ips",
 }
 
 func eniInitFlags() {
@@ -87,15 +87,15 @@ func eniInitFlags() {
 
 	eniCmd.Flags().BoolP("all", "a", false,
 		"Search for all ENIs without any filter. Cannot be combined with other filters.")
-	eniCmd.Flags().StringSliceVarP(&eniF.Ids, "ids", "i", []string{},
+	eniCmd.Flags().StringSliceVarP(&eniF.IDs, flagIDs, "i", []string{},
 		"Filter ENIs by ids. `eni-1230456078901,eni-1230456078902`")
-	eniCmd.Flags().StringSliceVarP(&eniF.Tags, "tags", "t", []string{},
+	eniCmd.Flags().StringSliceVarP(&eniF.Tags, flagTags, "t", []string{},
 		"Filter ENIs by tags. `'Key=Value1:Value2,Environment=Production'`")
-	eniCmd.Flags().StringSliceVarP(&eniF.TagsKey, "tags-key", "k", []string{},
+	eniCmd.Flags().StringSliceVarP(&eniF.TagsKey, flagTagsKey, "k", []string{},
 		"Filter ENIs by tags key. `Key,Environment`")
 	eniCmd.Flags().StringSliceVarP(&eniF.InstanceIDs, "instance-ids", "I", []string{},
 		"Filter ENIs by instance IDs. `i-1230456078901,i-1230456078902`")
-	eniCmd.Flags().StringSliceVarP(&eniF.AvailabilityZones, "availability-zones", "z", []string{},
+	eniCmd.Flags().StringSliceVarP(&eniF.AvailabilityZones, flagAvailabilityZones, "z", []string{},
 		"Filter ENIs by availability zones. It will append to current region. `a,b`")
 	eniCmd.Flags().IPSliceVarP(&eniF.PrivateIPs, "private-ips", "p", []net.IP{},
 		"Filter ENIs by private IPs. `172.16.0.1,172.17.1.254`")

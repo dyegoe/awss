@@ -31,6 +31,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
+// filterKeyInstanceID is the AWS EC2 "instance-id" filter key.
+const filterKeyInstanceID = "instance-id"
+
 // Results describes results of the EC2 instances search.
 type Results struct {
 	common.BaseResults
@@ -190,7 +193,7 @@ func (r *Results) getFilters() (*ec2.DescribeInstancesInput, error) {
 
 	for key, values := range r.Filters {
 		switch key {
-		case "instance-id":
+		case filterKeyInstanceID:
 			input.InstanceIds = values
 		case "tag:Name":
 			input.Filters = append(input.Filters, common.FilterNames(values)...)
@@ -255,7 +258,7 @@ func GetSortFields(f string) (map[string]string, error) {
 //
 // It returns the value of the tag:Name or empty string in case that the instance has no name.
 func SearchInstanceName(profile, region, instanceID string) (string, error) {
-	r := New(profile, region, map[string][]string{"instance-id": {instanceID}}, "id")
+	r := New(profile, region, map[string][]string{filterKeyInstanceID: {instanceID}}, "id")
 	r.Search(context.Background())
 	if len(r.Errors) > 0 {
 		return "", fmt.Errorf("error searching instance name: %v", r.Errors)
@@ -277,7 +280,7 @@ func SearchInstanceNames(profile, region string, instanceIDs []string) (map[stri
 	if len(instanceIDs) == 0 {
 		return map[string]string{}, nil
 	}
-	r := New(profile, region, map[string][]string{"instance-id": instanceIDs}, "id")
+	r := New(profile, region, map[string][]string{filterKeyInstanceID: instanceIDs}, "id")
 	r.Search(context.Background())
 	if len(r.Errors) > 0 {
 		return nil, fmt.Errorf("error searching instance names: %v", r.Errors)

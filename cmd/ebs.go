@@ -38,7 +38,7 @@ const (
 // common.StructToFilters is used to convert the struct to a map[string][]string.
 // The AWS filter names must be present in the struct tag `filter:"filter-name"`.
 type ebsFilters struct {
-	Ids               []string `filter:"volume-id"`
+	IDs               []string `filter:"volume-id"`
 	Tags              []string `filter:"tag"`
 	TagsKey           []string `filter:"tag-key"`
 	AvailabilityZones []string `filter:"availability-zone"`
@@ -74,11 +74,11 @@ This flag cannot be combined with other filters.
 
 // ebsFilterFlags lists all EBS filter flag names for mutual exclusivity with --all.
 var ebsFilterFlags = []string{
-	"ids", "tags", "tags-key", "availability-zones",
+	flagIDs, flagTags, flagTagsKey, flagAvailabilityZones,
 	"statuses", "volume-types", "instance-ids", "encrypted",
 }
 
-func ebsRunE(cmd *cobra.Command, args []string) error {
+func ebsRunE(cmd *cobra.Command, _ []string) error {
 	return runSearch(
 		cmd, labelEbsAll, labelEbsSort, labelEbsNoInstanceName,
 		ebsFilterFlags, ebsF.AvailabilityZones, ebsF.Tags, ebsF,
@@ -90,13 +90,13 @@ func ebsInitFlags() {
 
 	ebsCmd.Flags().BoolP("all", "a", false,
 		"Search for all EBS volumes without any filter. Cannot be combined with other filters.")
-	ebsCmd.Flags().StringSliceVarP(&ebsF.Ids, "ids", "i", []string{},
+	ebsCmd.Flags().StringSliceVarP(&ebsF.IDs, flagIDs, "i", []string{},
 		"Filter EBS volumes by IDs. `vol-1230456078901,vol-1230456078902`")
-	ebsCmd.Flags().StringSliceVarP(&ebsF.Tags, "tags", "t", []string{},
+	ebsCmd.Flags().StringSliceVarP(&ebsF.Tags, flagTags, "t", []string{},
 		"Filter EBS volumes by tags. `'Key=Value1:Value2,Environment=Production'`")
-	ebsCmd.Flags().StringSliceVarP(&ebsF.TagsKey, "tags-key", "k", []string{},
+	ebsCmd.Flags().StringSliceVarP(&ebsF.TagsKey, flagTagsKey, "k", []string{},
 		"Filter EBS volumes by tags key. `Key,Environment`")
-	ebsCmd.Flags().StringSliceVarP(&ebsF.AvailabilityZones, "availability-zones", "z", []string{},
+	ebsCmd.Flags().StringSliceVarP(&ebsF.AvailabilityZones, flagAvailabilityZones, "z", []string{},
 		"Filter EBS volumes by availability zones. It will append to current region. `a,b`")
 	ebsCmd.Flags().StringSliceVarP(&ebsF.Statuses, "statuses", "s", []string{},
 		"Filter EBS volumes by status. `available,in-use,creating,deleting,deleted,error`")
