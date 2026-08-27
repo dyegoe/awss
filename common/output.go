@@ -44,7 +44,7 @@ const (
 //
 // The key is the output format.
 // The value is the function that prints the results in the given format.
-var outputs = map[string]func(Results, bool, bool) string{
+var outputs = map[string]func(Results, bool, bool, []string) string{
 	JSON:       toJSON,
 	JSONPretty: toJSONPretty,
 	Table:      toTable,
@@ -68,14 +68,17 @@ func ValidOutputs(o string) (string, bool) {
 // The output is the format of the output.
 // The showEmpty flag indicates if empty results should be shown.
 // The showTags flag indicates if the tags should be shown.
-func PrintResults(w io.Writer, resultsChan <-chan Results, done chan<- bool, output string, showEmpty, showTags bool) {
+// The tagsKeys flag, when non-empty, restricts the Tags column to those keys. It is ignored for json formats.
+func PrintResults(
+	w io.Writer, resultsChan <-chan Results, done chan<- bool, output string, showEmpty, showTags bool, tagsKeys []string,
+) {
 	for results := range resultsChan {
 		printResults, ok := outputs[output]
 		if !ok {
 			fmt.Fprintf(w, "Invalid output format: %s\n", output)
 			continue
 		}
-		s := printResults(results, showEmpty, showTags)
+		s := printResults(results, showEmpty, showTags, tagsKeys)
 		if s != "" {
 			fmt.Fprintln(w, s)
 		}
@@ -99,9 +102,9 @@ func toBold(s string) string {
 // toJSON returns the results in JSON format.
 //
 // showEmpty indicates if empty results should be shown.
-// showTags indicates if the tags should be shown. It is ignored for json format.
-func toJSON(r Results, showEmpty, showTags bool) string {
-	_ = showTags // ignored for json format
+// showTags and tagsKeys are ignored for json format.
+func toJSON(r Results, showEmpty, showTags bool, tagsKeys []string) string {
+	_, _ = showTags, tagsKeys // ignored for json format
 	b, err := json.Marshal(r)
 	if err != nil {
 		return ""
@@ -115,9 +118,9 @@ func toJSON(r Results, showEmpty, showTags bool) string {
 // toJSONPretty returns the results in JSON format.
 //
 // showEmpty indicates if empty results should be shown.
-// showTags indicates if the tags should be shown. It is ignored for json format.
-func toJSONPretty(r Results, showEmpty, showTags bool) string {
-	_ = showTags // ignored for json format
+// showTags and tagsKeys are ignored for json format.
+func toJSONPretty(r Results, showEmpty, showTags bool, tagsKeys []string) string {
+	_, _ = showTags, tagsKeys // ignored for json format
 	b, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
 		return ""
@@ -132,7 +135,8 @@ func toJSONPretty(r Results, showEmpty, showTags bool) string {
 //
 // showEmpty indicates if empty results should be shown.
 // showTags indicates if the tags should be shown.
-func toTable(r Results, showEmpty, showTags bool) string {
+// tagsKeys, when non-empty, restricts the Tags column to those keys.
+func toTable(r Results, showEmpty, showTags bool, tagsKeys []string) string {
 	if r.Len() == 0 && !showEmpty {
 		return ""
 	}
@@ -170,7 +174,7 @@ func toTable(r Results, showEmpty, showTags bool) string {
 	t.AppendHeader(r.GetHeaders())
 
 	for _, d := range r.GetRows() {
-		t.AppendRow(rowFromStruct(d))
+		t.AppendRow(rowFromStruct(d, tagsKeys))
 	}
 
 	t.SetColumnConfigs(
@@ -184,10 +188,11 @@ func toTable(r Results, showEmpty, showTags bool) string {
 
 // RowsFromStruct returns a table.Row from a struct.
 //
-// If the field is a map, it calls mapToTable.
+// If the field is a map, it calls mapToTable. tagsKeys, when non-empty, restricts a map field's
+// entries to those keys.
 // If the field is a slice, it joins the elements with a new line.
 // If the field is a struct, it calls structToTable.
-func rowFromStruct(i interface{}) table.Row {
+func rowFromStruct(i interface{}, tagsKeys []string) table.Row {
 	row := table.Row{}
 
 	v := reflect.ValueOf(i)
@@ -199,7 +204,7 @@ func rowFromStruct(i interface{}) table.Row {
 			case reflect.Struct:
 				row = append(row, headerStructFieldsToString(field.Interface()))
 			case reflect.Map:
-				row = append(row, sortedStringMapToString(field.Interface().(map[string]string)))
+				row = append(row, sortedStringMapToString(field.Interface().(map[string]string), tagsKeys))
 			case reflect.Slice:
 				row = append(row, sortedStringSliceToString(field.Interface().([]string)))
 			default:
@@ -239,10 +244,15 @@ func headerStructFieldsToString(i interface{}) string {
 // <key>: <value>
 // <key>: <value>
 // ...
-func sortedStringMapToString(m map[string]string) string {
+//
+// keys, when non-empty, restricts the output to entries whose key is in keys.
+func sortedStringMapToString(m map[string]string, keys []string) string {
 	var s []string
 
 	for k, v := range m {
+		if len(keys) > 0 && !StringInSlice(k, keys) {
+			continue
+		}
 		s = append(s, fmt.Sprintf("%s: %s", Bold(k), v))
 	}
 

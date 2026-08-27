@@ -39,7 +39,11 @@ import (
 // The filters are used to filter the results.
 // The output is the format of the output.
 // The showEmpty flag indicates if empty results should be shown.
-func Execute(cmd string, profiles, regions []string, filters map[string][]string, sortField, output string, showEmpty, showTags, noInstanceName bool) error { //nolint:lll
+// The tagsKeys flag, when non-empty, restricts the Tags column of table output to those keys.
+func Execute(
+	cmd string, profiles, regions []string, filters map[string][]string, sortField, output string,
+	showEmpty, showTags bool, tagsKeys []string, noInstanceName bool,
+) error {
 	ctx := context.Background()
 	wg := sync.WaitGroup{}
 
@@ -49,7 +53,7 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 
 	done := make(chan bool)
 
-	go common.PrintResults(os.Stdout, resultsChan, done, output, showEmpty, showTags)
+	go common.PrintResults(os.Stdout, resultsChan, done, output, showEmpty, showTags, tagsKeys)
 
 	runOnce := true
 
