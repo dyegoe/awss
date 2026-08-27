@@ -1,7 +1,7 @@
 VERSION := $(shell git describe --tags --always --dirty)
 LDFLAGS := -ldflags="-X github.com/dyegoe/awss/cmd.version=$(VERSION)"
 
-.PHONY: build test lint clean
+.PHONY: build test lint clean commit release
 
 build:
 	go build $(LDFLAGS) -o awss .
@@ -14,3 +14,9 @@ lint:
 
 clean:
 	rm -f awss
+
+commit:
+	cz commit
+
+release:
+	cz bump --changelog
