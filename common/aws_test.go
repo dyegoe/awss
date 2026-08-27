@@ -115,6 +115,175 @@ func TestGetAwsProfiles(t *testing.T) {
 	}
 }
 
+// Test_CheckProfiles tests the CheckProfiles function.
+func Test_CheckProfiles(t *testing.T) {
+	// save the original variable, defer the restore and mock the variable
+	oldGetAwsProfilesFn := getAwsProfilesFn
+	defer func() { getAwsProfilesFn = oldGetAwsProfilesFn }()
+	getAwsProfilesFn = func() ([]string, error) {
+		return []string{"default", "profile1"}, nil
+	}
+
+	type args struct {
+		profiles []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{
+			name:    "empty",
+			args:    args{profiles: []string{}},
+			want:    []string{""},
+			wantErr: false,
+		},
+		{
+			name:    "all",
+			args:    args{profiles: []string{"all"}},
+			want:    []string{"default", "profile1"},
+			wantErr: false,
+		},
+		{
+			name:    "default",
+			args:    args{profiles: []string{"default"}},
+			want:    []string{"default"},
+			wantErr: false,
+		},
+		{
+			name:    "default,profile1",
+			args:    args{profiles: []string{"default", "profile1"}},
+			want:    []string{"default", "profile1"},
+			wantErr: false,
+		},
+		{
+			name:    "default,profile1,profile2",
+			args:    args{profiles: []string{"default", "profile1", "profile2"}},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CheckProfiles(tt.args.profiles)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CheckProfiles() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CheckProfiles()\n%#v\nwant\n%#v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Test_CheckRegions tests the CheckRegions function.
+func Test_CheckRegions(t *testing.T) {
+	// save the original variable, defer the restore and mock the variable
+	oldGetAwsRegionEnvFn := getAwsRegionEnvFn
+	defer func() { getAwsRegionEnvFn = oldGetAwsRegionEnvFn }()
+	getAwsRegionEnvFn = func() string { return "" }
+
+	allRegions := []string{"us-east-1", "us-east-2"}
+
+	type args struct {
+		regions    []string
+		allRegions []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{
+			name:    "empty falls back to DefaultRegion",
+			args:    args{regions: []string{}, allRegions: allRegions},
+			want:    []string{DefaultRegion},
+			wantErr: false,
+		},
+		{
+			name:    "us-east-1",
+			args:    args{regions: []string{"us-east-1"}, allRegions: allRegions},
+			want:    []string{"us-east-1"},
+			wantErr: false,
+		},
+		{
+			name:    "us-east-2",
+			args:    args{regions: []string{"us-east-2"}, allRegions: allRegions},
+			want:    []string{"us-east-2"},
+			wantErr: false,
+		},
+		{
+			name:    "us-east-1,us-east-2",
+			args:    args{regions: []string{"us-east-1", "us-east-2"}, allRegions: allRegions},
+			want:    []string{"us-east-1", "us-east-2"},
+			wantErr: false,
+		},
+		{
+			name:    "us-east-1,us-east-2,us-west-1",
+			args:    args{regions: []string{"us-east-1", "us-east-2", "us-west-1"}, allRegions: allRegions},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CheckRegions(tt.args.regions, tt.args.allRegions)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CheckRegions() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CheckRegions()\n%#v\nwant\n%#v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Test_CheckRegions_envFallback tests that CheckRegions uses AWS_REGION/AWS_DEFAULT_REGION,
+// bypassing the allRegions validation, when no --regions flag is passed.
+func Test_CheckRegions_envFallback(t *testing.T) {
+	oldGetAwsRegionEnvFn := getAwsRegionEnvFn
+	defer func() { getAwsRegionEnvFn = oldGetAwsRegionEnvFn }()
+	getAwsRegionEnvFn = func() string { return "af-south-1" }
+
+	got, err := CheckRegions([]string{}, []string{"us-east-1", "us-east-2"})
+	if err != nil {
+		t.Fatalf("CheckRegions() unexpected error = %v", err)
+	}
+	want := []string{"af-south-1"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("CheckRegions()\n%#v\nwant\n%#v", got, want)
+	}
+}
+
+// Test_CheckAvailabilityZones tests the CheckAvailabilityZones function.
+func Test_CheckAvailabilityZones(t *testing.T) {
+	type args struct {
+		az []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "empty",
+			args:    args{az: []string{}},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := CheckAvailabilityZones(tt.args.az); (err != nil) != tt.wantErr {
+				t.Errorf("CheckAvailabilityZones() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestTagName tests the TagName function.
 func TestTagName(t *testing.T) {
 	type args struct {

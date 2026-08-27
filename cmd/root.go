@@ -32,10 +32,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// errNoAZSelected is returned when no availability zone is selected.
-// It is used as a sentinel to distinguish "no AZ filter" from invalid AZ input.
-var errNoAZSelected = fmt.Errorf("no availability zone selected")
-
 const (
 	labelConfig         = "config"
 	labelProfiles       = "profiles"
@@ -46,10 +42,6 @@ const (
 	labelShowTagsCobra  = "show-tags"
 	labelShowTags       = "show.tags"
 	labelAllRegions     = "all-regions"
-
-	// defaultRegion is used when no --regions flag, AWS_REGION, or
-	// AWS_DEFAULT_REGION is set.
-	defaultRegion = "us-east-1"
 
 	// flagIDs, flagTags, flagTagsKey, and flagAvailabilityZones name the flags
 	// shared by the ec2, eni, and ebs commands' sort-field lists.
@@ -123,13 +115,13 @@ func persistentPreRun(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	profiles, err := checkProfiles(viper.GetStringSlice(labelProfiles))
+	profiles, err := common.CheckProfiles(viper.GetStringSlice(labelProfiles))
 	if err != nil {
 		return err
 	}
 	viper.Set(labelProfiles, profiles)
 
-	regions, err := checkRegions(viper.GetStringSlice(labelRegions), viper.GetStringSlice(labelAllRegions))
+	regions, err := common.CheckRegions(viper.GetStringSlice(labelRegions), viper.GetStringSlice(labelAllRegions))
 	if err != nil {
 		return err
 	}
@@ -158,7 +150,7 @@ func initFlags() {
 		fmt.Sprintf(
 			"Select a region to perform your API calls. You can pass multiple regions separated by comma. "+
 				"e.g. `region1,region2`. If not set, falls back to AWS_REGION/AWS_DEFAULT_REGION, or %s.",
-			defaultRegion,
+			common.DefaultRegion,
 		))
 	rootCmd.PersistentFlags().String(labelOutput, "table",
 		fmt.Sprintf("Select the output format. Valid outputs are: %s", validOutputs))
@@ -249,104 +241,6 @@ func initConfig(cfg string) error {
 	return nil
 }
 
-// getAwsProfiles returns the profiles found in the config file.
-//
-// We use a variable to mock the function in the tests.
-var getAwsProfiles = common.GetAwsProfiles
-
-// checkProfiles checks if the profiles are valid.
-//
-// If the user passes no profile, it returns a single empty-string profile so
-// the AWS SDK resolves credentials itself, in order: AWS_PROFILE, static
-// AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars, or the `default` profile.
-// This is intentionally not validated against ~/.aws/config, since that file
-// may not exist when credentials come purely from the environment.
-// If the user passes the `all` profile, it will return all the profiles.
-// If the user passes a list of profiles, it will check if they are valid and return them.
-// It compares the profiles passed by the user with the profiles found in the config file.
-func checkProfiles(profiles []string) ([]string, error) {
-	if len(profiles) == 0 {
-		return []string{""}, nil
-	}
-
-	awsProfiles, err := getAwsProfiles()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(profiles) == 1 && profiles[0] == "all" {
-		return awsProfiles, nil
-	}
-
-	for _, profile := range profiles {
-		if !common.StringInSlice(profile, awsProfiles) {
-			return nil, fmt.Errorf("profile %s not found", profile)
-		}
-	}
-	return profiles, nil
-}
-
-// getAwsRegionEnv returns the region from the AWS_REGION or AWS_DEFAULT_REGION
-// environment variables, in that order of precedence, matching the AWS SDK's
-// own resolution order. It returns an empty string when neither is set.
-//
-// We use a variable to mock it in the tests.
-var getAwsRegionEnv = func() string {
-	if region := os.Getenv("AWS_REGION"); region != "" {
-		return region
-	}
-	return os.Getenv("AWS_DEFAULT_REGION")
-}
-
-// checkRegions checks if the regions are valid.
-//
-// If the user passes no region, it falls back to AWS_REGION/AWS_DEFAULT_REGION,
-// or defaultRegion, and that single region is not validated against allRegions.
-// If the user passes the `all` region, it will return all the regions.
-// If the user passes a list of regions, it will check if they are valid and return them.
-// It compares the regions passwd by the user with the all-regions list in the config file.
-func checkRegions(regions, allRegions []string) ([]string, error) {
-	if len(regions) == 0 {
-		if region := getAwsRegionEnv(); region != "" {
-			return []string{region}, nil
-		}
-		return []string{defaultRegion}, nil
-	}
-
-	if len(regions) == 1 && regions[0] == "all" {
-		return allRegions, nil
-	}
-
-	for _, region := range regions {
-		if !common.StringInSlice(region, allRegions) {
-			return nil, fmt.Errorf("region %s not found", region)
-		}
-	}
-	return regions, nil
-}
-
-// checkAvailabilityZones checks if the availability zones are valid.
-//
-// Availability zones must be only one letter that will be appended to the region name.
-// Example: a,b,c,d,e,f for us-east-1
-func checkAvailabilityZones(az []string) error {
-	if len(az) == 0 {
-		return errNoAZSelected
-	}
-
-	for _, zone := range az {
-		validAvailabilityZones := []string{"a", "b", "c", "d", "e", "f"}
-		if len(zone) != 1 {
-			return fmt.Errorf("availability zones must be just a letter. It will be append to the region: %s", zone)
-		}
-		if !common.StringInSlice(zone, validAvailabilityZones) {
-			return fmt.Errorf("availability zone %s not found. Valid options are: %s",
-				zone, common.StringSliceToString(validAvailabilityZones, ", "))
-		}
-	}
-	return nil
-}
-
 // buildFilters validates and builds the filter map for a subcommand.
 //
 // When allFlag is true, it checks that no filter flags were set and returns an empty map.
@@ -367,7 +261,7 @@ func buildFilters(
 		return map[string][]string{}, nil
 	}
 
-	if err := checkAvailabilityZones(azs); err != nil && !errors.Is(err, errNoAZSelected) {
+	if err := common.CheckAvailabilityZones(azs); err != nil && !errors.Is(err, common.ErrNoAZSelected) {
 		return nil, err
 	}
 
