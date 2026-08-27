@@ -12,6 +12,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Output formats: `--output table` (default), `--output json`, `--output json-pretty`
 - Show empty results: `--show-empty`
 - Show tags in table output: `--show-tags`
+- Restrict which tag keys are shown in table output: `--show-tags-keys Name,Environment` (implies `--show-tags`)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
 
@@ -152,7 +153,7 @@ awss ec2 \
   --tags 'Environment=prod' \
   --instance-states running \
   --sort name \
-  --show-tags
+  --show-tags-keys Name,Environment
 
 # List all ENIs, skip instance name lookup for speed
 awss eni --all --no-instance-name

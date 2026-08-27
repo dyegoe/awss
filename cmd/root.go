@@ -41,6 +41,8 @@ const (
 	labelShowEmpty      = "show.empty"
 	labelShowTagsCobra  = "show-tags"
 	labelShowTags       = "show.tags"
+	labelTagsKeysCobra  = "show-tags-keys"
+	labelTagsKeys       = "show.tags.keys"
 	labelAllRegions     = "all-regions"
 
 	// flagIDs, flagTags, flagTagsKey, and flagAvailabilityZones name the flags
@@ -158,6 +160,8 @@ func initFlags() {
 		"Show empty resources. Default is false.")
 	rootCmd.PersistentFlags().Bool(labelShowTagsCobra, false,
 		"Show tags for resources. Default is false.")
+	rootCmd.PersistentFlags().StringSlice(labelTagsKeysCobra, []string{},
+		"Restrict the tags shown to these keys. Implies --show-tags. e.g. `Name,Environment`")
 }
 
 // initViper binds the flags to viper.
@@ -196,6 +200,9 @@ func initViper() error {
 	}
 	if err := viper.BindPFlag(labelShowTags, rootCmd.PersistentFlags().Lookup(labelShowTagsCobra)); err != nil {
 		return fmt.Errorf("error binding flag %s: %w", labelShowTags, err)
+	}
+	if err := viper.BindPFlag(labelTagsKeys, rootCmd.PersistentFlags().Lookup(labelTagsKeysCobra)); err != nil {
+		return fmt.Errorf("error binding flag %s: %w", labelTagsKeys, err)
 	}
 	viper.SetDefault(labelAllRegions, allRegionsDefault)
 
@@ -294,6 +301,8 @@ func runSearch(
 		return err
 	}
 
+	tagsKeys := viper.GetStringSlice(labelTagsKeys)
+
 	return search.Execute(
 		cmd.Name(),
 		viper.GetStringSlice(labelProfiles),
@@ -302,7 +311,8 @@ func runSearch(
 		viper.GetString(sortLabel),
 		viper.GetString(labelOutput),
 		viper.GetBool(labelShowEmpty),
-		viper.GetBool(labelShowTags),
+		viper.GetBool(labelShowTags) || len(tagsKeys) > 0,
+		tagsKeys,
 		noInstanceNameLabel != "" && viper.GetBool(noInstanceNameLabel),
 	)
 }

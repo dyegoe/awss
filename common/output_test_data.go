@@ -260,6 +260,23 @@ var tableTags = `+--------------------------------------------------------------
 +--------------------------------+--------------+-------------+--------------+
 `
 
+// tableTagsFiltered is a test table output from tr with tags restricted to key1 and key3.
+var tableTagsFiltered = `+----------------------------------------------------------------------------+
+| [Profile] testProfile [Region] testRegion [Sort] field                     |
+|                                                                            |
+| testError1                                                                 |
+| testError2                                                                 |
++--------------------------------+--------------+-------------+--------------+
+| Struct Field                   | Tags         | Slice Field | String Field |
++--------------------------------+--------------+-------------+--------------+
+| Info String1: testInfo1String1 | key1: value1 | sliceValue1 | testString1  |
+| Info String2: testInfo1String2 |              | sliceValue2 |              |
++--------------------------------+--------------+-------------+--------------+
+| Info String1: testInfo2String1 | key3: value3 | sliceValue3 | testString2  |
+| Info String2: testInfo2String2 |              | sliceValue4 |              |
++--------------------------------+--------------+-------------+--------------+
+`
+
 // tableEmptyNoTags is a test table output from trEmpty.
 var tableEmptyNoTags = `+-------------------------------------------+
 | [Profile] testProfileEmpty [Region] testR |

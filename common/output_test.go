@@ -76,10 +76,10 @@ func TestPrintResults(t *testing.T) {
 	// save the original function map, defer the restore and mock the function map
 	originalOutputs := outputs
 	defer func() { outputs = originalOutputs }()
-	outputs = map[string]func(Results, bool, bool) string{
-		JSON:       func(_ Results, _, _ bool) string { return "json" },
-		JSONPretty: func(_ Results, _, _ bool) string { return "json-pretty" },
-		Table:      func(_ Results, _, _ bool) string { return "table" },
+	outputs = map[string]func(Results, bool, bool, []string) string{
+		JSON:       func(_ Results, _, _ bool, _ []string) string { return "json" },
+		JSONPretty: func(_ Results, _, _ bool, _ []string) string { return "json-pretty" },
+		Table:      func(_ Results, _, _ bool, _ []string) string { return "table" },
 	}
 
 	type args struct {
@@ -125,7 +125,7 @@ func TestPrintResults(t *testing.T) {
 				close(done)
 			}()
 			w := bytes.Buffer{}
-			PrintResults(&w, resultsChan, done, tt.args.output, tt.args.showEmpty, tt.args.showTags)
+			PrintResults(&w, resultsChan, done, tt.args.output, tt.args.showEmpty, tt.args.showTags, nil)
 			if got := w.String(); got != tt.want {
 				t.Errorf("PrintResults()\n%#v\nwant\n%#v", got, tt.want)
 			}
@@ -195,7 +195,7 @@ func Test_toJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := toJSON(tt.args.r, tt.args.showEmpty, tt.args.showTags)
+			got := toJSON(tt.args.r, tt.args.showEmpty, tt.args.showTags, nil)
 			if got != tt.want {
 				t.Errorf("toJSON()\n%#v\nwant\n%#v", got, tt.want)
 			}
@@ -235,7 +235,7 @@ func Test_toJSONPretty(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := toJSONPretty(tt.args.r, tt.args.showEmpty, tt.args.showTags)
+			got := toJSONPretty(tt.args.r, tt.args.showEmpty, tt.args.showTags, nil)
 			if got != tt.want {
 				t.Errorf("toJSON()\n%#v\nwant\n%#v", got, tt.want)
 			}
@@ -254,6 +254,7 @@ func Test_toTable(t *testing.T) {
 		r         Results
 		showEmpty bool
 		showTags  bool
+		tagsKeys  []string
 	}
 	tests := []struct {
 		name string
@@ -269,6 +270,11 @@ func Test_toTable(t *testing.T) {
 			name: "table with tags",
 			args: args{r: &tr, showEmpty: false, showTags: true},
 			want: tableTags,
+		},
+		{
+			name: "table with tags filtered by key",
+			args: args{r: &tr, showEmpty: false, showTags: true, tagsKeys: []string{"key1", "key3"}},
+			want: tableTagsFiltered,
 		},
 		{
 			name: "empty table with no tags",
@@ -288,7 +294,7 @@ func Test_toTable(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := toTable(tt.args.r, tt.args.showEmpty, tt.args.showTags)
+			got := toTable(tt.args.r, tt.args.showEmpty, tt.args.showTags, tt.args.tagsKeys)
 			if got != tt.want {
 				t.Errorf("toTable()\n%#v\nwant\n%#v", got, tt.want)
 			}
@@ -299,7 +305,8 @@ func Test_toTable(t *testing.T) {
 // Test_rowFromStruct is a test function for rowFromStruct.
 func Test_rowFromStruct(t *testing.T) {
 	type args struct {
-		i interface{}
+		i        interface{}
+		tagsKeys []string
 	}
 	tests := []struct {
 		name string
@@ -329,10 +336,24 @@ func Test_rowFromStruct(t *testing.T) {
 				"testString1",
 			},
 		},
+		{
+			name: "test struct with tagsKeys filter",
+			args: args{i: tdr1, tagsKeys: []string{"key1"}},
+			want: table.Row{
+				fmt.Sprintf("%s: %s\n%s: %s",
+					text.Bold.Sprint("Info String1"),
+					"testInfo1String1",
+					text.Bold.Sprint("Info String2"),
+					"testInfo1String2"),
+				fmt.Sprintf("%s: %s", text.Bold.Sprint("key1"), "value1"),
+				"sliceValue1\nsliceValue2",
+				"testString1",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := rowFromStruct(tt.args.i); !reflect.DeepEqual(got, tt.want) {
+			if got := rowFromStruct(tt.args.i, tt.args.tagsKeys); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("rowFromStruct()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
@@ -385,7 +406,8 @@ func Test_headerStructFieldsToString(t *testing.T) {
 // Test_sortedStringMapToString is a test function for sortedStringMapToString.
 func Test_sortedStringMapToString(t *testing.T) {
 	type args struct {
-		m map[string]string
+		m    map[string]string
+		keys []string
 	}
 	tests := []struct {
 		name string
@@ -415,10 +437,20 @@ func Test_sortedStringMapToString(t *testing.T) {
 				text.Bold.Sprint("three"),
 				text.Bold.Sprint("two")),
 		},
+		{
+			name: "filtered by keys",
+			args: args{m: map[string]string{"one": "1", "two": "2", "three": "3"}, keys: []string{"one", "two"}},
+			want: fmt.Sprintf("%s: 1\n%s: 2", text.Bold.Sprint("one"), text.Bold.Sprint("two")),
+		},
+		{
+			name: "filtered by keys, no match",
+			args: args{m: map[string]string{"one": "1"}, keys: []string{"missing"}},
+			want: "",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := sortedStringMapToString(tt.args.m); got != tt.want {
+			if got := sortedStringMapToString(tt.args.m, tt.args.keys); got != tt.want {
 				t.Errorf("sortedStringMapToString()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
