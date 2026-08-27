@@ -128,8 +128,11 @@ computes releases directly.
    major, or minor while pre-1.0.0). Nothing is released while this PR sits open.
 2. When you're ready to ship what's accumulated, merge that release PR. Merging it makes
    release-please tag `vX.Y.Z` and publish the GitHub release.
-3. That tag/release triggers `.github/workflows/build-binaries.yml`, which builds and attaches
+3. Publishing that release triggers `.github/workflows/release.yml`, which builds and attaches
    the linux/darwin amd64/arm64 binaries — no manual build or `gh release create` step needed.
+   Publishing a release manually (e.g. backfilling an old tag) triggers the same workflow.
 
-Publishing a release manually (e.g. backfilling an old tag) still works: publishing any GitHub
-release triggers `.github/workflows/release.yml`, which calls the same binary build.
+`refs/tags/v*` is protected by a repository ruleset that only admins can bypass, so
+`release-please.yml` authenticates with a `RELEASE_PLEASE_TOKEN` PAT (an admin's fine-grained
+token scoped to this repo, stored as a repository secret) instead of the default `GITHUB_TOKEN`,
+which isn't covered by that bypass.
