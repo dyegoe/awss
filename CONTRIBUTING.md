@@ -53,7 +53,7 @@ Ready to contribute? Here's how to set up `awss` for local development.
 
     ```bash
     pip install pre-commit commitizen
-    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
+    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1
     pre-commit install
     ```
 

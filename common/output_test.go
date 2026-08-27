@@ -77,9 +77,9 @@ func TestPrintResults(t *testing.T) {
 	originalOutputs := outputs
 	defer func() { outputs = originalOutputs }()
 	outputs = map[string]func(Results, bool, bool) string{
-		JSON:       func(r Results, b1, b2 bool) string { return "json" },
-		JSONPretty: func(r Results, b1, b2 bool) string { return "json-pretty" },
-		Table:      func(r Results, b1, b2 bool) string { return "table" },
+		JSON:       func(_ Results, _, _ bool) string { return "json" },
+		JSONPretty: func(_ Results, _, _ bool) string { return "json-pretty" },
+		Table:      func(_ Results, _, _ bool) string { return "table" },
 	}
 
 	type args struct {

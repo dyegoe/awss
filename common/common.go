@@ -38,7 +38,7 @@ type terminalSize struct {
 }
 
 func getTerminalSize() terminalSize {
-	w, h, err := term.GetSize(int(os.Stdout.Fd())) //nolint:gosec // fd is a valid file descriptor, overflow not possible
+	w, h, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
 		return terminalSize{Width: 80, Height: 24}
 	}

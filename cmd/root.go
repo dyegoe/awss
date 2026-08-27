@@ -50,6 +50,13 @@ const (
 	// defaultRegion is used when no --regions flag, AWS_REGION, or
 	// AWS_DEFAULT_REGION is set.
 	defaultRegion = "us-east-1"
+
+	// flagIDs, flagTags, flagTagsKey, and flagAvailabilityZones name the flags
+	// shared by the ec2, eni, and ebs commands' sort-field lists.
+	flagIDs               = "ids"
+	flagTags              = "tags"
+	flagTagsKey           = "tags-key"
+	flagAvailabilityZones = "availability-zones"
 )
 
 // version is overridden at build time via -ldflags.
@@ -106,7 +113,7 @@ func Execute() {
 }
 
 // persistentPreRun is executed before any command.
-func persistentPreRun(cmd *cobra.Command, args []string) error {
+func persistentPreRun(cmd *cobra.Command, _ []string) error {
 	cfg, err := cmd.Flags().GetString(labelConfig)
 	if err != nil {
 		return err

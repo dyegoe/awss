@@ -38,7 +38,7 @@ const (
 // common.StructToFilters is used to convert the struct to a map[string][]string.
 // The AWS filter names must be present in the struct tag `filter:"filter-name"`.
 type ec2Filters struct {
-	Ids               []string `filter:"instance-id"`
+	IDs               []string `filter:"instance-id"`
 	Names             []string `filter:"tag:Name"`
 	Tags              []string `filter:"tag"`
 	TagsKey           []string `filter:"tag-key"`
@@ -73,11 +73,11 @@ Use --all to search for all EC2 instances without any filter. This flag cannot b
 
 // ec2FilterFlags lists all EC2 filter flag names for mutual exclusivity with --all.
 var ec2FilterFlags = []string{
-	"ids", "names", "tags", "tags-key", "instance-types",
-	"availability-zones", "instance-states", "private-ips", "public-ips",
+	flagIDs, "names", flagTags, flagTagsKey, "instance-types",
+	flagAvailabilityZones, "instance-states", "private-ips", "public-ips",
 }
 
-func ec2RunE(cmd *cobra.Command, args []string) error {
+func ec2RunE(cmd *cobra.Command, _ []string) error {
 	return runSearch(
 		cmd, labelEc2All, labelEc2Sort, "",
 		ec2FilterFlags, ec2F.AvailabilityZones, ec2F.Tags, ec2F,
@@ -89,17 +89,17 @@ func ec2InitFlags() {
 
 	ec2Cmd.Flags().BoolP("all", "a", false,
 		"Search for all EC2 instances without any filter. Cannot be combined with other filters.")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.Ids, "ids", "i", []string{},
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.IDs, flagIDs, "i", []string{},
 		"Filter EC2 instances by ids. `i-1230456078901,i-1230456078902`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.Names, "names", "n", []string{},
 		"Filter EC2 instances by names. It searches using the 'tag:Name'. `instance-1,instance-2`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.Tags, "tags", "t", []string{},
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.Tags, flagTags, "t", []string{},
 		"Filter EC2 instances by tags. `'Key=Value1:Value2,Environment=Production'`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.TagsKey, "tags-key", "k", []string{},
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.TagsKey, flagTagsKey, "k", []string{},
 		"Filter EC2 instances by tags key. `Key,Environment`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.InstanceTypes, "instance-types", "T", []string{},
 		"Filter EC2 instances by instance type. `t2.micro,t2.small`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.AvailabilityZones, "availability-zones", "z", []string{},
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.AvailabilityZones, flagAvailabilityZones, "z", []string{},
 		"Filter EC2 instances by availability zones. It will append to current region. `a,b`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.InstanceStates, "instance-states", "s", []string{},
 		"Filter EC2 instances by instance state. `running,stopped`")
