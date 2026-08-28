@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.11.0](https://github.com/dyegoe/awss/compare/v0.10.0...v0.11.0) (2026-08-28)
+
+
+### Features
+
+* **common:** add --show-tags-keys to restrict tags shown in table output ([#114](https://github.com/dyegoe/awss/issues/114)) ([da2eb09](https://github.com/dyegoe/awss/commit/da2eb0907af2fb730858cbb839678754c72602d8)), closes [#51](https://github.com/dyegoe/awss/issues/51)
+
 ## [0.10.0](https://github.com/dyegoe/awss/compare/v0.9.0...v0.10.0) (2026-08-27)
 
 
