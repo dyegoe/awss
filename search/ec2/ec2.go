@@ -254,26 +254,6 @@ func GetSortFields(f string) (map[string]string, error) {
 	return sortFields, nil
 }
 
-// SearchInstanceName returns the name of an instance.
-//
-// It returns the value of the tag:Name or empty string in case that the instance has no name.
-func SearchInstanceName(profile, region, instanceID string) (string, error) {
-	r := New(profile, region, map[string][]string{filterKeyInstanceID: {instanceID}}, "id")
-	r.Search(context.Background())
-	if len(r.Errors) > 0 {
-		return "", fmt.Errorf("error searching instance name: %v", r.Errors)
-	}
-
-	switch r.Len() {
-	case 0:
-		return "", fmt.Errorf("instance %s not found", instanceID)
-	case 1:
-		return r.Data[0].InstanceName, nil
-	default:
-		return "", fmt.Errorf("more than one instance found")
-	}
-}
-
 // SearchInstanceNames returns a map of instanceID to instance name for all given IDs.
 // It makes a single DescribeInstances API call instead of one per ID.
 func SearchInstanceNames(profile, region string, instanceIDs []string) (map[string]string, error) {
