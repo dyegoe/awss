@@ -463,32 +463,3 @@ func TestGetSortFields(t *testing.T) {
 		})
 	}
 }
-
-// // TestSearchInstanceName tests the SearchInstanceName function.
-// func TestSearchInstanceName(t *testing.T) {
-// 	type args struct {
-// 		profile    string
-// 		region     string
-// 		instanceID string
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		want    string
-// 		wantErr bool
-// 	}{
-// 		// TODO: Add test cases.
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			got, err := SearchInstanceName(tt.args.profile, tt.args.region, tt.args.instanceID)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("SearchInstanceName() error = %v, wantErr %v", err, tt.wantErr)
-// 				return
-// 			}
-// 			if got != tt.want {
-// 				t.Errorf("SearchInstanceName()\n%#v\nwant\n%#v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
