@@ -36,7 +36,7 @@ Filter by:
 | `--public-ips` | `-P` | Public IP addresses |
 | `--volume-ids` | `-v` | Attached EBS volume IDs |
 
-Sort by: `--sort id|name|type|az|state|private-ip|public-ip|enis` (default: `name`)
+Sort by: `--sort id|name|type|az|state|private-ip|public-ip|enis|volumes` (default: `name`)
 
 The output also lists the EBS volumes attached to each instance.
 

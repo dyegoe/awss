@@ -22,8 +22,6 @@ package ec2
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"sort"
 
 	"github.com/dyegoe/awss/common"
 
@@ -72,7 +70,7 @@ type dataRow struct {
 	NetworkInterfaces []string `json:"enis,omitempty" header:"ENIs" sort:"enis"`
 
 	// Volumes are the EBS volume IDs attached to the instance.
-	Volumes []string `json:"volumes,omitempty" header:"Volumes"`
+	Volumes []string `json:"volumes,omitempty" header:"Volumes" sort:"volumes"`
 
 	// Tags are a map of the tags assigned to the instance.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
@@ -176,31 +174,11 @@ func parseVolumeIDs(mappings []types.InstanceBlockDeviceMapping) []string {
 // Len returns the length of the results.
 func (r *Results) Len() int { return len(r.Data) }
 
-// GetHeaders returns the the tag `header` of the struct fields.
-func (r *Results) GetHeaders() []interface{} {
-	headers := []interface{}{}
+// GetHeaders returns the `header` tag of the dataRow fields.
+func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
 
-	v := reflect.ValueOf(dataRow{})
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Type().Field(i)
-
-		if header, ok := field.Tag.Lookup("header"); ok {
-			headers = append(headers, header)
-		}
-	}
-
-	return headers
-}
-
-// GetRows iterates results.Data and returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} {
-	rows := []interface{}{}
-
-	for _, row := range r.Data { //nolint:gocritic
-		rows = append(rows, row)
-	}
-	return rows
-}
+// GetRows returns the results as a slice of interface{}.
+func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
 
 // getFilters returns the filters used to search.
 //
@@ -238,40 +216,21 @@ func (r *Results) sortResults(field string) error {
 	if err != nil {
 		return err
 	}
-
-	sort.Slice(r.Data, func(p, q int) bool {
-		sortField1 := reflect.ValueOf(r.Data[p]).FieldByName(sortFields[field]).String()
-		sortField2 := reflect.ValueOf(r.Data[q]).FieldByName(sortFields[field]).String()
-		return sortField1 < sortField2
-	})
+	common.SortByField(r.Data, sortFields[field])
 	return nil
 }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.
 //
-// The sort fields are defined in the struct tag `sort`.
+// The sort fields are defined in the struct tag `sort` on dataRow.
 // The function returns an error if the given field is not a valid sort field.
 func GetSortFields(f string) (map[string]string, error) {
-	sortFields := map[string]string{}
+	return common.SortFields(dataRow{}, f)
+}
 
-	v := reflect.ValueOf(dataRow{})
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Type().Field(i)
-
-		if s, ok := field.Tag.Lookup("sort"); ok {
-			sortFields[s] = field.Name
-		}
-	}
-
-	if _, ok := sortFields[f]; !ok {
-		options := make([]string, 0, len(sortFields))
-		for k := range sortFields {
-			options = append(options, k)
-		}
-		sort.Strings(options)
-		return nil, fmt.Errorf("invalid sort field: %s. The options are: %s", f, common.StringSliceToString(options, ", "))
-	}
-	return sortFields, nil
+// SortFieldNames returns the valid sort fields, sorted alphabetically.
+func SortFieldNames() []string {
+	return common.SortFieldNames(dataRow{})
 }
 
 // SearchInstanceNames returns a map of instanceID to instance name for all given IDs.

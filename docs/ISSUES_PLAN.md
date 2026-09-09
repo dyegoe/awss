@@ -56,14 +56,14 @@ Not in any issue. Each item removes boilerplate that four new commands would oth
 Ordering: #72 ships first **without** a `sort` tag on the new slice column; 0c then lands
 before #78 and retrofits `sort:"volumes"` (and fixes `enis`) in the same PR.
 
-- [ ] **0a: `search.Options` struct + constructor registry** (`search/search.go`)
+- [x] **0a: `search.Options` struct + constructor registry** (`search/search.go`)
   - `Execute` already carries a resource-specific `noInstanceName bool`. S3 adds `regex bool`
     and later `keys`. Replace the trailing args with `search.Options{SortField, NoInstanceName, Regex string...}`.
   - Replace the `switch cmd` with `var constructors = map[string]func(profile, region string, filters map[string][]string, opts Options) common.Results`.
   - `getSortFieldsCMDList` and `constructors` then become the single registration point.
   - Tests: `search_test.go` already mocks `getSortFieldsCMDList`; add "unknown command returns error".
 
-- [ ] **0b: `common.CheckCIDRs([]string) error`** (`common/aws.go` or `common/common.go`)
+- [x] **0b: `common.CheckCIDRs([]string) error`** (`common/aws.go` or `common/common.go`)
   - Validates each value with `net.ParseCIDR`. Used by #78, #79, #82 flag validation.
   - Decision: keep CIDR flags as `[]string` (not `[]net.IPNet`) so `StructToFilters` needs no new
     case and `*` wildcards still pass through to AWS filters.
@@ -71,7 +71,7 @@ before #78 and retrofits `sort:"volumes"` (and fixes `enis`) in the same PR.
     values must parse.
   - Tests: valid v4, invalid string, `10.0.*` accepted, `*` accepted.
 
-- [ ] **0c: Fix slice-field sorting** (`search/ec2/ec2.go`, then reuse)
+- [x] **0c: Fix slice-field sorting** (`search/ec2/ec2.go`, then reuse)
   - Add `common.SortKey(v reflect.Value) string` that returns `String()` for strings, the
     decimal for ints, and `strings.Join(sorted slice, ",")` for `[]string`.
   - Use it in `ec2.sortResults` (fixes `enis`) and in every new package's `sortResults`.
@@ -86,20 +86,20 @@ before #78 and retrofits `sort:"volumes"` (and fixes `enis`) in the same PR.
 
 Branch: `72-add-volumes-to-ec2`
 
-- [ ] **Show attached volumes.** In `search/ec2/ec2.go` add to `dataRow`:
+- [x] **Show attached volumes.** In `search/ec2/ec2.go` add to `dataRow`:
   `Volumes []string \`json:"volumes,omitempty" header:"Volumes"\``.
   Populate in `parseInstance` from `inst.BlockDeviceMappings[].Ebs.VolumeId`.
   Nil-check `Ebs` and `VolumeId`. No extra API call needed.
   Ship without the `sort` tag (slice sorting is a no-op today); 0c adds it back.
-- [ ] **Search by volume id.** In `cmd/ec2.go`:
+- [x] **Search by volume id.** In `cmd/ec2.go`:
   - `VolumeIDs []string \`filter:"block-device-mapping.volume-id"\`` on `ec2Filters`.
   - Flag `--volume-ids` / `-v` (short letter is free; ec2 uses a i n t k T z s p P). Cobra's
     `--version`/`-v` lives on the root command only, but confirm with `awss ec2 --help` that
     `-v` binds to `--volume-ids`; fall back to `-V` if it clashes.
   - Append `"volume-ids"` to `ec2FilterFlags` so `--all` exclusivity holds.
   - Update the command `Long` help text list of filters.
-- [ ] **Docs.** README ec2 filter table, sort list, usage example `awss ec2 --volume-ids vol-...`.
-- [ ] **Tests** (`search/ec2/ec2_test.go`, `cmd/`):
+- [x] **Docs.** README ec2 filter table, sort list, usage example `awss ec2 --volume-ids vol-...`.
+- [x] **Tests** (`search/ec2/ec2_test.go`, `cmd/`):
   - `parseInstance`: mapping with nil `Ebs`, nil `VolumeId`, two volumes, no mappings.
   - `getFilters`: `block-device-mapping.volume-id` goes through the default case as a `types.Filter`.
   - `GetHeaders` includes `Volumes`; `GetSortFields` includes `volumes` (if tagged).

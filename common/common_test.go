@@ -152,6 +152,31 @@ func TestParseTags(t *testing.T) {
 	}
 }
 
+// TestCheckCIDRs tests the CheckCIDRs function.
+func TestCheckCIDRs(t *testing.T) {
+	tests := []struct {
+		name    string
+		cidrs   []string
+		wantErr bool
+	}{
+		{name: "empty list", cidrs: []string{}, wantErr: false},
+		{name: "valid ipv4", cidrs: []string{"10.0.0.0/16", "192.168.1.0/24"}, wantErr: false},
+		{name: "valid ipv6", cidrs: []string{"2001:db8::/32"}, wantErr: false},
+		{name: "wildcard only", cidrs: []string{"*"}, wantErr: false},
+		{name: "wildcard inside", cidrs: []string{"10.0.*"}, wantErr: false},
+		{name: "missing prefix length", cidrs: []string{"10.0.0.0"}, wantErr: true},
+		{name: "not an address", cidrs: []string{"not-a-cidr"}, wantErr: true},
+		{name: "one bad among good", cidrs: []string{"10.0.0.0/16", "bad"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := CheckCIDRs(tt.cidrs); (err != nil) != tt.wantErr {
+				t.Errorf("CheckCIDRs() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestStringValue tests the StringValue function.
 func TestStringValue(t *testing.T) {
 	// Variables to test the pointer

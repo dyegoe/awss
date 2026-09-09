@@ -101,8 +101,7 @@ func eniInitFlags() {
 		"Filter ENIs by private IPs. `172.16.0.1,172.17.1.254`")
 	eniCmd.Flags().IPSliceVarP(&eniF.PublicIPs, "public-ips", "P", []net.IP{},
 		"Filter ENIs by public IPs. `52.28.19.20,52.30.31.32`")
-	eniCmd.Flags().String("sort", "id",
-		"Sort ENIs by id, type, az, status, subnet-id, instance-id or instance-name. `id`")
+	eniCmd.Flags().String("sort", "id", sortHelp("eni", "ENIs", "id"))
 	eniCmd.Flags().Bool("no-instance-name", false,
 		"Skip the instance name lookup to speed up the ENI search.")
 }

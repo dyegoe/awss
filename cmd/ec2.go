@@ -110,8 +110,7 @@ func ec2InitFlags() {
 		"Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.VolumeIDs, "volume-ids", "v", []string{},
 		"Filter EC2 instances by attached EBS volume IDs. `vol-1230456078901,vol-1230456078902`")
-	ec2Cmd.Flags().String("sort", "name",
-		"Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
+	ec2Cmd.Flags().String("sort", "name", sortHelp("ec2", "EC2 instances", "name"))
 }
 
 func ec2InitViper() error {

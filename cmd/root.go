@@ -248,6 +248,12 @@ func initConfig(cfg string) error {
 	return nil
 }
 
+// sortHelp builds the --sort help text of a command from its registered sort fields,
+// so the help never drifts from the struct tags.
+func sortHelp(cmd, what, def string) string {
+	return fmt.Sprintf("Sort %s by %s. `%s`", what, common.StringSliceToString(search.SortFieldNames(cmd), ", "), def)
+}
+
 // buildFilters validates and builds the filter map for a subcommand.
 //
 // When allFlag is true, it checks that no filter flags were set and returns an empty map.
@@ -308,11 +314,13 @@ func runSearch(
 		viper.GetStringSlice(labelProfiles),
 		viper.GetStringSlice(labelRegions),
 		filters,
-		viper.GetString(sortLabel),
-		viper.GetString(labelOutput),
-		viper.GetBool(labelShowEmpty),
-		viper.GetBool(labelShowTags) || len(tagsKeys) > 0,
-		tagsKeys,
-		noInstanceNameLabel != "" && viper.GetBool(noInstanceNameLabel),
+		search.Options{
+			SortField:      viper.GetString(sortLabel),
+			Output:         viper.GetString(labelOutput),
+			ShowEmpty:      viper.GetBool(labelShowEmpty),
+			ShowTags:       viper.GetBool(labelShowTags) || len(tagsKeys) > 0,
+			TagsKeys:       tagsKeys,
+			NoInstanceName: noInstanceNameLabel != "" && viper.GetBool(noInstanceNameLabel),
+		},
 	)
 }
