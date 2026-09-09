@@ -89,12 +89,13 @@ func TestCheckSortField(t *testing.T) {
 // TestExecute_unknownCommand checks that an unknown command fails before any profile or region is touched.
 func TestExecute_unknownCommand(t *testing.T) {
 	called := false
-	mockEngines(t, func(_, _ string, _ map[string][]string, _ Options) common.Results {
+	mockEngines(t, func(_, _ string, _ map[string][]string, _ *Options) common.Results {
 		called = true
 		return nil
 	})
 
-	err := Execute("nope", []string{"default"}, []string{"us-east-1"}, map[string][]string{}, Options{Output: common.JSON})
+	opts := &Options{Output: common.JSON}
+	err := Execute("nope", []string{"default"}, []string{"us-east-1"}, map[string][]string{}, opts)
 	if err == nil {
 		t.Fatal("Execute() error = nil, want command not found")
 	}
@@ -105,7 +106,7 @@ func TestExecute_unknownCommand(t *testing.T) {
 
 // TestEngines_registeredCommands checks every built-in command has both a constructor and sort fields.
 func TestEngines_registeredCommands(t *testing.T) {
-	for _, cmd := range []string{"ec2", "eni", "ebs", "vpc", "subnet", "s3"} {
+	for _, cmd := range []string{"ec2", "eni", "ebs", "vpc", "subnet", "s3", "s3obj"} {
 		eng, ok := engines[cmd]
 		if !ok {
 			t.Errorf("engines[%q] missing", cmd)
@@ -119,7 +120,7 @@ func TestEngines_registeredCommands(t *testing.T) {
 				t.Errorf("engines[%q]: sortFieldNames lists %q but sortFields rejects it: %v", cmd, name, err)
 			}
 		}
-		r := eng.new("default", "us-east-1", map[string][]string{}, Options{SortField: "id", NoInstanceName: true})
+		r := eng.new("default", "us-east-1", map[string][]string{}, &Options{SortField: "id", NoInstanceName: true})
 		if r == nil {
 			t.Errorf("engines[%q].new returned nil", cmd)
 			continue

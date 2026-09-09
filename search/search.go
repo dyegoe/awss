@@ -32,6 +32,7 @@ import (
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
 	searchENI "github.com/dyegoe/awss/search/eni"
 	searchS3 "github.com/dyegoe/awss/search/s3"
+	searchS3obj "github.com/dyegoe/awss/search/s3obj"
 	searchSubnet "github.com/dyegoe/awss/search/subnet"
 	searchVPC "github.com/dyegoe/awss/search/vpc"
 )
@@ -58,10 +59,13 @@ type Options struct {
 
 	// Regex makes name patterns regular expressions instead of globs, in searches that match names client-side.
 	Regex bool
+
+	// MaxKeys caps the keys scanned per bucket in the s3obj search. Zero means the search's default.
+	MaxKeys int
 }
 
 // constructor builds the results object of one search for a single profile and region.
-type constructor func(profile, region string, filters map[string][]string, opts Options) common.Results
+type constructor func(profile, region string, filters map[string][]string, opts *Options) common.Results
 
 // engine describes a search command: how to build its results and which sort fields it accepts.
 type engine struct {
@@ -81,46 +85,53 @@ type engine struct {
 // It is a variable so tests can replace it.
 var engines = map[string]engine{
 	"ec2": {
-		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
 			return searchEC2.New(profile, region, filters, opts.SortField)
 		},
 		sortFields:     searchEC2.GetSortFields,
 		sortFieldNames: searchEC2.SortFieldNames,
 	},
 	"eni": {
-		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
 			return searchENI.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
 		},
 		sortFields:     searchENI.GetSortFields,
 		sortFieldNames: searchENI.SortFieldNames,
 	},
 	"ebs": {
-		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
 			return searchEBS.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
 		},
 		sortFields:     searchEBS.GetSortFields,
 		sortFieldNames: searchEBS.SortFieldNames,
 	},
 	"vpc": {
-		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
 			return searchVPC.New(profile, region, filters, opts.SortField)
 		},
 		sortFields:     searchVPC.GetSortFields,
 		sortFieldNames: searchVPC.SortFieldNames,
 	},
 	"subnet": {
-		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
 			return searchSubnet.New(profile, region, filters, opts.SortField)
 		},
 		sortFields:     searchSubnet.GetSortFields,
 		sortFieldNames: searchSubnet.SortFieldNames,
 	},
 	"s3": {
-		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
 			return searchS3.New(profile, region, filters, opts.SortField, opts.Regex)
 		},
 		sortFields:     searchS3.GetSortFields,
 		sortFieldNames: searchS3.SortFieldNames,
+	},
+	"s3obj": {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
+			return searchS3obj.New(profile, region, filters, opts.SortField, opts.Regex, opts.MaxKeys)
+		},
+		sortFields:     searchS3obj.GetSortFields,
+		sortFieldNames: searchS3obj.SortFieldNames,
 	},
 }
 
@@ -128,7 +139,7 @@ var engines = map[string]engine{
 //
 // It searches for the given command in the given profiles and regions, in parallel.
 // The filters are used to filter the results and opts holds every other setting.
-func Execute(cmd string, profiles, regions []string, filters map[string][]string, opts Options) error {
+func Execute(cmd string, profiles, regions []string, filters map[string][]string, opts *Options) error {
 	eng, ok := engines[cmd]
 	if !ok {
 		return fmt.Errorf("command %s not found", cmd)
