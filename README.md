@@ -101,6 +101,26 @@ Filter by:
 
 Sort by: `--sort id|name|cidr|cidrs|state|default|owner|dhcp` (default: `name`)
 
+#### Subnets (`awss subnet`)
+
+Filter by:
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--all` | `-a` | Search all subnets (no filters) |
+| `--ids` | `-i` | Subnet IDs |
+| `--names` | `-n` | Subnet names (tag:Name) |
+| `--tags` | `-t` | Tags (`Key=Value1:Value2`) |
+| `--tags-key` | `-k` | Tag keys |
+| `--vpc-ids` | `-V` | VPC IDs |
+| `--cidrs` | `-c` | IPv4 CIDR block, exact match (`10.0.1.0/24`) |
+| `--availability-zones` | `-z` | Availability zones (letter only, e.g. `a,b`) |
+| `--states` | `-s` | Subnet state (`pending`, `available`) |
+| `--default-for-az` | `-d` | Default subnet of its AZ (`true`, `false`) |
+| `--public-ip-on-launch` | `-p` | Instances get a public IP on launch (`true`, `false`) |
+
+Sort by: `--sort id|name|vpc-id|cidr|az|available-ips|state|public-ip|default|owner` (default: `name`)
+
 ### Common behavior
 
 - Filters can be combined: `awss ec2 -n '*' -s running -z a,b`
@@ -160,6 +180,8 @@ ebs:
   sort: id
 vpc:
   sort: name
+subnet:
+  sort: name
 ```
 
 ## Usage
@@ -189,6 +211,9 @@ awss ec2 --volume-ids vol-1234567890abcdef0
 
 # Find the VPC that owns a CIDR block
 awss vpc --cidrs 10.0.0.0/16
+
+# List the subnets of a VPC in two availability zones, fewest free IPs first
+awss subnet --vpc-ids vpc-1234567890abcdef0 -z a,b --sort available-ips
 
 # JSON output for scripting
 awss ec2 --all --output json

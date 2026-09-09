@@ -74,7 +74,7 @@ Use --all to search for all EC2 instances without any filter. This flag cannot b
 
 // ec2FilterFlags lists all EC2 filter flag names for mutual exclusivity with --all.
 var ec2FilterFlags = []string{
-	flagIDs, "names", flagTags, flagTagsKey, "instance-types",
+	flagIDs, flagNames, flagTags, flagTagsKey, "instance-types",
 	flagAvailabilityZones, "instance-states", "private-ips", "public-ips", "volume-ids",
 }
 
@@ -92,7 +92,7 @@ func ec2InitFlags() {
 		"Search for all EC2 instances without any filter. Cannot be combined with other filters.")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.IDs, flagIDs, "i", []string{},
 		"Filter EC2 instances by ids. `i-1230456078901,i-1230456078902`")
-	ec2Cmd.Flags().StringSliceVarP(&ec2F.Names, "names", "n", []string{},
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.Names, flagNames, "n", []string{},
 		"Filter EC2 instances by names. It searches using the 'tag:Name'. `instance-1,instance-2`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.Tags, flagTags, "t", []string{},
 		"Filter EC2 instances by tags. `'Key=Value1:Value2,Environment=Production'`")

@@ -49,14 +49,7 @@ func ensureVpcFlags() {
 // Test_vpcFilterFlags_coversStruct checks every vpcFilters field has a flag listed for --all exclusivity.
 func Test_vpcFilterFlags_coversStruct(t *testing.T) {
 	ensureVpcFlags()
-	if n := reflect.TypeOf(vpcFilters{}).NumField(); n != len(vpcFilterFlags) {
-		t.Errorf("vpcFilters has %d fields but vpcFilterFlags lists %d flags", n, len(vpcFilterFlags))
-	}
-	for _, flag := range vpcFilterFlags {
-		if vpcCmd.Flags().Lookup(flag) == nil {
-			t.Errorf("vpcFilterFlags lists %q but the vpc command has no such flag", flag)
-		}
-	}
+	checkFilterFlags(t, "vpc", vpcCmd, reflect.TypeOf(vpcFilters{}).NumField(), vpcFilterFlags)
 }
 
 // Test_vpcRunE_invalidCIDR checks that a malformed --cidrs value is rejected before searching.

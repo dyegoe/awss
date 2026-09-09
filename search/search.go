@@ -31,6 +31,7 @@ import (
 	searchEBS "github.com/dyegoe/awss/search/ebs"
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
 	searchENI "github.com/dyegoe/awss/search/eni"
+	searchSubnet "github.com/dyegoe/awss/search/subnet"
 	searchVPC "github.com/dyegoe/awss/search/vpc"
 )
 
@@ -102,6 +103,13 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchVPC.GetSortFields,
 		sortFieldNames: searchVPC.SortFieldNames,
+	},
+	"subnet": {
+		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
+			return searchSubnet.New(profile, region, filters, opts.SortField)
+		},
+		sortFields:     searchSubnet.GetSortFields,
+		sortFieldNames: searchSubnet.SortFieldNames,
 	},
 }
 
