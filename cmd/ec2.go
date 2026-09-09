@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/dyegoe/awss/common"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -48,6 +50,9 @@ type ec2Filters struct {
 	PrivateIPs        []net.IP `filter:"network-interface.addresses.private-ip-address"`
 	PublicIPs         []net.IP `filter:"network-interface.addresses.association.public-ip"`
 	VolumeIDs         []string `filter:"block-device-mapping.volume-id"`
+
+	// CIDRs is a pseudo-filter: search/ec2 resolves it into subnet-id or vpc-id per region.
+	CIDRs []string `filter:"cidr"`
 }
 
 var ec2F = ec2Filters{}
@@ -59,8 +64,13 @@ var ec2Cmd = &cobra.Command{
 	Long: `
 Search for EC2 instances.
 You can search EC2 instances using the following filters:
-  ids, names, tags, instance-types, availability-zones, instance-states, private-ips, public-ips and volume-ids.
+  ids, names, tags, instance-types, availability-zones, instance-states, private-ips, public-ips,
+  volume-ids and cidrs.
 You can use multiple values for each filter, separated by comma. Example: --names 'Name1,Name2'
+
+--cidrs finds the instances in the network with that CIDR block: it first looks for subnets whose
+CIDR block matches exactly and searches instances in them; if there is no such subnet it looks for
+VPCs with that CIDR block associated instead. Example: --cidrs 10.0.1.0/24
 
 You can use multiple filters at same time, for example:
 	awss ec2 -n '*' -t 'Key=Value1:Value2,Environment=Production' -T t2.micro,t2.small -z a,b -s running,stopped
@@ -75,10 +85,13 @@ Use --all to search for all EC2 instances without any filter. This flag cannot b
 // ec2FilterFlags lists all EC2 filter flag names for mutual exclusivity with --all.
 var ec2FilterFlags = []string{
 	flagIDs, flagNames, flagTags, flagTagsKey, "instance-types",
-	flagAvailabilityZones, "instance-states", "private-ips", "public-ips", "volume-ids",
+	flagAvailabilityZones, "instance-states", "private-ips", "public-ips", "volume-ids", flagCIDRs,
 }
 
 func ec2RunE(cmd *cobra.Command, _ []string) error {
+	if err := common.CheckCIDRs(ec2F.CIDRs); err != nil {
+		return err
+	}
 	return runSearch(
 		cmd, labelEc2All, labelEc2Sort, "",
 		ec2FilterFlags, ec2F.AvailabilityZones, ec2F.Tags, ec2F,
@@ -110,6 +123,8 @@ func ec2InitFlags() {
 		"Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.VolumeIDs, "volume-ids", "v", []string{},
 		"Filter EC2 instances by attached EBS volume IDs. `vol-1230456078901,vol-1230456078902`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.CIDRs, flagCIDRs, "c", []string{},
+		"Filter EC2 instances by the CIDR block of their subnet, or VPC if no subnet matches. `10.0.1.0/24`")
 	ec2Cmd.Flags().String("sort", "name", sortHelp("ec2", "EC2 instances", "name"))
 }
 

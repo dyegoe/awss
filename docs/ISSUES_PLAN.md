@@ -171,10 +171,10 @@ Branch: `79-subnet-search`. Same shape as step 2.
 Branch: `82-ec2-search-by-cidr`. Semantics exactly as the issue: subnets first, then VPCs,
 else error.
 
-- [ ] **Flag** in `cmd/ec2.go`: `CIDRs []string \`filter:"cidr"\`` on `ec2Filters`, flag
+- [x] **Flag** in `cmd/ec2.go`: `CIDRs []string \`filter:"cidr"\`` on `ec2Filters`, flag
   `--cidrs` / `-c`, validated with `common.CheckCIDRs`, added to `ec2FilterFlags`.
   Comment on the field: `cidr` is a pseudo-filter resolved inside `search/ec2`, not an AWS filter.
-- [ ] **Resolution inside `search/ec2`** (it must run per profile x region because IDs differ per region):
+- [x] **Resolution inside `search/ec2`** (it must run per profile x region because IDs differ per region):
   - Package vars for mocking: `var subnetIDsByCIDR = searchSubnet.IDsByCIDR` and
     `var vpcIDsByCIDR = searchVPC.IDsByCIDR`. `search/ec2` now imports `subnet` and `vpc`;
     those two must never import `ec2` (eni/ebs already import ec2).
@@ -189,9 +189,9 @@ else error.
     data (CODESTYLE §1: per-region errors go into `r.Errors`, never abort the run).
   - `getFilters` takes the resolved map; add `case "cidr":` guard that errors if it ever reaches
     there unresolved, so it cannot fall into `default` and be sent to AWS.
-- [ ] **Docs**: README ec2 table + example `awss ec2 --cidrs 10.0.1.0/24`; note that CIDR must
+- [x] **Docs**: README ec2 table + example `awss ec2 --cidrs 10.0.1.0/24`; note that CIDR must
   exactly match a subnet or VPC block (AWS filter semantics), `*` works.
-- [ ] **Tests**: mock the two lookups; cases: subnet hit, subnet miss + VPC hit, both miss ->
+- [x] **Tests**: mock the two lookups; cases: subnet hit, subnet miss + VPC hit, both miss ->
   error in `r.Errors` and no AWS call, lookup error propagates to `r.Errors`, original
   `r.Filters` untouched after resolution (`reflect.DeepEqual` before/after), `getFilters` rejects
   a raw `cidr` key.

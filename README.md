@@ -35,10 +35,15 @@ Filter by:
 | `--private-ips` | `-p` | Private IP addresses |
 | `--public-ips` | `-P` | Public IP addresses |
 | `--volume-ids` | `-v` | Attached EBS volume IDs |
+| `--cidrs` | `-c` | CIDR block of the subnet, or of the VPC when no subnet matches (`10.0.1.0/24`) |
 
 Sort by: `--sort id|name|type|az|state|private-ip|public-ip|enis|volumes` (default: `name`)
 
 The output also lists the EBS volumes attached to each instance.
+
+`--cidrs` resolves the CIDR per profile and region: it looks for subnets whose CIDR block matches
+exactly and searches instances in them; if none matches, it looks for VPCs with that CIDR block
+associated. If neither matches, the region reports an error and no instance is returned.
 
 #### ENI (`awss eni`)
 
@@ -208,6 +213,9 @@ awss ebs --instance-ids i-1234567890abcdef0
 
 # Find the instance an EBS volume is attached to
 awss ec2 --volume-ids vol-1234567890abcdef0
+
+# Find the running instances in the subnet (or VPC) that owns a CIDR block
+awss ec2 --cidrs 10.0.1.0/24 --instance-states running
 
 # Find the VPC that owns a CIDR block
 awss vpc --cidrs 10.0.0.0/16
