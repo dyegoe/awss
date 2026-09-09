@@ -78,24 +78,21 @@ if eni.Attachment != nil && eni.Attachment.InstanceId != nil {
 
 ## 3. Context
 
-Never use `context.TODO()` in production code.
+Never use `context.TODO()` in production code. `Search(ctx context.Context)` receives the
+context from `search.Execute`; pass it to every AWS call and every helper that makes one.
 
 ```go
 // Bad
 response, err := client.DescribeInstances(context.TODO(), input)
 
-// Good — in Search() which does not yet receive a ctx
-response, err := client.DescribeInstances(context.Background(), input)
-
-// Best — when Search() is refactored to accept ctx
+// Good
 func (r *Results) Search(ctx context.Context) {
     response, err := client.DescribeInstances(ctx, input)
 }
 ```
 
-The long-term goal is for `Search()` to accept `ctx context.Context` so callers can cancel
-in-flight requests. Do not block other fixes on this — use `context.Background()` as an
-intermediate step.
+`context.Background()` is acceptable only at the top of `search.Execute` and in one-off helpers
+that have no caller context (for example `common.WhoAmI`).
 
 ---
 
@@ -162,12 +159,34 @@ Build with:
 go build -ldflags="-X github.com/dyegoe/awss/cmd.version=$(git describe --tags --always)" .
 ```
 
-The Makefile and goreleaser config must inject the version. The source file must never contain
-a release version number.
+The Makefile and the release workflow (`.github/workflows/build-binaries.yml`) must inject the
+version. The source file must never contain a release version number.
 
 ---
 
-## 6. Struct consistency: exported vs unexported
+## 6. Reuse the shared helpers
+
+Do not copy reflection or matching code into a resource package. `common` already provides:
+
+| Need                                   | Helper                                              |
+| -------------------------------------- | --------------------------------------------------- |
+| Table headers from `header` tags       | `common.Headers(dataRow{})`                         |
+| Rows for the output layer              | `common.Rows(r.Data)`                               |
+| Validate a `--sort` value              | `common.SortFields(dataRow{}, f)`                   |
+| List the valid sort values (help text) | `common.SortFieldNames(dataRow{})`                  |
+| Sort rows by a field (numeric, slices) | `common.SortByField(r.Data, fieldName)`             |
+| Client-side glob/regex matching        | `common.NewMatcher(patterns, regex)` + `.Prefix()`  |
+| Validate CIDR flags                    | `common.CheckCIDRs(values)`                         |
+| Build AWS filters                      | `common.FilterTags`, `FilterNames`, `FilterDefault` |
+
+A resource package's `GetHeaders`, `GetRows`, `GetSortFields`, `SortFieldNames` and
+`sortResults` should each be one line calling these.
+
+Never mutate `Results.Filters` inside `Search()`: the same map is handed to every
+profile x region goroutine. Build a copy when a filter must be rewritten (see
+`resolveCIDRFilter` in `search/ec2`).
+
+## 7. Struct consistency: exported vs unexported
 
 If a type is returned by an exported function, it must be exported.
 
@@ -187,7 +206,7 @@ func terminalSize() terminalSize { ... }
 
 ---
 
-## 7. Eliminating struct duplication with embedding
+## 8. Eliminating struct duplication with embedding
 
 `ec2.Results` and `eni.Results` share identical fields and getter methods.
 When refactoring, extract a `common.BaseResults` and embed it:
@@ -216,7 +235,7 @@ type Results struct {
 
 ---
 
-## 8. N+1 API call pattern
+## 9. N+1 API call pattern
 
 Never call AWS APIs inside a loop over results from another AWS call.
 
@@ -236,7 +255,7 @@ for _, eni := range response.NetworkInterfaces {
 
 ---
 
-## 9. Naming conventions
+## 10. Naming conventions
 
 | Thing                       | Convention             | Example                         |
 | --------------------------- | ---------------------- | ------------------------------- |
@@ -252,7 +271,7 @@ CLI sort/filter flag values use **kebab-case**: `private-ip`, `public-ip`, not `
 
 ---
 
-## 10. Doc comments
+## 11. Doc comments
 
 Every exported symbol (type, function, variable, constant) must have a doc comment.
 Comments start with the symbol name and are written as full sentences.

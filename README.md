@@ -176,9 +176,16 @@ to S3 so only that part of the bucket is listed.
 
 ## Installation
 
-Download the binary from the [releases](https://github.com/dyegoe/awss/releases) page.
+Download the binary for your platform (Linux and macOS, amd64 and arm64) from the
+[releases](https://github.com/dyegoe/awss/releases) page and put it on your `PATH`.
 
-Or build from source:
+Or install with Go (the version reported by `awss --version` will be `dev`):
+
+```bash
+go install github.com/dyegoe/awss@latest
+```
+
+Or build from source, which injects the version from the git tag:
 
 ```bash
 git clone https://github.com/dyegoe/awss.git
@@ -186,6 +193,37 @@ cd awss
 make build
 cp awss /usr/local/bin
 ```
+
+## Requirements
+
+- AWS credentials. awss uses the AWS SDK's standard resolution: named profiles from
+  `~/.aws/config` (`--profiles`), `AWS_PROFILE`, or `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`.
+  SSO profiles work after `aws sso login`.
+- Read-only IAM permissions. awss never modifies anything. The minimum policy is:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity",
+        "ec2:DescribeInstances",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeVpcs",
+        "ec2:DescribeSubnets",
+        "s3:ListAllMyBuckets",
+        "s3:ListBucket"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+`ec2:Describe*` is only needed for the commands you use, and `s3:ListBucket` only for `awss s3obj`.
 
 ## Configuration
 
@@ -198,8 +236,9 @@ regions:
   - us-east-1
 output: table
 show:
-  empty: false
-  tags: false
+  empty: false        # --show-empty
+  tags: false         # --show-tags
+  tags.keys: []       # --show-tags-keys; non-empty implies show.tags
 all-regions:
   - eu-central-1
   - eu-north-1
@@ -222,18 +261,25 @@ ec2:
   sort: name
 eni:
   sort: id
+  no-instance-name: false
 ebs:
   sort: id
+  no-instance-name: false
 vpc:
   sort: name
 subnet:
   sort: name
 s3:
   sort: name
+  regex: false
 s3obj:
   sort: key
+  regex: false
   max-keys: 10000
 ```
+
+Every key mirrors a flag: the flag wins when both are set. `all-regions` is the list
+`--regions all` expands to.
 
 ## Usage
 
@@ -290,7 +336,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and guidelines.
 
 ## License
 
-Apache 2.0
+[Apache 2.0](LICENSE)
 
 ## Dependencies
 
@@ -298,3 +344,5 @@ Apache 2.0
 - [Cobra](https://github.com/spf13/cobra)
 - [Viper](https://github.com/spf13/viper)
 - [Go-Pretty](https://github.com/jedib0t/go-pretty)
+- [ini.v1](https://github.com/go-ini/ini) (reads `~/.aws/config` for `--profiles all`)
+- [golang.org/x/term](https://pkg.go.dev/golang.org/x/term) (terminal width for tables)

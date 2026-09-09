@@ -11,15 +11,15 @@ It defines how Claude should behave, what the project does, and how to work in i
 across multiple profiles and regions. It wraps AWS SDK Go v2 and uses Cobra + Viper for CLI wiring.
 
 **Module:** `github.com/dyegoe/awss`
-**Go version:** 1.19 (go.mod) — target 1.21+ on next upgrade
+**Go version:** see the `go` directive in `go.mod` (currently 1.26); do not hardcode it in docs.
 **Key dependencies:** cobra, viper, aws-sdk-go-v2 (ec2, s3, sts), go-pretty, ini.v1
 
 ### Package layout
 
 ```text
 main.go              — entry point, delegates to cmd.Execute()
-cmd/                 — Cobra CLI commands (root, ec2, eni)
-search/              — orchestrates parallel search across profiles × regions
+cmd/                 — Cobra CLI commands: root (global flags, runSearch/cmdSpec) + one file per resource
+search/              — engine registry (engines map, Options) and the parallel profiles × regions fan-out
 search/ec2/          — EC2-specific search logic and result type
 search/eni/          — ENI-specific search logic and result type
 search/ebs/          — EBS volume search logic and result type
@@ -27,7 +27,8 @@ search/vpc/          — VPC search logic, result type, and IDsByCIDR lookup
 search/subnet/       — Subnet search logic, result type, and IDsByCIDR lookup
 search/s3/           — S3 bucket search (per region, client-side name matching)
 search/s3obj/        — S3 object (key) search inside given buckets, capped by --max-keys
-common/              — shared: interfaces, AWS helpers, output formatting, utilities
+common/              — shared: Results interface, BaseResults, AWS helpers, filter builders,
+                       output formatting, reflection row helpers (rows.go), Matcher (match.go), utilities
 ```
 
 The `common.Results` interface is the central contract. Every resource type implements it.
@@ -70,15 +71,16 @@ Summary of non-negotiable rules:
 - Nil-check all pointer dereferences from AWS SDK responses before use.
 - Max nesting depth: 3 levels. Extract early-return guards or helper functions to reduce nesting.
 - All exported symbols must have a doc comment.
-- `terminalSize` struct must be exported if `TerminalSize()` is exported (or vice versa — keep consistent).
+- Never mutate `Results.Filters` inside `Search()`: the map is shared by every goroutine of a run. Copy it.
 
 ---
 
-## Fix plan
+## Backlog
 
-See `docs/FIXPLAN.md` for the prioritised, ordered list of fixes.
-Work through fixes in priority order: P0 → P1 → P2 → P3.
-After completing each fix, run the verify commands and check off the item in FIXPLAN.md.
+Open improvements live in `docs/BACKLOG.md`; feature requests live in GitHub issues.
+Work on an issue happens on an issue-numbered branch (`<number>-short-title`) and lands through a
+pull request; never commit straight to `main`. When an item is done, remove it from the backlog
+(history lives in `CHANGELOG.md` and git), do not tick it.
 
 ---
 
@@ -104,7 +106,11 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
 
 - Every package must have a `_test.go` file.
 - Use table-driven tests with named cases (`name string` as first field).
-- Mock AWS calls by injecting a function variable (see `getAwsProfiles` in `cmd/root.go` as the pattern).
+- Mock AWS calls one of two ways, never with real credentials:
+  - a package-level function variable that tests replace (`getAwsProfilesFn` in `common/aws.go`,
+    `searchFn` in `search/vpc`, `subnetIDsByCIDR` in `search/ec2`);
+  - the SDK's `*APIClient` interfaces, so a fake client drives the paginator (`search/s3`, `search/s3obj`).
+    Prefer this for new packages: it lets the whole `Search()` body be tested.
 - Test files for output live in `common/output_test.go` — use `output_test_data.go` for fixtures.
 - Do not make real AWS API calls in tests.
 - Target ≥ 80% coverage per package.
@@ -132,12 +138,15 @@ for _, inst := range i.Instances { //nolint:gocritic // rangeValCopy: AWS SDK st
 ```text
 <type>(<scope>): <short description>
 
-Types: fix, feat, refactor, test, docs, chore
-Scope: cmd, search/ec2, search/eni, common, search
+Types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test
+Scope: cmd, common, search, search/<resource> (ec2, eni, ebs, vpc, subnet, s3, s3obj), release
+
+Reference the issue in the body or title, e.g. "(#82)". `feat` bumps the minor version and `fix`
+the patch version on release (release-please), so pick the type by what the user sees.
 
 Examples:
   fix(search/eni): nil-check SubnetId before dereference
   refactor(common): extract BaseResults to eliminate struct duplication
-  feat(search): add Security Group resource type
+  feat(search/sg): add Security Group resource type (#130)
   test(common): add table-driven tests for FilterTags error path
 ```

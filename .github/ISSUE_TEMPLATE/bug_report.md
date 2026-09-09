@@ -1,38 +1,37 @@
 ---
 name: Bug report
-about: Create a report to help us improve
-title: "[BUG]"
+about: Something does not work as documented
+title: "[BUG] "
 labels: bug
 assignees: ''
 
 ---
 
 **Describe the bug**
-A clear and concise description of what the bug is.
+A clear and concise description of what is wrong.
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+**Command**
+The exact command you ran (redact account IDs, bucket names or IPs if needed):
+
+```bash
+awss --regions us-east-1 ec2 --names 'web-*'
+```
+
+**Output**
+What awss printed, including the error message if any:
+
+```text
+
+```
 
 **Expected behavior**
-A clear and concise description of what you expected to happen.
+What you expected to happen instead.
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
-
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
-
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+**Environment**
+- awss version (`awss --version`):
+- OS and architecture (e.g. Linux amd64, macOS arm64):
+- How credentials are provided (named profile, `AWS_PROFILE`, env vars, SSO):
+- Config file in use (`~/.awss/config.yaml`), if relevant:
 
 **Additional context**
-Add any other context about the problem here.
+Anything else that helps, such as whether it worked in a previous version.
