@@ -21,7 +21,23 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/spf13/cobra"
 )
+
+// checkFilterFlags checks that a command's --all exclusivity list has one entry per filter struct
+// field and that every listed flag is registered on the command.
+func checkFilterFlags(t *testing.T, name string, cmd *cobra.Command, numFields int, flags []string) {
+	t.Helper()
+	if numFields != len(flags) {
+		t.Errorf("%sFilters has %d fields but %sFilterFlags lists %d flags", name, numFields, name, len(flags))
+	}
+	for _, flag := range flags {
+		if cmd.Flags().Lookup(flag) == nil {
+			t.Errorf("%sFilterFlags lists %q but the %s command has no such flag", name, flag, name)
+		}
+	}
+}
 
 // Test_initConfig tests the initConfig function.
 func Test_initConfig(t *testing.T) {

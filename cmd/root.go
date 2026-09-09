@@ -48,6 +48,7 @@ const (
 	// flagIDs, flagTags, flagTagsKey, and flagAvailabilityZones name the flags
 	// shared by the ec2, eni, and ebs commands' sort-field lists.
 	flagIDs               = "ids"
+	flagNames             = "names"
 	flagTags              = "tags"
 	flagTagsKey           = "tags-key"
 	flagAvailabilityZones = "availability-zones"
@@ -81,6 +82,7 @@ func Execute() {
 	eniInitFlags()
 	ebsInitFlags()
 	vpcInitFlags()
+	subnetInitFlags()
 
 	if err := initViper(); err != nil {
 		fmt.Println(err)
@@ -103,6 +105,11 @@ func Execute() {
 	}
 
 	if err := vpcInitViper(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	if err := subnetInitViper(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

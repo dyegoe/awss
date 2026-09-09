@@ -7,7 +7,7 @@ It defines how Claude should behave, what the project does, and how to work in i
 
 ## Project overview
 
-**awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs) in parallel
+**awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs, subnets) in parallel
 across multiple profiles and regions. It wraps AWS SDK Go v2 and uses Cobra + Viper for CLI wiring.
 
 **Module:** `github.com/dyegoe/awss`
@@ -24,6 +24,7 @@ search/ec2/          — EC2-specific search logic and result type
 search/eni/          — ENI-specific search logic and result type
 search/ebs/          — EBS volume search logic and result type
 search/vpc/          — VPC search logic, result type, and IDsByCIDR lookup
+search/subnet/       — Subnet search logic, result type, and IDsByCIDR lookup
 common/              — shared: interfaces, AWS helpers, output formatting, utilities
 ```
 

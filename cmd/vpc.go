@@ -78,7 +78,7 @@ This flag cannot be combined with other filters.
 
 // vpcFilterFlags lists all VPC filter flag names for mutual exclusivity with --all.
 var vpcFilterFlags = []string{
-	flagIDs, "names", flagTags, flagTagsKey, flagCIDRs,
+	flagIDs, flagNames, flagTags, flagTagsKey, flagCIDRs,
 	"states", "default", "owner-ids",
 }
 
@@ -99,7 +99,7 @@ func vpcInitFlags() {
 		"Search for all VPCs without any filter. Cannot be combined with other filters.")
 	vpcCmd.Flags().StringSliceVarP(&vpcF.IDs, flagIDs, "i", []string{},
 		"Filter VPCs by IDs. `vpc-1230456078901,vpc-1230456078902`")
-	vpcCmd.Flags().StringSliceVarP(&vpcF.Names, "names", "n", []string{},
+	vpcCmd.Flags().StringSliceVarP(&vpcF.Names, flagNames, "n", []string{},
 		"Filter VPCs by names. It searches using the 'tag:Name'. `vpc-1,vpc-2`")
 	vpcCmd.Flags().StringSliceVarP(&vpcF.Tags, flagTags, "t", []string{},
 		"Filter VPCs by tags. `'Key=Value1:Value2,Environment=Production'`")

@@ -144,7 +144,7 @@ Branch: `78-vpc-search`. Copy the `ebs` package shape (paginator, helpers under 
 
 Branch: `79-subnet-search`. Same shape as step 2.
 
-- [ ] **`search/subnet/subnet.go`**
+- [x] **`search/subnet/subnet.go`**
   - `dataRow`: `SubnetID` (id), `Name` (name), `VpcID` (vpc-id), `CidrBlock` (cidr),
     `AvailabilityZone` (az), `AvailableIPs int32` (available-ips, numeric compare like ebs `Size`),
     `State` (state), `MapPublicIP string` (public-ip), `DefaultForAz string` (default),
@@ -154,14 +154,14 @@ Branch: `79-subnet-search`. Same shape as step 2.
   - `Search`: `NewDescribeSubnetsPaginator`, `parseSubnet`, sort.
   - **Export `IDsByCIDR(ctx, profile, region string, cidrs []string) ([]string, error)`** using
     filter `cidr-block`. Needed by #82.
-- [ ] **`cmd/subnet.go`**
+- [x] **`cmd/subnet.go`**
   - `subnetFilters`: `IDs "subnet-id"`, `Names "tag:Name"`, `Tags`, `TagsKey`,
     `VpcIDs "vpc-id"`, `CIDRs "cidr-block"`, `AvailabilityZones "availability-zone"`,
     `States "state"`, `DefaultForAz "default-for-az"`, `MapPublicIP "map-public-ip-on-launch"`.
   - Flags: `-a -i -n -t -k`, `-V --vpc-ids`, `-c --cidrs`, `-z --availability-zones`,
     `-s --states`, `-d --default-for-az`, `-p --public-ip`, `--sort` (default `name`).
   - `subnetRunE`: `CheckCIDRs`, then `runSearch(..., subnetF.AvailabilityZones, subnetF.Tags, subnetF)`.
-- [ ] **Wire-up, docs, tests**: same checklist as step 2. Extra parse cases: nil
+- [x] **Wire-up, docs, tests**: same checklist as step 2. Extra parse cases: nil
   `AvailableIpAddressCount`, nil `MapPublicIpOnLaunch`, nil `DefaultForAz`.
 
 ---
