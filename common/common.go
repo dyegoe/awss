@@ -75,6 +75,21 @@ func ParseTags(tags []string) (map[string][]string, error) {
 	return m, nil
 }
 
+// CheckCIDRs checks that every value is an IPv4 or IPv6 CIDR such as 10.0.0.0/16.
+//
+// Values containing the wildcard `*` are accepted as they are, because AWS CIDR filters support it.
+func CheckCIDRs(cidrs []string) error {
+	for _, cidr := range cidrs {
+		if strings.Contains(cidr, "*") {
+			continue
+		}
+		if _, _, err := net.ParseCIDR(cidr); err != nil {
+			return fmt.Errorf("invalid CIDR %s: it must be in the form 10.0.0.0/16 (wildcard * is allowed): %w", cidr, err)
+		}
+	}
+	return nil
+}
+
 // StringValue returns an empty string if the pointer is nil.
 func StringValue(s *string) string {
 	if s != nil {
