@@ -308,11 +308,13 @@ func runSearch(
 		viper.GetStringSlice(labelProfiles),
 		viper.GetStringSlice(labelRegions),
 		filters,
-		viper.GetString(sortLabel),
-		viper.GetString(labelOutput),
-		viper.GetBool(labelShowEmpty),
-		viper.GetBool(labelShowTags) || len(tagsKeys) > 0,
-		tagsKeys,
-		noInstanceNameLabel != "" && viper.GetBool(noInstanceNameLabel),
+		search.Options{
+			SortField:      viper.GetString(sortLabel),
+			Output:         viper.GetString(labelOutput),
+			ShowEmpty:      viper.GetBool(labelShowEmpty),
+			ShowTags:       viper.GetBool(labelShowTags) || len(tagsKeys) > 0,
+			TagsKeys:       tagsKeys,
+			NoInstanceName: noInstanceNameLabel != "" && viper.GetBool(noInstanceNameLabel),
+		},
 	)
 }

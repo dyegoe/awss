@@ -84,9 +84,11 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
 1. Create `search/<resource>/` package with a `Results` struct and `New()` + `Search()` functions.
 2. Implement all methods of the `common.Results` interface.
 3. Use struct tags `json`, `header`, `sort` on `dataRow` fields — do not add special-case logic to the output layer.
+   Implement `GetHeaders`, `GetRows`, `GetSortFields` and `sortResults` with the `common.Headers`,
+   `common.Rows`, `common.SortFields` and `common.SortByField` helpers (see `search/ebs/ebs.go`).
 4. Add a `filter` struct in `cmd/<resource>.go` with `filter:""` tags matching AWS API filter names.
 5. Register the command in `cmd/root.go` via `<resource>InitFlags()` and `<resource>InitViper()`.
-6. Add the new command to the `switch` in `search/search.go` and `getSortFieldsCMDList`.
+6. Register the command in the `engines` map in `search/search.go` (constructor + `GetSortFields`).
 7. Wire the `RunE` through `runSearch()` in the command file (see `cmd/ebs.go` as the pattern).
 8. Write tests covering: filter building, result parsing, sort validation, edge cases (nil fields, empty results).
 9. Update `README.md` with the new subcommand, its filters, sort fields, and any additional flags.

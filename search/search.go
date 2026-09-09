@@ -33,17 +33,74 @@ import (
 	searchENI "github.com/dyegoe/awss/search/eni"
 )
 
+// Options carries the settings of a search that are not AWS filters.
+type Options struct {
+	// SortField is the field used to sort each result set.
+	SortField string
+
+	// Output is the output format: table, json or json-pretty.
+	Output string
+
+	// ShowEmpty prints result sets that have no rows.
+	ShowEmpty bool
+
+	// ShowTags shows the Tags column in table output.
+	ShowTags bool
+
+	// TagsKeys, when non-empty, restricts the Tags column of table output to those keys.
+	TagsKeys []string
+
+	// NoInstanceName skips the instance name lookup in searches that enrich rows with it.
+	NoInstanceName bool
+}
+
+// constructor builds the results object of one search for a single profile and region.
+type constructor func(profile, region string, filters map[string][]string, opts Options) common.Results
+
+// engine describes a search command: how to build its results and which sort fields it accepts.
+type engine struct {
+	// new builds the common.Results for one profile and region.
+	new constructor
+
+	// sortFields validates a sort field and returns the sort tag to struct field mapping.
+	sortFields func(string) (map[string]string, error)
+}
+
+// engines is the registry of search commands, keyed by the cobra command name.
+//
+// Adding a resource type means adding one entry here.
+// It is a variable so tests can replace it.
+var engines = map[string]engine{
+	"ec2": {
+		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
+			return searchEC2.New(profile, region, filters, opts.SortField)
+		},
+		sortFields: searchEC2.GetSortFields,
+	},
+	"eni": {
+		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
+			return searchENI.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
+		},
+		sortFields: searchENI.GetSortFields,
+	},
+	"ebs": {
+		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
+			return searchEBS.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
+		},
+		sortFields: searchEBS.GetSortFields,
+	},
+}
+
 // Execute executes the search command.
 //
-// It searches for the given command in the given profiles and regions.
-// The filters are used to filter the results.
-// The output is the format of the output.
-// The showEmpty flag indicates if empty results should be shown.
-// The tagsKeys flag, when non-empty, restricts the Tags column of table output to those keys.
-func Execute(
-	cmd string, profiles, regions []string, filters map[string][]string, sortField, output string,
-	showEmpty, showTags bool, tagsKeys []string, noInstanceName bool,
-) error {
+// It searches for the given command in the given profiles and regions, in parallel.
+// The filters are used to filter the results and opts holds every other setting.
+func Execute(cmd string, profiles, regions []string, filters map[string][]string, opts Options) error {
+	eng, ok := engines[cmd]
+	if !ok {
+		return fmt.Errorf("command %s not found", cmd)
+	}
+
 	ctx := context.Background()
 	wg := sync.WaitGroup{}
 
@@ -53,14 +110,12 @@ func Execute(
 
 	done := make(chan bool)
 
-	go common.PrintResults(os.Stdout, resultsChan, done, output, showEmpty, showTags, tagsKeys)
+	go common.PrintResults(os.Stdout, resultsChan, done, opts.Output, opts.ShowEmpty, opts.ShowTags, opts.TagsKeys)
 
 	runOnce := true
 
 	for _, profile := range profiles {
 		for _, region := range regions {
-			var searchResults common.Results
-
 			// Workaround to avoid to spam Okta with too many requests.
 			// It will run once just to pre-authenticate.
 			if runOnce {
@@ -70,16 +125,7 @@ func Execute(
 				runOnce = false
 			}
 
-			switch cmd {
-			case "ec2":
-				searchResults = searchEC2.New(profile, region, filters, sortField)
-			case "eni":
-				searchResults = searchENI.New(profile, region, filters, sortField, noInstanceName)
-			case "ebs":
-				searchResults = searchEBS.New(profile, region, filters, sortField, noInstanceName)
-			default:
-				return fmt.Errorf("command %s not found", cmd)
-			}
+			searchResults := eng.new(profile, region, filters, opts)
 
 			wg.Add(1)
 
@@ -101,27 +147,16 @@ func Execute(
 	return nil
 }
 
-// getSortFieldsCMDlist is a map of functions that return the sort fields for the given command.
-//
-// The key is the command name.
-// The value is the function that returns the sort fields.
-// We use a map to avoid a switch case and mock the functions in the tests.
-var getSortFieldsCMDList = map[string]func(string) (map[string]string, error){
-	"ec2": searchEC2.GetSortFields,
-	"eni": searchENI.GetSortFields,
-	"ebs": searchEBS.GetSortFields,
-}
-
 // CheckSortField checks if the given sort field is valid for the given command.
 //
-// It returns an error if the sort field is not valid.
+// It returns an error if the command is unknown or the sort field is not valid.
 func CheckSortField(cmd, f string) error {
-	execute, ok := getSortFieldsCMDList[cmd]
+	eng, ok := engines[cmd]
 	if !ok {
 		return fmt.Errorf("command %s not found", cmd)
 	}
 
-	if _, err := execute(f); err != nil {
+	if _, err := eng.sortFields(f); err != nil {
 		return err
 	}
 

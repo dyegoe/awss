@@ -24,60 +24,32 @@ package search
 import (
 	"fmt"
 	"testing"
+
+	"github.com/dyegoe/awss/common"
 )
 
-// // TestExecute tests the Execute function.
-// func TestExecute(t *testing.T) {
-// 	type args struct {
-// 		cmd       string
-// 		profiles  []string
-// 		regions   []string
-// 		filters   map[string][]string
-// 		sortField string
-// 		output    string
-// 		showEmpty bool
-// 		showTags  bool
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		wantErr bool
-// 	}{
-// 		// TODO: Add test cases.
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			err := Execute(
-// 				tt.args.cmd,
-// 				tt.args.profiles,
-// 				tt.args.regions,
-// 				tt.args.filters,
-// 				tt.args.sortField,
-// 				tt.args.output,
-// 				tt.args.showEmpty,
-// 				tt.args.showTags,
-// 			)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
-// 			}
-// 		})
-// 	}
-// }
-
-// TestCheckSortField tests the checkSortField function.
-func TestCheckSortField(t *testing.T) {
-	// save the original function, defer the restore and mock the function
-	oldGetSortFieldsCMDList := getSortFieldsCMDList
-	defer func() { getSortFieldsCMDList = oldGetSortFieldsCMDList }()
-	getSortFieldsCMDList = map[string]func(string) (map[string]string, error){
-		"test": func(f string) (map[string]string, error) {
-			fields := map[string]string{"field1": "value1"}
-			if _, ok := fields[f]; !ok {
-				return nil, fmt.Errorf("field %s not found", f)
-			}
-			return fields, nil
+// mockEngines swaps the registry for a single "test" engine and restores it after the test.
+func mockEngines(t *testing.T, newFn constructor) {
+	t.Helper()
+	old := engines
+	t.Cleanup(func() { engines = old })
+	engines = map[string]engine{
+		"test": {
+			new: newFn,
+			sortFields: func(f string) (map[string]string, error) {
+				fields := map[string]string{"field1": "value1"}
+				if _, ok := fields[f]; !ok {
+					return nil, fmt.Errorf("field %s not found", f)
+				}
+				return fields, nil
+			},
 		},
 	}
+}
+
+// TestCheckSortField tests the CheckSortField function.
+func TestCheckSortField(t *testing.T) {
+	mockEngines(t, nil)
 
 	type args struct {
 		cmd string
@@ -110,5 +82,44 @@ func TestCheckSortField(t *testing.T) {
 				t.Errorf("CheckSortField() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+// TestExecute_unknownCommand checks that an unknown command fails before any profile or region is touched.
+func TestExecute_unknownCommand(t *testing.T) {
+	called := false
+	mockEngines(t, func(_, _ string, _ map[string][]string, _ Options) common.Results {
+		called = true
+		return nil
+	})
+
+	err := Execute("nope", []string{"default"}, []string{"us-east-1"}, map[string][]string{}, Options{Output: common.JSON})
+	if err == nil {
+		t.Fatal("Execute() error = nil, want command not found")
+	}
+	if called {
+		t.Error("Execute() built results for an unknown command")
+	}
+}
+
+// TestEngines_registeredCommands checks every built-in command has both a constructor and sort fields.
+func TestEngines_registeredCommands(t *testing.T) {
+	for _, cmd := range []string{"ec2", "eni", "ebs"} {
+		eng, ok := engines[cmd]
+		if !ok {
+			t.Errorf("engines[%q] missing", cmd)
+			continue
+		}
+		if eng.new == nil || eng.sortFields == nil {
+			t.Errorf("engines[%q] must define both new and sortFields", cmd)
+		}
+		r := eng.new("default", "us-east-1", map[string][]string{}, Options{SortField: "id", NoInstanceName: true})
+		if r == nil {
+			t.Errorf("engines[%q].new returned nil", cmd)
+			continue
+		}
+		if got := r.GetSortField(); got != "id" {
+			t.Errorf("engines[%q].new did not pass SortField through, got %q", cmd, got)
+		}
 	}
 }
