@@ -66,6 +66,7 @@ Use --all to search for all ENIs without any filter. This flag cannot be combine
 
 (You can use the wildcard '*' to search for all values in a filter)
 `,
+	Args: cobra.NoArgs,
 	RunE: eniRunE,
 }
 

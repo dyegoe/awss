@@ -55,11 +55,13 @@ Buckets are listed per region, so use --regions all to search every region.
 You can search buckets by name using glob patterns ('*' matches anything, '?' one character):
 	awss s3 -n 'prod-*,*-logs'
 
-Use --regex to treat the patterns as Go regular expressions instead:
+Use --regex to treat the patterns as Go regular expressions instead. It is a switch, the
+patterns still go in --names:
 	awss s3 -n '^prod-.*-(logs|backups)$' --regex
 
 Use --all to list all buckets without any filter. This flag cannot be combined with --names.
 `,
+	Args: cobra.NoArgs,
 	RunE: s3RunE,
 }
 

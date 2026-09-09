@@ -79,6 +79,7 @@ Use --all to search for all EC2 instances without any filter. This flag cannot b
 
 (You can use the wildcard '*' to search for all values in a filter)
 `,
+	Args: cobra.NoArgs,
 	RunE: ec2RunE,
 }
 

@@ -73,6 +73,7 @@ This flag cannot be combined with other filters.
 
 (You can use the wildcard '*' to search for all values in a filter)
 `,
+	Args: cobra.NoArgs,
 	RunE: vpcRunE,
 }
 

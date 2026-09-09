@@ -60,3 +60,15 @@ func Test_boolLabel(t *testing.T) {
 		t.Error("boolLabel(test.bool) = false, want true")
 	}
 }
+
+// Test_subcommands_rejectPositionalArgs checks a stray argument (e.g. a pattern given to --regex) fails loudly.
+func Test_subcommands_rejectPositionalArgs(t *testing.T) {
+	for _, c := range rootCmd.Commands() {
+		if c.Name() == "completion" || c.Name() == "help" {
+			continue
+		}
+		if err := c.ValidateArgs([]string{"^(prod|stag)-.*"}); err == nil {
+			t.Errorf("command %q accepts positional arguments, want cobra.NoArgs", c.Name())
+		}
+	}
+}
