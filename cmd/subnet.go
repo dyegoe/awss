@@ -84,10 +84,11 @@ func subnetRunE(cmd *cobra.Command, _ []string) error {
 	if err := common.CheckCIDRs(subnetF.CIDRs); err != nil {
 		return err
 	}
-	return runSearch(
-		cmd, labelSubnetAll, labelSubnetSort, "",
-		subnetFilterFlags, subnetF.AvailabilityZones, subnetF.Tags, subnetF,
-	)
+	return runSearch(cmd, &cmdSpec{
+		allLabel:    labelSubnetAll,
+		sortLabel:   labelSubnetSort,
+		filterFlags: subnetFilterFlags,
+	}, subnetF.AvailabilityZones, subnetF.Tags, subnetF)
 }
 
 func subnetInitFlags() {
@@ -120,7 +121,7 @@ func subnetInitFlags() {
 
 func subnetInitViper() error {
 	return bindFlags(subnetCmd, map[string]string{
-		labelSubnetAll:  "all",
-		labelSubnetSort: "sort",
+		labelSubnetAll:  flagAll,
+		labelSubnetSort: flagSort,
 	})
 }

@@ -79,10 +79,12 @@ var ebsFilterFlags = []string{
 }
 
 func ebsRunE(cmd *cobra.Command, _ []string) error {
-	return runSearch(
-		cmd, labelEbsAll, labelEbsSort, labelEbsNoInstanceName,
-		ebsFilterFlags, ebsF.AvailabilityZones, ebsF.Tags, ebsF,
-	)
+	return runSearch(cmd, &cmdSpec{
+		allLabel:            labelEbsAll,
+		sortLabel:           labelEbsSort,
+		noInstanceNameLabel: labelEbsNoInstanceName,
+		filterFlags:         ebsFilterFlags,
+	}, ebsF.AvailabilityZones, ebsF.Tags, ebsF)
 }
 
 func ebsInitFlags() {

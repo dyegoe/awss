@@ -31,6 +31,7 @@ import (
 	searchEBS "github.com/dyegoe/awss/search/ebs"
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
 	searchENI "github.com/dyegoe/awss/search/eni"
+	searchS3 "github.com/dyegoe/awss/search/s3"
 	searchSubnet "github.com/dyegoe/awss/search/subnet"
 	searchVPC "github.com/dyegoe/awss/search/vpc"
 )
@@ -54,6 +55,9 @@ type Options struct {
 
 	// NoInstanceName skips the instance name lookup in searches that enrich rows with it.
 	NoInstanceName bool
+
+	// Regex makes name patterns regular expressions instead of globs, in searches that match names client-side.
+	Regex bool
 }
 
 // constructor builds the results object of one search for a single profile and region.
@@ -110,6 +114,13 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchSubnet.GetSortFields,
 		sortFieldNames: searchSubnet.SortFieldNames,
+	},
+	"s3": {
+		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
+			return searchS3.New(profile, region, filters, opts.SortField, opts.Regex)
+		},
+		sortFields:     searchS3.GetSortFields,
+		sortFieldNames: searchS3.SortFieldNames,
 	},
 }
 

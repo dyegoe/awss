@@ -92,10 +92,11 @@ func ec2RunE(cmd *cobra.Command, _ []string) error {
 	if err := common.CheckCIDRs(ec2F.CIDRs); err != nil {
 		return err
 	}
-	return runSearch(
-		cmd, labelEc2All, labelEc2Sort, "",
-		ec2FilterFlags, ec2F.AvailabilityZones, ec2F.Tags, ec2F,
-	)
+	return runSearch(cmd, &cmdSpec{
+		allLabel:    labelEc2All,
+		sortLabel:   labelEc2Sort,
+		filterFlags: ec2FilterFlags,
+	}, ec2F.AvailabilityZones, ec2F.Tags, ec2F)
 }
 
 func ec2InitFlags() {

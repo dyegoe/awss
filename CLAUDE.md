@@ -7,12 +7,12 @@ It defines how Claude should behave, what the project does, and how to work in i
 
 ## Project overview
 
-**awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs, subnets) in parallel
+**awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs, subnets, S3 buckets) in parallel
 across multiple profiles and regions. It wraps AWS SDK Go v2 and uses Cobra + Viper for CLI wiring.
 
 **Module:** `github.com/dyegoe/awss`
 **Go version:** 1.19 (go.mod) — target 1.21+ on next upgrade
-**Key dependencies:** cobra, viper, aws-sdk-go-v2, go-pretty, ini.v1
+**Key dependencies:** cobra, viper, aws-sdk-go-v2 (ec2, s3, sts), go-pretty, ini.v1
 
 ### Package layout
 
@@ -25,6 +25,7 @@ search/eni/          — ENI-specific search logic and result type
 search/ebs/          — EBS volume search logic and result type
 search/vpc/          — VPC search logic, result type, and IDsByCIDR lookup
 search/subnet/       — Subnet search logic, result type, and IDsByCIDR lookup
+search/s3/           — S3 bucket search (per region, client-side name matching)
 common/              — shared: interfaces, AWS helpers, output formatting, utilities
 ```
 
@@ -92,7 +93,7 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
 4. Add a `filter` struct in `cmd/<resource>.go` with `filter:""` tags matching AWS API filter names.
 5. Register the command in `cmd/root.go` via `<resource>InitFlags()` and `<resource>InitViper()`.
 6. Register the command in the `engines` map in `search/search.go` (constructor + `GetSortFields`).
-7. Wire the `RunE` through `runSearch()` in the command file (see `cmd/ebs.go` as the pattern).
+7. Wire the `RunE` through `runSearch()` with a `cmdSpec` in the command file (see `cmd/ebs.go` as the pattern).
 8. Write tests covering: filter building, result parsing, sort validation, edge cases (nil fields, empty results).
 9. Update `README.md` with the new subcommand, its filters, sort fields, and any additional flags.
 

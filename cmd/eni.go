@@ -70,10 +70,12 @@ Use --all to search for all ENIs without any filter. This flag cannot be combine
 }
 
 func eniRunE(cmd *cobra.Command, _ []string) error {
-	return runSearch(
-		cmd, labelEniAll, labelEniSort, labelEniNoInstanceName,
-		eniFilterFlags, eniF.AvailabilityZones, eniF.Tags, eniF,
-	)
+	return runSearch(cmd, &cmdSpec{
+		allLabel:            labelEniAll,
+		sortLabel:           labelEniSort,
+		noInstanceNameLabel: labelEniNoInstanceName,
+		filterFlags:         eniFilterFlags,
+	}, eniF.AvailabilityZones, eniF.Tags, eniF)
 }
 
 // eniFilterFlags lists all ENI filter flag names for mutual exclusivity with --all.
