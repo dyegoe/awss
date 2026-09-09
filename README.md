@@ -147,6 +147,26 @@ Name matching happens client-side (S3 has no server-side name filter). Globs are
 `prod-*` matches `prod-logs` but not `my-prod-logs`; use `--regex` with `prod-` for a substring match.
 Bucket tags are not shown.
 
+#### S3 objects (`awss s3obj`)
+
+Searches object keys inside given buckets. Each region only scans the buckets that live in it,
+so use `--regions all` when you do not know the bucket's region.
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--buckets` | `-b` | Buckets to scan, exact names. Required |
+| `--keys` | `-K` | Key patterns, globs by default (`logs/2024/*.gz`). Without it every key is listed |
+
+Sort by: `--sort bucket|key|size|modified|class` (default: `key`)
+
+Additional flags:
+
+- `--regex` -- treat `--keys` patterns as Go regular expressions instead of globs
+- `--max-keys` -- stop after scanning this many keys per bucket (default 10000) and report it
+
+In globs `*` also matches `/`. With one pattern, its literal prefix (`logs/2024/` above) is sent
+to S3 so only that part of the bucket is listed.
+
 ### Common behavior
 
 - Filters can be combined: `awss ec2 -n '*' -s running -z a,b`
@@ -210,6 +230,9 @@ subnet:
   sort: name
 s3:
   sort: name
+s3obj:
+  sort: key
+  max-keys: 10000
 ```
 
 ## Usage
@@ -251,6 +274,9 @@ awss --regions all s3 --names 'prod-*'
 
 # Buckets whose name contains "logs" or "backup", as a regular expression
 awss s3 --names 'logs|backup' --regex
+
+# Gzipped logs of January 2024 in a bucket, biggest first
+awss --regions all s3obj -b my-logs -K 'logs/2024-01/*.gz' --sort size
 
 # JSON output for scripting
 awss ec2 --all --output json

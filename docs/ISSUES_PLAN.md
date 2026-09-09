@@ -232,7 +232,7 @@ Decided 2026-09-09: A = two commands (`awss s3`, `awss s3obj`); B = glob by defa
   - Filters map keys: `name` (patterns) only. `--all` returns every bucket in the region.
   - No tags in phase one (`GetBucketTagging` is N+1 and uses a different tag type). Note in README.
   - Pre-auth via `common.WhoAmI` already works (STS, not service-specific).
-- [ ] **5c: `search/s3obj/s3obj.go` (objects)** — only if Decision A = 1
+- [x] **5c: `search/s3obj/s3obj.go` (objects)** — only if Decision A = 1
   - `dataRow`: `Bucket`, `Key` (key), `Size int64` (size, numeric compare), `LastModified`
     (modified, RFC3339), `StorageClass` (class), `ETag`.
   - Requires `--buckets` (exact names, comma list) and `--keys` (patterns). Uses
@@ -244,10 +244,10 @@ Decided 2026-09-09: A = two commands (`awss s3`, `awss s3obj`); B = glob by defa
   search; unit tested (glob, regex, invalid pattern error, prefix derivation).
 - [x] **5e (s3 part): `cmd/s3.go`**: flags `-a --all`, `-n --names`, `--regex`, `--sort`; `regex`
   travels through `search.Options.Regex`; `runSearch` now takes a `cmdSpec`.
-- [ ] **5e (s3obj part): `cmd/s3obj.go`**: adds `-b --buckets`, `-K --keys`, `--max-keys`.
+- [x] **5e (s3obj part): `cmd/s3obj.go`**: adds `-b --buckets`, `-K --keys`, `--max-keys`.
 - [x] **5f (s3 part): wire-up, README, config example (`s3: sort: name`), CLAUDE.md layout.**
-- [ ] **5f (s3obj part): same for `s3obj`.**
-- [ ] **5g: tests**: `matchName` table (glob, regex, prefix derivation), `parseBucket` with nil
+- [x] **5f (s3obj part): same for `s3obj`.**
+- [x] **5g: tests**: `matchName` table (glob, regex, prefix derivation), `parseBucket` with nil
   `CreationDate`/`BucketRegion`, region skip logic, `--buckets` required error, sort numeric on size.
 
 ---

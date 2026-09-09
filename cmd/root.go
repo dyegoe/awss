@@ -86,6 +86,7 @@ func Execute() {
 	vpcInitFlags()
 	subnetInitFlags()
 	s3InitFlags()
+	s3objInitFlags()
 
 	if err := initViper(); err != nil {
 		fmt.Println(err)
@@ -118,6 +119,11 @@ func Execute() {
 	}
 
 	if err := s3InitViper(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	if err := s3objInitViper(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -327,6 +333,9 @@ type cmdSpec struct {
 	// regexLabel is the viper key of --regex, or "" when the command has none.
 	regexLabel string
 
+	// maxKeysLabel is the viper key of --max-keys, or "" when the command has none.
+	maxKeysLabel string
+
 	// filterFlags lists the filter flag names that cannot be combined with --all.
 	filterFlags []string
 }
@@ -334,6 +343,14 @@ type cmdSpec struct {
 // boolLabel returns the viper bool at label, or false when label is empty.
 func boolLabel(label string) bool {
 	return label != "" && viper.GetBool(label)
+}
+
+// intLabel returns the viper int at label, or 0 when label is empty.
+func intLabel(label string) int {
+	if label == "" {
+		return 0
+	}
+	return viper.GetInt(label)
 }
 
 // runSearch is the common RunE body of every search subcommand.
@@ -359,7 +376,7 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 		viper.GetStringSlice(labelProfiles),
 		viper.GetStringSlice(labelRegions),
 		filters,
-		search.Options{
+		&search.Options{
 			SortField:      viper.GetString(spec.sortLabel),
 			Output:         viper.GetString(labelOutput),
 			ShowEmpty:      viper.GetBool(labelShowEmpty),
@@ -367,6 +384,7 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 			TagsKeys:       tagsKeys,
 			NoInstanceName: boolLabel(spec.noInstanceNameLabel),
 			Regex:          boolLabel(spec.regexLabel),
+			MaxKeys:        intLabel(spec.maxKeysLabel),
 		},
 	)
 }
