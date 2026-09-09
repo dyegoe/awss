@@ -97,11 +97,12 @@ var mockResults = &Results{
 		*mockDataRow2,
 	},
 	Filters: map[string][]string{
-		"instance-id":         {"i-1234567890abcdef0", "i-0987654321fedcba9"},
-		"tag:Name":            {"instance-name-1", "instance-name-2"},
-		"tag":                 {"key=value:value3", "key2=value2"},
-		"availability-zone":   {"a", "b"},
-		"instance-state-name": {"running", "stopped"},
+		"instance-id":                    {"i-1234567890abcdef0", "i-0987654321fedcba9"},
+		"tag:Name":                       {"instance-name-1", "instance-name-2"},
+		"tag":                            {"key=value:value3", "key2=value2"},
+		"availability-zone":              {"a", "b"},
+		"instance-state-name":            {"running", "stopped"},
+		"block-device-mapping.volume-id": {"vol-1234567890abcdef0"},
 	},
 }
 
@@ -114,6 +115,7 @@ var mockDataRow1 = &dataRow{
 	PrivateIPAddress:  "172.16.0.1",
 	PublicIPAddress:   "52.53.54.55",
 	NetworkInterfaces: []string{"eni-1234567890abcdef0"},
+	Volumes:           []string{"vol-1234567890abcdef0"},
 	Tags: map[string]string{
 		"Name":        "instance-name-1",
 		"Environment": "test",
@@ -295,7 +297,7 @@ func TestResults_GetHeaders(t *testing.T) {
 		{
 			name:    "TestResults_GetHeaders",
 			results: mockResults,
-			want:    []interface{}{"ID", "Name", "Type", "AZ", "State", "Private IP", "Public IP", "ENIs", "Tags"},
+			want:    []interface{}{"ID", "Name", "Type", "AZ", "State", "Private IP", "Public IP", "ENIs", "Volumes", "Tags"},
 		},
 	}
 	for _, tt := range tests {
@@ -351,6 +353,7 @@ func TestResults_getFilters(t *testing.T) {
 					{Name: common.String("tag:key2"), Values: []string{"value2"}},
 					{Name: common.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b"}},
 					{Name: common.String("instance-state-name"), Values: []string{"running", "stopped"}},
+					{Name: common.String("block-device-mapping.volume-id"), Values: []string{"vol-1234567890abcdef0"}},
 				},
 			},
 		},
@@ -461,5 +464,71 @@ func TestGetSortFields(t *testing.T) {
 				t.Errorf("GetSortFields()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestParseVolumeIDs tests parseVolumeIDs with nil and populated block device mappings.
+func TestParseVolumeIDs(t *testing.T) {
+	tests := []struct {
+		name     string
+		mappings []types.InstanceBlockDeviceMapping
+		want     []string
+	}{
+		{
+			name:     "no mappings returns nil",
+			mappings: nil,
+			want:     nil,
+		},
+		{
+			name: "nil ebs block is skipped",
+			mappings: []types.InstanceBlockDeviceMapping{
+				{DeviceName: common.String("/dev/sda1"), Ebs: nil},
+			},
+			want: nil,
+		},
+		{
+			name: "nil volume id is skipped",
+			mappings: []types.InstanceBlockDeviceMapping{
+				{DeviceName: common.String("/dev/sda1"), Ebs: &types.EbsInstanceBlockDevice{VolumeId: nil}},
+			},
+			want: nil,
+		},
+		{
+			name: "two volumes",
+			mappings: []types.InstanceBlockDeviceMapping{
+				{DeviceName: common.String("/dev/sda1"), Ebs: &types.EbsInstanceBlockDevice{VolumeId: common.String("vol-1")}},
+				{DeviceName: common.String("/dev/sdf"), Ebs: nil},
+				{DeviceName: common.String("/dev/sdg"), Ebs: &types.EbsInstanceBlockDevice{VolumeId: common.String("vol-2")}},
+			},
+			want: []string{"vol-1", "vol-2"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := parseVolumeIDs(tt.mappings); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseVolumeIDs() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestParseInstance_volumes tests that parseInstance fills the Volumes column and tolerates nil fields.
+func TestParseInstance_volumes(t *testing.T) {
+	inst := types.Instance{
+		InstanceId: common.String("i-1"),
+		BlockDeviceMappings: []types.InstanceBlockDeviceMapping{
+			{Ebs: &types.EbsInstanceBlockDevice{VolumeId: common.String("vol-a")}},
+			{Ebs: nil},
+		},
+	}
+	got := parseInstance(&inst)
+	if got.InstanceID != "i-1" {
+		t.Errorf("InstanceID = %q, want %q", got.InstanceID, "i-1")
+	}
+	if !reflect.DeepEqual(got.Volumes, []string{"vol-a"}) {
+		t.Errorf("Volumes = %#v, want %#v", got.Volumes, []string{"vol-a"})
+	}
+	if got.AvailabilityZone != "" || got.InstanceState != "" {
+		t.Errorf("nil Placement/State must yield empty strings, got az=%q state=%q", got.AvailabilityZone, got.InstanceState)
 	}
 }

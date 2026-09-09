@@ -34,8 +34,11 @@ Filter by:
 | `--instance-states` | `-s` | Instance states |
 | `--private-ips` | `-p` | Private IP addresses |
 | `--public-ips` | `-P` | Public IP addresses |
+| `--volume-ids` | `-v` | Attached EBS volume IDs |
 
 Sort by: `--sort id|name|type|az|state|private-ip|public-ip|enis` (default: `name`)
+
+The output also lists the EBS volumes attached to each instance.
 
 #### ENI (`awss eni`)
 
@@ -160,6 +163,9 @@ awss eni --all --no-instance-name
 
 # Search EBS volumes attached to a specific instance
 awss ebs --instance-ids i-1234567890abcdef0
+
+# Find the instance an EBS volume is attached to
+awss ec2 --volume-ids vol-1234567890abcdef0
 
 # JSON output for scripting
 awss ec2 --all --output json
