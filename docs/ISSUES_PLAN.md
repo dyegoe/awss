@@ -220,9 +220,9 @@ so bucket rows and object rows cannot share a package cleanly. Options:
 
 Decided 2026-09-09: A = two commands (`awss s3`, `awss s3obj`); B = glob by default plus `--regex`.
 
-- [ ] **5a: dependency.** `go get github.com/aws/aws-sdk-go-v2/service/s3` (depguard already
+- [x] **5a: dependency.** `go get github.com/aws/aws-sdk-go-v2/service/s3` (depguard already
   allows the `aws-sdk-go-v2/` prefix). Run `go mod tidy`.
-- [ ] **5b: `search/s3/s3.go` (buckets)**
+- [x] **5b: `search/s3/s3.go` (buckets)**
   - `dataRow`: `Name` (name), `Region` (region), `CreationDate string` (created, RFC3339 so
     string sort is chronological), `ARN`.
   - `Search`: `ListBucketsPaginator` with `BucketRegion: r.Region` and `Prefix` set to the
@@ -240,12 +240,13 @@ Decided 2026-09-09: A = two commands (`awss s3`, `awss s3obj`); B = glob by defa
   - Region check: skip a bucket whose `BucketRegion` (from a single `ListBuckets` call) is not
     `r.Region`, so `--regions all` does not list the same bucket 17 times.
   - Add `--max-keys` guard (default e.g. 10000) that appends a warning to `r.Errors` when hit.
-- [ ] **5d: `common.MatchPattern(value string, patterns []string, regex bool) (bool, error)`**
-  with compiled-regex caching; unit tested (glob, regex, invalid regex error).
-- [ ] **5e: `cmd/s3.go`, `cmd/s3obj.go`**: flags `-a --all`, `-n --names`, `--regex`, `--sort`;
-  s3obj adds `-b --buckets`, `-K --keys`, `--max-keys`. Both pass `nil` for AZs.
-  `regex` travels through `search.Options` (0a) or, without 0a, as a filters-map key `regex: ["true"]`.
-- [ ] **5f: wire-up, README, config example (`s3: sort: name`), CLAUDE.md layout.**
+- [x] **5d: `common.NewMatcher(patterns, regex)`** with `Match` and `Prefix`, compiled once per
+  search; unit tested (glob, regex, invalid pattern error, prefix derivation).
+- [x] **5e (s3 part): `cmd/s3.go`**: flags `-a --all`, `-n --names`, `--regex`, `--sort`; `regex`
+  travels through `search.Options.Regex`; `runSearch` now takes a `cmdSpec`.
+- [ ] **5e (s3obj part): `cmd/s3obj.go`**: adds `-b --buckets`, `-K --keys`, `--max-keys`.
+- [x] **5f (s3 part): wire-up, README, config example (`s3: sort: name`), CLAUDE.md layout.**
+- [ ] **5f (s3obj part): same for `s3obj`.**
 - [ ] **5g: tests**: `matchName` table (glob, regex, prefix derivation), `parseBucket` with nil
   `CreationDate`/`BucketRegion`, region skip logic, `--buckets` required error, sort numeric on size.
 

@@ -126,6 +126,27 @@ Filter by:
 
 Sort by: `--sort id|name|vpc-id|cidr|az|available-ips|state|public-ip|default|owner` (default: `name`)
 
+#### S3 buckets (`awss s3`)
+
+Buckets are listed per region, so use `--regions all` to search every region.
+
+Filter by:
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--all` | `-a` | List all buckets (no filters) |
+| `--names` | `-n` | Name patterns, globs by default (`prod-*,*-logs`) |
+
+Sort by: `--sort name|region|created|arn` (default: `name`)
+
+Additional flags:
+
+- `--regex` -- treat `--names` patterns as Go regular expressions instead of globs
+
+Name matching happens client-side (S3 has no server-side name filter). Globs are anchored:
+`prod-*` matches `prod-logs` but not `my-prod-logs`; use `--regex` with `prod-` for a substring match.
+Bucket tags are not shown.
+
 ### Common behavior
 
 - Filters can be combined: `awss ec2 -n '*' -s running -z a,b`
@@ -187,6 +208,8 @@ vpc:
   sort: name
 subnet:
   sort: name
+s3:
+  sort: name
 ```
 
 ## Usage
@@ -222,6 +245,12 @@ awss vpc --cidrs 10.0.0.0/16
 
 # List the subnets of a VPC in two availability zones, fewest free IPs first
 awss subnet --vpc-ids vpc-1234567890abcdef0 -z a,b --sort available-ips
+
+# Buckets named like prod-* in every region
+awss --regions all s3 --names 'prod-*'
+
+# Buckets whose name contains "logs" or "backup", as a regular expression
+awss s3 --names 'logs|backup' --regex
 
 # JSON output for scripting
 awss ec2 --all --output json

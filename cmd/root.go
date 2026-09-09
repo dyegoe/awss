@@ -49,6 +49,8 @@ const (
 	// shared by the ec2, eni, and ebs commands' sort-field lists.
 	flagIDs               = "ids"
 	flagNames             = "names"
+	flagAll               = "all"
+	flagSort              = "sort"
 	flagTags              = "tags"
 	flagTagsKey           = "tags-key"
 	flagAvailabilityZones = "availability-zones"
@@ -83,6 +85,7 @@ func Execute() {
 	ebsInitFlags()
 	vpcInitFlags()
 	subnetInitFlags()
+	s3InitFlags()
 
 	if err := initViper(); err != nil {
 		fmt.Println(err)
@@ -110,6 +113,11 @@ func Execute() {
 	}
 
 	if err := subnetInitViper(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	if err := s3InitViper(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -308,22 +316,36 @@ func buildFilters(
 	return common.StructToFilters(filterStruct)
 }
 
-// runSearch is the common RunE body for ec2, eni, and ebs commands.
+// cmdSpec describes how a subcommand maps its viper keys and flags onto a search.
+type cmdSpec struct {
+	// allLabel and sortLabel are the viper keys of the --all and --sort flags.
+	allLabel, sortLabel string
+
+	// noInstanceNameLabel is the viper key of --no-instance-name, or "" when the command has none.
+	noInstanceNameLabel string
+
+	// regexLabel is the viper key of --regex, or "" when the command has none.
+	regexLabel string
+
+	// filterFlags lists the filter flag names that cannot be combined with --all.
+	filterFlags []string
+}
+
+// boolLabel returns the viper bool at label, or false when label is empty.
+func boolLabel(label string) bool {
+	return label != "" && viper.GetBool(label)
+}
+
+// runSearch is the common RunE body of every search subcommand.
 //
 // It validates the sort field, builds filters, and executes the search.
-func runSearch(
-	cmd *cobra.Command,
-	allLabel, sortLabel, noInstanceNameLabel string,
-	filterFlags []string,
-	azs, tags []string,
-	filterStruct interface{},
-) error {
-	if err := search.CheckSortField(cmd.Name(), viper.GetString(sortLabel)); err != nil {
+func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStruct interface{}) error {
+	if err := search.CheckSortField(cmd.Name(), viper.GetString(spec.sortLabel)); err != nil {
 		return err
 	}
 
 	filters, err := buildFilters(
-		cmd, viper.GetBool(allLabel), filterFlags,
+		cmd, viper.GetBool(spec.allLabel), spec.filterFlags,
 		azs, tags, filterStruct,
 	)
 	if err != nil {
@@ -338,12 +360,13 @@ func runSearch(
 		viper.GetStringSlice(labelRegions),
 		filters,
 		search.Options{
-			SortField:      viper.GetString(sortLabel),
+			SortField:      viper.GetString(spec.sortLabel),
 			Output:         viper.GetString(labelOutput),
 			ShowEmpty:      viper.GetBool(labelShowEmpty),
 			ShowTags:       viper.GetBool(labelShowTags) || len(tagsKeys) > 0,
 			TagsKeys:       tagsKeys,
-			NoInstanceName: noInstanceNameLabel != "" && viper.GetBool(noInstanceNameLabel),
+			NoInstanceName: boolLabel(spec.noInstanceNameLabel),
+			Regex:          boolLabel(spec.regexLabel),
 		},
 	)
 }

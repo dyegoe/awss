@@ -73,6 +73,7 @@ This flag cannot be combined with other filters.
 
 (You can use the wildcard '*' to search for all values in a filter)
 `,
+	Args: cobra.NoArgs,
 	RunE: vpcRunE,
 }
 
@@ -86,10 +87,11 @@ func vpcRunE(cmd *cobra.Command, _ []string) error {
 	if err := common.CheckCIDRs(vpcF.CIDRs); err != nil {
 		return err
 	}
-	return runSearch(
-		cmd, labelVpcAll, labelVpcSort, "",
-		vpcFilterFlags, nil, vpcF.Tags, vpcF,
-	)
+	return runSearch(cmd, &cmdSpec{
+		allLabel:    labelVpcAll,
+		sortLabel:   labelVpcSort,
+		filterFlags: vpcFilterFlags,
+	}, nil, vpcF.Tags, vpcF)
 }
 
 func vpcInitFlags() {
@@ -118,7 +120,7 @@ func vpcInitFlags() {
 
 func vpcInitViper() error {
 	return bindFlags(vpcCmd, map[string]string{
-		labelVpcAll:  "all",
-		labelVpcSort: "sort",
+		labelVpcAll:  flagAll,
+		labelVpcSort: flagSort,
 	})
 }
