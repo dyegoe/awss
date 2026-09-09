@@ -110,7 +110,7 @@ Branch: `72-add-volumes-to-ec2`
 
 Branch: `78-vpc-search`. Copy the `ebs` package shape (paginator, helpers under 60 lines).
 
-- [ ] **`search/vpc/vpc.go`**
+- [x] **`search/vpc/vpc.go`**
   - `Results{common.BaseResults; Data []dataRow; Filters map[string][]string}`.
   - `dataRow` (all with `json`/`header`, sortable ones with `sort`):
     `VpcID` (id), `Name` (name, from tag:Name), `CidrBlock` (cidr), `CidrBlocks []string`
@@ -122,7 +122,7 @@ Branch: `78-vpc-search`. Copy the `ebs` package shape (paginator, helpers under 
   - **Export `IDsByCIDR(ctx, profile, region string, cidrs []string) ([]string, error)`**: runs a
     search with filter `cidr-block-association.cidr-block` (covers primary and secondary blocks)
     and returns the VPC IDs. Needed by #82. Must not import `search/ec2` (cycle).
-- [ ] **`cmd/vpc.go`**
+- [x] **`cmd/vpc.go`**
   - `vpcFilters`: `IDs "vpc-id"`, `Names "tag:Name"`, `Tags "tag"`, `TagsKey "tag-key"`,
     `CIDRs "cidr-block-association.cidr-block"`, `States "state"`, `IsDefault "is-default"`,
     `OwnerIDs "owner-id"`.
@@ -131,10 +131,10 @@ Branch: `78-vpc-search`. Copy the `ebs` package shape (paginator, helpers under 
   - `vpcRunE` validates `vpcF.CIDRs` with `common.CheckCIDRs`, then calls
     `runSearch(cmd, labelVpcAll, labelVpcSort, "", vpcFilterFlags, nil, vpcF.Tags, vpcF)`
     (VPCs have no AZ).
-- [ ] **Wire-up**: `vpcInitFlags()` / `vpcInitViper()` in `cmd/root.go`, `case "vpc"` in
+- [x] **Wire-up**: `vpcInitFlags()` / `vpcInitViper()` in `cmd/root.go`, `case "vpc"` in
   `search.Execute` (or registry from 0a), `"vpc": searchVPC.GetSortFields`.
-- [ ] **Docs**: README section + config example `vpc: sort: name`; CLAUDE.md package layout.
-- [ ] **Tests**: `New`, `getFilters` (ids path, tag path, malformed tag error, default path),
+- [x] **Docs**: README section + config example `vpc: sort: name`; CLAUDE.md package layout.
+- [x] **Tests**: `New`, `getFilters` (ids path, tag path, malformed tag error, default path),
   `parseVpc` with nil `IsDefault`/`OwnerId`/empty association set, `sortResults`, `GetSortFields`
   invalid field message, `IDsByCIDR` with the search function injected via a package var.
 

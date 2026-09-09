@@ -50,7 +50,7 @@ func Test_ec2FilterFlags_coversStruct(t *testing.T) {
 
 // Test_sortHelp_listsEveryField checks the --sort help text of each command names every valid sort field.
 func Test_sortHelp_listsEveryField(t *testing.T) {
-	for _, cmd := range []string{"ec2", "eni", "ebs"} {
+	for _, cmd := range []string{"ec2", "eni", "ebs", "vpc"} {
 		help := sortHelp(cmd, "things", "id")
 		for _, name := range search.SortFieldNames(cmd) {
 			if !strings.Contains(help, name) {

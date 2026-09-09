@@ -31,6 +31,7 @@ import (
 	searchEBS "github.com/dyegoe/awss/search/ebs"
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
 	searchENI "github.com/dyegoe/awss/search/eni"
+	searchVPC "github.com/dyegoe/awss/search/vpc"
 )
 
 // Options carries the settings of a search that are not AWS filters.
@@ -94,6 +95,13 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchEBS.GetSortFields,
 		sortFieldNames: searchEBS.SortFieldNames,
+	},
+	"vpc": {
+		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
+			return searchVPC.New(profile, region, filters, opts.SortField)
+		},
+		sortFields:     searchVPC.GetSortFields,
+		sortFieldNames: searchVPC.SortFieldNames,
 	},
 }
 

@@ -80,6 +80,7 @@ func Execute() {
 	ec2InitFlags()
 	eniInitFlags()
 	ebsInitFlags()
+	vpcInitFlags()
 
 	if err := initViper(); err != nil {
 		fmt.Println(err)
@@ -97,6 +98,11 @@ func Execute() {
 	}
 
 	if err := ebsInitViper(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	if err := vpcInitViper(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -244,6 +250,16 @@ func initConfig(cfg string) error {
 
 	if err := viper.ReadInConfig(); err != nil {
 		return err
+	}
+	return nil
+}
+
+// bindFlags binds the flags of cmd to viper keys. keys maps the viper key to the flag name.
+func bindFlags(cmd *cobra.Command, keys map[string]string) error {
+	for key, flag := range keys {
+		if err := viper.BindPFlag(key, cmd.Flags().Lookup(flag)); err != nil {
+			return fmt.Errorf("error binding flag %s: %w", flag, err)
+		}
 	}
 	return nil
 }
