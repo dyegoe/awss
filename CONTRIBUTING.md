@@ -23,8 +23,9 @@ is open to whoever wants to implement it.
 
 ### Implement Features
 
-Look through the GitHub issues for features. Anything tagged with "feature"
-is open to whoever wants to implement it.
+Look through the GitHub issues for features. Anything tagged with "enhancement"
+is open to whoever wants to implement it. Smaller technical improvements that have no issue yet
+are listed in `docs/BACKLOG.md`.
 
 ### Submit Feedback
 
@@ -61,10 +62,10 @@ Ready to contribute? Here's how to set up `awss` for local development.
     `default_install_hook_types` in `.pre-commit-config.yaml`), so commit messages are validated
     against the Conventional Commits format automatically.
 
-4. Create a branch for local development:
+4. Create a branch for local development, named after the issue when there is one:
 
     ```bash
-    git checkout -b name-of-your-bugfix-or-feature
+    git checkout -b 123-short-description
     ```
 
 5. Make your changes. Before committing, verify everything passes:
@@ -88,9 +89,12 @@ Ready to contribute? Here's how to set up `awss` for local development.
     ```text
     <type>(<scope>): <short description>
 
-    Types: build, bump, chore, ci, docs, feat, fix, perf, refactor, revert, style, test
-    Scope: cmd, search/ec2, search/eni, common, search
+    Types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test
+    Scope: cmd, common, search, search/<resource> (ec2, eni, ebs, vpc, subnet, s3, s3obj)
     ```
+
+    `feat` produces a minor release and `fix` a patch release, so pick the type by what a user
+    would notice, not by how big the diff is.
 
     Example:
 
@@ -111,7 +115,9 @@ Ready to contribute? Here's how to set up `awss` for local development.
 Before you submit a pull request, check that it meets these guidelines:
 
 1. All three verify commands must pass: `make build`, `make test`, `make lint`.
-2. If the pull request adds functionality, update the docs and add tests.
+2. If the pull request adds functionality, update the docs and add tests. A new flag, command,
+   sort field or config key must appear in `README.md`; a new resource type must follow the
+   "Adding new resource types" checklist in `CLAUDE.md`.
 3. New exported symbols must have doc comments (see `docs/CODESTYLE.md`).
 4. Follow the coding conventions described in `docs/CODESTYLE.md`.
 
