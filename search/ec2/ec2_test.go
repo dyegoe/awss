@@ -441,6 +441,7 @@ func TestGetSortFields(t *testing.T) {
 				"private-ip": "PrivateIPAddress",
 				"public-ip":  "PublicIPAddress",
 				"enis":       "NetworkInterfaces",
+				"volumes":    "Volumes",
 			},
 			wantErr: false,
 		},
@@ -530,5 +531,38 @@ func TestParseInstance_volumes(t *testing.T) {
 	}
 	if got.AvailabilityZone != "" || got.InstanceState != "" {
 		t.Errorf("nil Placement/State must yield empty strings, got az=%q state=%q", got.AvailabilityZone, got.InstanceState)
+	}
+}
+
+// TestResults_sortResults_sliceField checks that sorting by a slice column reorders rows.
+func TestResults_sortResults_sliceField(t *testing.T) {
+	r := New("default", "us-east-1", map[string][]string{}, "enis")
+	r.Data = []dataRow{
+		{InstanceID: "i-1", NetworkInterfaces: []string{"eni-zzz"}, Volumes: []string{"vol-b"}},
+		{InstanceID: "i-2", NetworkInterfaces: []string{"eni-aaa"}, Volumes: []string{"vol-d", "vol-c"}},
+		{InstanceID: "i-3", NetworkInterfaces: nil, Volumes: nil},
+	}
+	tests := []struct {
+		name  string
+		field string
+		want  []string
+	}{
+		{name: "enis", field: "enis", want: []string{"i-3", "i-2", "i-1"}},
+		{name: "volumes", field: "volumes", want: []string{"i-3", "i-1", "i-2"}},
+		{name: "id", field: "id", want: []string{"i-1", "i-2", "i-3"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := r.sortResults(tt.field); err != nil {
+				t.Fatalf("sortResults(%q) error = %v", tt.field, err)
+			}
+			got := make([]string, 0, len(r.Data))
+			for i := range r.Data {
+				got = append(got, r.Data[i].InstanceID)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("sortResults(%q) order = %v, want %v", tt.field, got, tt.want)
+			}
+		})
 	}
 }

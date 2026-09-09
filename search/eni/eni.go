@@ -183,31 +183,11 @@ func parseENIRow(eni *types.NetworkInterface) dataRow {
 // Len returns the length of the results.
 func (r *Results) Len() int { return len(r.Data) }
 
-// GetHeaders returns the the tag `header` of the struct fields.
-func (r *Results) GetHeaders() []interface{} {
-	headers := []interface{}{}
+// GetHeaders returns the `header` tag of the dataRow fields.
+func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
 
-	v := reflect.ValueOf(dataRow{})
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Type().Field(i)
-
-		if header, ok := field.Tag.Lookup("header"); ok {
-			headers = append(headers, header)
-		}
-	}
-
-	return headers
-}
-
-// GetRows iterates results.Data and returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} {
-	rows := []interface{}{}
-
-	for _, row := range r.Data { //nolint:gocritic
-		rows = append(rows, row)
-	}
-	return rows
-}
+// GetRows returns the results as a slice of interface{}.
+func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
 
 // getFilters returns the filters used to search.
 //
@@ -237,17 +217,19 @@ func (r *Results) getFilters() (*ec2.DescribeNetworkInterfacesInput, error) {
 	return &input, nil
 }
 
-// sortResults sorts the results by the given field.
+// sortResults sorts the results by the given field of the nested InterfaceInfo struct.
 func (r *Results) sortResults(field string) error {
 	sortFields, err := GetSortFields(field)
 	if err != nil {
 		return err
 	}
 
-	sort.Slice(r.Data, func(p, q int) bool {
-		pInfo := reflect.ValueOf(r.Data[p].InterfaceInfo)
-		qInfo := reflect.ValueOf(r.Data[q].InterfaceInfo)
-		return pInfo.FieldByName(sortFields[field]).String() < qInfo.FieldByName(sortFields[field]).String()
+	name := sortFields[field]
+	sort.SliceStable(r.Data, func(p, q int) bool {
+		return common.Less(
+			reflect.ValueOf(r.Data[p].InterfaceInfo).FieldByName(name),
+			reflect.ValueOf(r.Data[q].InterfaceInfo).FieldByName(name),
+		)
 	})
 	return nil
 }
@@ -257,24 +239,5 @@ func (r *Results) sortResults(field string) error {
 // The sort fields are defined in the struct tag `sort` on eniInfo.
 // The function returns an error if the given field is not a valid sort field.
 func GetSortFields(f string) (map[string]string, error) {
-	sortFields := map[string]string{}
-
-	v := reflect.ValueOf(eniInfo{})
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Type().Field(i)
-
-		if s, ok := field.Tag.Lookup("sort"); ok {
-			sortFields[s] = field.Name
-		}
-	}
-
-	if _, ok := sortFields[f]; !ok {
-		options := make([]string, 0, len(sortFields))
-		for k := range sortFields {
-			options = append(options, k)
-		}
-		sort.Strings(options)
-		return nil, fmt.Errorf("invalid sort field: %s. The options are: %s", f, common.StringSliceToString(options, ", "))
-	}
-	return sortFields, nil
+	return common.SortFields(eniInfo{}, f)
 }

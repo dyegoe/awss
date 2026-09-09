@@ -384,3 +384,41 @@ func TestResults_getFilters(t *testing.T) {
 		})
 	}
 }
+
+// TestResults_sortResults tests sorting on the nested InterfaceInfo fields.
+func TestResults_sortResults(t *testing.T) {
+	r := New("default", "us-east-1", map[string][]string{}, "id", false)
+	r.Data = []dataRow{
+		{InterfaceInfo: eniInfo{NetworkInterfaceID: "eni-b", SubnetID: "subnet-2"}},
+		{InterfaceInfo: eniInfo{NetworkInterfaceID: "eni-a", SubnetID: "subnet-3"}},
+		{InterfaceInfo: eniInfo{NetworkInterfaceID: "eni-c", SubnetID: "subnet-1"}},
+	}
+	tests := []struct {
+		name    string
+		field   string
+		want    []string
+		wantErr bool
+	}{
+		{name: "id", field: "id", want: []string{"eni-a", "eni-b", "eni-c"}},
+		{name: "subnet-id", field: "subnet-id", want: []string{"eni-c", "eni-b", "eni-a"}},
+		{name: "invalid", field: "nope", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := r.sortResults(tt.field)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("sortResults(%q) error = %v, wantErr %v", tt.field, err, tt.wantErr)
+			}
+			if tt.wantErr {
+				return
+			}
+			got := make([]string, 0, len(r.Data))
+			for i := range r.Data {
+				got = append(got, r.Data[i].InterfaceInfo.NetworkInterfaceID)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("sortResults(%q) order = %v, want %v", tt.field, got, tt.want)
+			}
+		})
+	}
+}
