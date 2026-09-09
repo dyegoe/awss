@@ -83,6 +83,24 @@ Additional flags:
 
 - `--no-instance-name` -- skip instance name lookup for faster results
 
+#### VPCs (`awss vpc`)
+
+Filter by:
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--all` | `-a` | Search all VPCs (no filters) |
+| `--ids` | `-i` | VPC IDs |
+| `--names` | `-n` | VPC names (tag:Name) |
+| `--tags` | `-t` | Tags (`Key=Value1:Value2`) |
+| `--tags-key` | `-k` | Tag keys |
+| `--cidrs` | `-c` | Associated IPv4 CIDR blocks, exact match (`10.0.0.0/16`) |
+| `--states` | `-s` | VPC state (`pending`, `available`) |
+| `--default` | `-d` | Default VPC (`true`, `false`) |
+| `--owner-ids` | `-o` | Owner account IDs |
+
+Sort by: `--sort id|name|cidr|cidrs|state|default|owner|dhcp` (default: `name`)
+
 ### Common behavior
 
 - Filters can be combined: `awss ec2 -n '*' -s running -z a,b`
@@ -140,6 +158,8 @@ eni:
   sort: id
 ebs:
   sort: id
+vpc:
+  sort: name
 ```
 
 ## Usage
@@ -166,6 +186,9 @@ awss ebs --instance-ids i-1234567890abcdef0
 
 # Find the instance an EBS volume is attached to
 awss ec2 --volume-ids vol-1234567890abcdef0
+
+# Find the VPC that owns a CIDR block
+awss vpc --cidrs 10.0.0.0/16
 
 # JSON output for scripting
 awss ec2 --all --output json

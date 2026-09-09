@@ -105,7 +105,7 @@ func TestExecute_unknownCommand(t *testing.T) {
 
 // TestEngines_registeredCommands checks every built-in command has both a constructor and sort fields.
 func TestEngines_registeredCommands(t *testing.T) {
-	for _, cmd := range []string{"ec2", "eni", "ebs"} {
+	for _, cmd := range []string{"ec2", "eni", "ebs", "vpc"} {
 		eng, ok := engines[cmd]
 		if !ok {
 			t.Errorf("engines[%q] missing", cmd)
