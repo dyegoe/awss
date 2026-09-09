@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.12.0](https://github.com/dyegoe/awss/compare/v0.11.0...v0.12.0) (2026-09-09)
+
+
+### Features
+
+* **search/ec2:** add --cidrs to search instances by subnet or VPC CIDR ([#82](https://github.com/dyegoe/awss/issues/82)) ([#123](https://github.com/dyegoe/awss/issues/123)) ([c62c571](https://github.com/dyegoe/awss/commit/c62c571495aa59be83e642cec6be28d60d20d9d0))
+* **search/ec2:** show attached volumes and add --volume-ids filter ([#72](https://github.com/dyegoe/awss/issues/72)) ([#117](https://github.com/dyegoe/awss/issues/117)) ([b02b888](https://github.com/dyegoe/awss/commit/b02b888c0a9c99b276d0f7dafbf5e9981c75ba21))
+* **search/s3:** add S3 bucket search command ([#23](https://github.com/dyegoe/awss/issues/23)) ([#124](https://github.com/dyegoe/awss/issues/124)) ([3a202f7](https://github.com/dyegoe/awss/commit/3a202f702734c5c87c71efda507ebf7856087266))
+* **search/s3obj:** add S3 object search command ([#23](https://github.com/dyegoe/awss/issues/23)) ([#125](https://github.com/dyegoe/awss/issues/125)) ([74b38c9](https://github.com/dyegoe/awss/commit/74b38c95ef94bd03c75d54a01954244ca9a59ca3))
+* **search/subnet:** add subnet search command ([#79](https://github.com/dyegoe/awss/issues/79)) ([#122](https://github.com/dyegoe/awss/issues/122)) ([35cad04](https://github.com/dyegoe/awss/commit/35cad0450076e5db5fc24a1dbc6b669778a48dbb))
+* **search/vpc:** add VPC search command ([#78](https://github.com/dyegoe/awss/issues/78)) ([#121](https://github.com/dyegoe/awss/issues/121)) ([fc67b71](https://github.com/dyegoe/awss/commit/fc67b71b2ca82c7101f6243eb1a69ace5efaae8d))
+
 ## [0.11.0](https://github.com/dyegoe/awss/compare/v0.10.0...v0.11.0) (2026-08-28)
 
 
