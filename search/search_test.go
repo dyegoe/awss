@@ -43,6 +43,7 @@ func mockEngines(t *testing.T, newFn constructor) {
 				}
 				return fields, nil
 			},
+			sortFieldNames: func() []string { return []string{"field1"} },
 		},
 	}
 }
@@ -110,8 +111,13 @@ func TestEngines_registeredCommands(t *testing.T) {
 			t.Errorf("engines[%q] missing", cmd)
 			continue
 		}
-		if eng.new == nil || eng.sortFields == nil {
-			t.Errorf("engines[%q] must define both new and sortFields", cmd)
+		if eng.new == nil || eng.sortFields == nil || eng.sortFieldNames == nil {
+			t.Errorf("engines[%q] must define new, sortFields and sortFieldNames", cmd)
+		}
+		for _, name := range eng.sortFieldNames() {
+			if _, err := eng.sortFields(name); err != nil {
+				t.Errorf("engines[%q]: sortFieldNames lists %q but sortFields rejects it: %v", cmd, name, err)
+			}
 		}
 		r := eng.new("default", "us-east-1", map[string][]string{}, Options{SortField: "id", NoInstanceName: true})
 		if r == nil {
@@ -121,5 +127,16 @@ func TestEngines_registeredCommands(t *testing.T) {
 		if got := r.GetSortField(); got != "id" {
 			t.Errorf("engines[%q].new did not pass SortField through, got %q", cmd, got)
 		}
+	}
+}
+
+// TestSortFieldNames tests SortFieldNames for known and unknown commands.
+func TestSortFieldNames(t *testing.T) {
+	mockEngines(t, nil)
+	if got := SortFieldNames("test"); len(got) != 1 || got[0] != "field1" {
+		t.Errorf("SortFieldNames(test) = %v, want [field1]", got)
+	}
+	if got := SortFieldNames("nope"); got != nil {
+		t.Errorf("SortFieldNames(nope) = %v, want nil", got)
 	}
 }

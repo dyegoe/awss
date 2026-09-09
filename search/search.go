@@ -64,6 +64,9 @@ type engine struct {
 
 	// sortFields validates a sort field and returns the sort tag to struct field mapping.
 	sortFields func(string) (map[string]string, error)
+
+	// sortFieldNames returns the valid sort fields, used to build the --sort help text.
+	sortFieldNames func() []string
 }
 
 // engines is the registry of search commands, keyed by the cobra command name.
@@ -75,19 +78,22 @@ var engines = map[string]engine{
 		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
 			return searchEC2.New(profile, region, filters, opts.SortField)
 		},
-		sortFields: searchEC2.GetSortFields,
+		sortFields:     searchEC2.GetSortFields,
+		sortFieldNames: searchEC2.SortFieldNames,
 	},
 	"eni": {
 		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
 			return searchENI.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
 		},
-		sortFields: searchENI.GetSortFields,
+		sortFields:     searchENI.GetSortFields,
+		sortFieldNames: searchENI.SortFieldNames,
 	},
 	"ebs": {
 		new: func(profile, region string, filters map[string][]string, opts Options) common.Results {
 			return searchEBS.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
 		},
-		sortFields: searchEBS.GetSortFields,
+		sortFields:     searchEBS.GetSortFields,
+		sortFieldNames: searchEBS.SortFieldNames,
 	},
 }
 
@@ -161,4 +167,15 @@ func CheckSortField(cmd, f string) error {
 	}
 
 	return nil
+}
+
+// SortFieldNames returns the valid sort fields of the given command, sorted alphabetically.
+//
+// It returns nil for an unknown command. It is used by the cmd package to build --sort help texts.
+func SortFieldNames(cmd string) []string {
+	eng, ok := engines[cmd]
+	if !ok {
+		return nil
+	}
+	return eng.sortFieldNames()
 }

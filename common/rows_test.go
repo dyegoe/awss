@@ -49,6 +49,16 @@ func TestRows(t *testing.T) {
 	}
 }
 
+func TestSortFieldNames(t *testing.T) {
+	want := []string{"count", "id", "items", "size"}
+	if got := SortFieldNames(testRow{}); !reflect.DeepEqual(got, want) {
+		t.Errorf("SortFieldNames() = %v, want %v", got, want)
+	}
+	if got := SortFieldNames(struct{ A string }{}); len(got) != 0 {
+		t.Errorf("SortFieldNames(no tags) = %v, want empty", got)
+	}
+}
+
 func TestSortFields(t *testing.T) {
 	tests := []struct {
 		name    string

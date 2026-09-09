@@ -106,8 +106,7 @@ func ebsInitFlags() {
 		"Filter EBS volumes by attached instance IDs. `i-1230456078901,i-1230456078902`")
 	ebsCmd.Flags().StringSliceVarP(&ebsF.Encrypted, "encrypted", "e", []string{},
 		"Filter EBS volumes by encryption. `true,false`")
-	ebsCmd.Flags().String("sort", "id",
-		"Sort EBS volumes by id, size, type, state, az, encrypted, instance-id, instance-name or device. `id`")
+	ebsCmd.Flags().String("sort", "id", sortHelp("ebs", "EBS volumes", "id"))
 	ebsCmd.Flags().Bool("no-instance-name", false,
 		"Skip the instance name lookup to speed up the EBS volume search.")
 }

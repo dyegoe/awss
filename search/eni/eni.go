@@ -241,3 +241,8 @@ func (r *Results) sortResults(field string) error {
 func GetSortFields(f string) (map[string]string, error) {
 	return common.SortFields(eniInfo{}, f)
 }
+
+// SortFieldNames returns the valid sort fields, sorted alphabetically.
+func SortFieldNames() []string {
+	return common.SortFieldNames(eniInfo{})
+}

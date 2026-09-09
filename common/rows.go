@@ -48,6 +48,23 @@ func Rows[T any](data []T) []interface{} {
 	return rows
 }
 
+// SortFieldNames returns the `sort` struct tags of row's fields, sorted alphabetically.
+//
+// It is used to build help texts that stay in sync with the struct tags.
+func SortFieldNames(row interface{}) []string {
+	names := []string{}
+
+	t := reflect.TypeOf(row)
+	for i := 0; i < t.NumField(); i++ {
+		if s, ok := t.Field(i).Tag.Lookup("sort"); ok {
+			names = append(names, s)
+		}
+	}
+
+	sort.Strings(names)
+	return names
+}
+
 // SortFields returns a map of `sort` struct tag to struct field name for row.
 //
 // row must be a struct value (for example dataRow{}). It returns an error listing the valid
@@ -64,12 +81,8 @@ func SortFields(row interface{}, f string) (map[string]string, error) {
 	}
 
 	if _, ok := sortFields[f]; !ok {
-		options := make([]string, 0, len(sortFields))
-		for k := range sortFields {
-			options = append(options, k)
-		}
-		sort.Strings(options)
-		return nil, fmt.Errorf("invalid sort field: %s. The options are: %s", f, StringSliceToString(options, ", "))
+		options := StringSliceToString(SortFieldNames(row), ", ")
+		return nil, fmt.Errorf("invalid sort field: %s. The options are: %s", f, options)
 	}
 	return sortFields, nil
 }

@@ -18,9 +18,11 @@ package cmd
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dyegoe/awss/common"
+	"github.com/dyegoe/awss/search"
 )
 
 // Test_ec2Filters_volumeIDs checks that --volume-ids maps to the AWS block-device-mapping.volume-id filter.
@@ -43,5 +45,17 @@ func Test_ec2FilterFlags_coversStruct(t *testing.T) {
 	}
 	if !common.StringInSlice("volume-ids", ec2FilterFlags) {
 		t.Errorf("ec2FilterFlags must include volume-ids, got %v", ec2FilterFlags)
+	}
+}
+
+// Test_sortHelp_listsEveryField checks the --sort help text of each command names every valid sort field.
+func Test_sortHelp_listsEveryField(t *testing.T) {
+	for _, cmd := range []string{"ec2", "eni", "ebs"} {
+		help := sortHelp(cmd, "things", "id")
+		for _, name := range search.SortFieldNames(cmd) {
+			if !strings.Contains(help, name) {
+				t.Errorf("sortHelp(%q) = %q does not mention sort field %q", cmd, help, name)
+			}
+		}
 	}
 }

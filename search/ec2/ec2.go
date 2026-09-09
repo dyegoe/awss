@@ -228,6 +228,11 @@ func GetSortFields(f string) (map[string]string, error) {
 	return common.SortFields(dataRow{}, f)
 }
 
+// SortFieldNames returns the valid sort fields, sorted alphabetically.
+func SortFieldNames() []string {
+	return common.SortFieldNames(dataRow{})
+}
+
 // SearchInstanceNames returns a map of instanceID to instance name for all given IDs.
 // It makes a single DescribeInstances API call instead of one per ID.
 func SearchInstanceNames(profile, region string, instanceIDs []string) (map[string]string, error) {
