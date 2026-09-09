@@ -38,13 +38,33 @@ func Test_ec2Filters_volumeIDs(t *testing.T) {
 	}
 }
 
-// Test_ec2FilterFlags_coversStruct checks every ec2Filters field has a flag listed for --all exclusivity.
+// Test_ec2FilterFlags_coversStruct checks every ec2Filters field has a registered flag in the --all list.
 func Test_ec2FilterFlags_coversStruct(t *testing.T) {
-	if n := reflect.TypeOf(ec2Filters{}).NumField(); n != len(ec2FilterFlags) {
-		t.Errorf("ec2Filters has %d fields but ec2FilterFlags lists %d flags", n, len(ec2FilterFlags))
+	if ec2Cmd.Flags().Lookup("all") == nil {
+		ec2InitFlags()
 	}
-	if !common.StringInSlice("volume-ids", ec2FilterFlags) {
-		t.Errorf("ec2FilterFlags must include volume-ids, got %v", ec2FilterFlags)
+	checkFilterFlags(t, "ec2", ec2Cmd, reflect.TypeOf(ec2Filters{}).NumField(), ec2FilterFlags)
+}
+
+// Test_ec2Filters_cidrs checks --cidrs maps to the cidr pseudo-filter key.
+func Test_ec2Filters_cidrs(t *testing.T) {
+	got, err := common.StructToFilters(ec2Filters{CIDRs: []string{"10.0.1.0/24"}})
+	if err != nil {
+		t.Fatalf("StructToFilters() error = %v", err)
+	}
+	if want := map[string][]string{"cidr": {"10.0.1.0/24"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("StructToFilters() = %#v, want %#v", got, want)
+	}
+}
+
+// Test_ec2RunE_invalidCIDR checks that a malformed --cidrs value is rejected before searching.
+func Test_ec2RunE_invalidCIDR(t *testing.T) {
+	old := ec2F
+	t.Cleanup(func() { ec2F = old })
+	ec2F = ec2Filters{CIDRs: []string{"10.0.1.0"}}
+
+	if err := ec2RunE(ec2Cmd, nil); err == nil {
+		t.Error("ec2RunE() error = nil, want invalid CIDR error")
 	}
 }
 

@@ -20,7 +20,10 @@ limitations under the License.
 package ec2
 
 import (
+	"context"
+	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dyegoe/awss/common"
@@ -564,5 +567,166 @@ func TestResults_sortResults_sliceField(t *testing.T) {
 				t.Errorf("sortResults(%q) order = %v, want %v", tt.field, got, tt.want)
 			}
 		})
+	}
+}
+
+// mockCIDRLookups replaces the subnet and VPC lookups for the duration of the test.
+//
+// Each lookup returns the given ids and error. It also records whether each was called.
+func mockCIDRLookups(
+	t *testing.T, subnetIDs []string, subnetErr error, vpcIDs []string, vpcErr error,
+) (called *[2]bool) {
+	t.Helper()
+	oldSubnet, oldVpc := subnetIDsByCIDR, vpcIDsByCIDR
+	t.Cleanup(func() { subnetIDsByCIDR, vpcIDsByCIDR = oldSubnet, oldVpc })
+	called = &[2]bool{}
+	subnetIDsByCIDR = func(_ context.Context, _, _ string, _ []string) ([]string, error) {
+		called[0] = true
+		return subnetIDs, subnetErr
+	}
+	vpcIDsByCIDR = func(_ context.Context, _, _ string, _ []string) ([]string, error) {
+		called[1] = true
+		return vpcIDs, vpcErr
+	}
+	return called
+}
+
+// resolveCIDRCase is one table entry of TestResults_resolveCIDRFilter.
+type resolveCIDRCase struct {
+	name      string
+	filters   map[string][]string
+	subnetIDs []string
+	subnetErr error
+	vpcIDs    []string
+	vpcErr    error
+	want      map[string][]string
+	wantErr   string
+	wantCalls [2]bool
+}
+
+// resolveCIDRCases covers the subnet-then-VPC cascade of resolveCIDRFilter.
+func resolveCIDRCases() []resolveCIDRCase {
+	base := map[string][]string{"cidr": {"10.0.1.0/24"}, "instance-state-name": {"running"}}
+	return []resolveCIDRCase{
+		{
+			name:    "no cidr filter returns filters untouched and calls nothing",
+			filters: map[string][]string{"instance-id": {"i-1"}},
+			want:    map[string][]string{"instance-id": {"i-1"}},
+		},
+		{
+			name:      "subnet match becomes subnet-id",
+			filters:   base,
+			subnetIDs: []string{"subnet-1", "subnet-2"},
+			want:      map[string][]string{"subnet-id": {"subnet-1", "subnet-2"}, "instance-state-name": {"running"}},
+			wantCalls: [2]bool{true, false},
+		},
+		{
+			name:      "no subnet but vpc match becomes vpc-id",
+			filters:   base,
+			subnetIDs: []string{},
+			vpcIDs:    []string{"vpc-1"},
+			want:      map[string][]string{"vpc-id": {"vpc-1"}, "instance-state-name": {"running"}},
+			wantCalls: [2]bool{true, true},
+		},
+		{
+			name:      "no subnet and no vpc is an error",
+			filters:   base,
+			subnetIDs: []string{},
+			vpcIDs:    []string{},
+			wantErr:   "no subnet or VPC found for CIDR 10.0.1.0/24 in us-east-1",
+			wantCalls: [2]bool{true, true},
+		},
+		{
+			name:      "subnet lookup error stops before vpc lookup",
+			filters:   base,
+			subnetErr: errors.New("boom"),
+			wantErr:   "resolving CIDR filter: boom",
+			wantCalls: [2]bool{true, false},
+		},
+		{
+			name:      "vpc lookup error is returned",
+			filters:   base,
+			subnetIDs: []string{},
+			vpcErr:    errors.New("boom"),
+			wantErr:   "resolving CIDR filter: boom",
+			wantCalls: [2]bool{true, true},
+		},
+	}
+}
+
+// TestResults_resolveCIDRFilter tests the subnet-then-VPC cascade and the untouched shared filters map.
+func TestResults_resolveCIDRFilter(t *testing.T) {
+	for _, tt := range resolveCIDRCases() {
+		t.Run(tt.name, func(t *testing.T) {
+			called := mockCIDRLookups(t, tt.subnetIDs, tt.subnetErr, tt.vpcIDs, tt.vpcErr)
+			original := map[string][]string{}
+			for k, v := range tt.filters {
+				original[k] = append([]string(nil), v...)
+			}
+			r := New("default", "us-east-1", tt.filters, "id")
+
+			got, err := r.resolveCIDRFilter(context.Background())
+			if *called != tt.wantCalls {
+				t.Errorf("lookups called (subnet, vpc) = %v, want %v", *called, tt.wantCalls)
+			}
+			if !reflect.DeepEqual(r.Filters, original) {
+				t.Errorf("resolveCIDRFilter() mutated the shared filters: %v, want %v", r.Filters, original)
+			}
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Fatalf("resolveCIDRFilter() error = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("resolveCIDRFilter() unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("resolveCIDRFilter() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestResults_Search_cidrNoMatch checks Search records the error and makes no AWS call when no CIDR matches.
+func TestResults_Search_cidrNoMatch(t *testing.T) {
+	mockCIDRLookups(t, []string{}, nil, []string{}, nil)
+	r := New("default", "us-east-1", map[string][]string{"cidr": {"10.9.0.0/16"}}, "id")
+
+	r.Search(context.Background())
+
+	if len(r.Data) != 0 {
+		t.Errorf("Search() Data = %v, want empty", r.Data)
+	}
+	want := "no subnet or VPC found for CIDR 10.9.0.0/16 in us-east-1"
+	if len(r.Errors) != 1 || r.Errors[0] != want {
+		t.Errorf("Search() Errors = %v, want [%q]", r.Errors, want)
+	}
+}
+
+// TestFiltersToInput_rejectsRawCIDR checks an unresolved cidr key can never reach AWS as a filter name.
+func TestFiltersToInput_rejectsRawCIDR(t *testing.T) {
+	_, err := filtersToInput(map[string][]string{"cidr": {"10.0.1.0/24"}}, "us-east-1")
+	if err == nil {
+		t.Fatal("filtersToInput() error = nil, want error for unresolved cidr filter")
+	}
+	if !strings.Contains(err.Error(), "must be resolved") {
+		t.Errorf("filtersToInput() error = %v, want mention of resolution", err)
+	}
+}
+
+// TestFiltersToInput_subnetAndVpc checks the resolved keys pass through as AWS filters.
+func TestFiltersToInput_subnetAndVpc(t *testing.T) {
+	input, err := filtersToInput(map[string][]string{"subnet-id": {"subnet-1"}, "vpc-id": {"vpc-1"}}, "us-east-1")
+	if err != nil {
+		t.Fatalf("filtersToInput() error = %v", err)
+	}
+	got := map[string][]string{}
+	for _, f := range input.Filters {
+		got[*f.Name] = f.Values
+	}
+	want := map[string][]string{"subnet-id": {"subnet-1"}, "vpc-id": {"vpc-1"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("filtersToInput() filters = %v, want %v", got, want)
 	}
 }
