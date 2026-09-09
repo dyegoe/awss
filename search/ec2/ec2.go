@@ -71,6 +71,9 @@ type dataRow struct {
 	// NetworkInterfaces are the ENIs attached to the instance.
 	NetworkInterfaces []string `json:"enis,omitempty" header:"ENIs" sort:"enis"`
 
+	// Volumes are the EBS volume IDs attached to the instance.
+	Volumes []string `json:"volumes,omitempty" header:"Volumes"`
+
 	// Tags are a map of the tags assigned to the instance.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
 }
@@ -132,6 +135,7 @@ func parseInstance(inst *types.Instance) dataRow {
 	for _, eni := range inst.NetworkInterfaces { //nolint:gocritic
 		enis = append(enis, common.StringValue(eni.NetworkInterfaceId))
 	}
+	volumes := parseVolumeIDs(inst.BlockDeviceMappings)
 	var az string
 	if inst.Placement != nil {
 		az = common.StringValue(inst.Placement.AvailabilityZone)
@@ -149,8 +153,24 @@ func parseInstance(inst *types.Instance) dataRow {
 		PrivateIPAddress:  common.StringValue(inst.PrivateIpAddress),
 		PublicIPAddress:   common.StringValue(inst.PublicIpAddress),
 		NetworkInterfaces: enis,
+		Volumes:           volumes,
 		Tags:              common.TagsToMap(inst.Tags),
 	}
+}
+
+// parseVolumeIDs returns the EBS volume IDs from the instance block device mappings.
+//
+// Mappings without an EBS block or without a volume ID are skipped.
+// It returns nil when no volume is attached so the JSON output omits the field.
+func parseVolumeIDs(mappings []types.InstanceBlockDeviceMapping) []string {
+	var volumes []string
+	for _, m := range mappings {
+		if m.Ebs == nil || m.Ebs.VolumeId == nil {
+			continue
+		}
+		volumes = append(volumes, *m.Ebs.VolumeId)
+	}
+	return volumes
 }
 
 // Len returns the length of the results.

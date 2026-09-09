@@ -47,6 +47,7 @@ type ec2Filters struct {
 	AvailabilityZones []string `filter:"availability-zone"`
 	PrivateIPs        []net.IP `filter:"network-interface.addresses.private-ip-address"`
 	PublicIPs         []net.IP `filter:"network-interface.addresses.association.public-ip"`
+	VolumeIDs         []string `filter:"block-device-mapping.volume-id"`
 }
 
 var ec2F = ec2Filters{}
@@ -58,7 +59,7 @@ var ec2Cmd = &cobra.Command{
 	Long: `
 Search for EC2 instances.
 You can search EC2 instances using the following filters:
-  ids, names, tags, instance-types, availability-zones, instance-states, private-ips and public-ips.
+  ids, names, tags, instance-types, availability-zones, instance-states, private-ips, public-ips and volume-ids.
 You can use multiple values for each filter, separated by comma. Example: --names 'Name1,Name2'
 
 You can use multiple filters at same time, for example:
@@ -74,7 +75,7 @@ Use --all to search for all EC2 instances without any filter. This flag cannot b
 // ec2FilterFlags lists all EC2 filter flag names for mutual exclusivity with --all.
 var ec2FilterFlags = []string{
 	flagIDs, "names", flagTags, flagTagsKey, "instance-types",
-	flagAvailabilityZones, "instance-states", "private-ips", "public-ips",
+	flagAvailabilityZones, "instance-states", "private-ips", "public-ips", "volume-ids",
 }
 
 func ec2RunE(cmd *cobra.Command, _ []string) error {
@@ -107,6 +108,8 @@ func ec2InitFlags() {
 		"Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
 	ec2Cmd.Flags().IPSliceVarP(&ec2F.PublicIPs, "public-ips", "P", []net.IP{},
 		"Filter EC2 instances by public IPs. `52.28.19.20,52.30.31.32`")
+	ec2Cmd.Flags().StringSliceVarP(&ec2F.VolumeIDs, "volume-ids", "v", []string{},
+		"Filter EC2 instances by attached EBS volume IDs. `vol-1230456078901,vol-1230456078902`")
 	ec2Cmd.Flags().String("sort", "name",
 		"Sort EC2 instances by id, name, type, az, state, private-ip or public-ip. `name`")
 }
