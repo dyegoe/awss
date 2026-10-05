@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -492,6 +493,34 @@ func Test_sortedStringSliceToString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := sortedStringSliceToString(tt.args.s); got != tt.want {
 				t.Errorf("sortedStringSliceToString()\n%#v\nwant\n%#v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Test_printers_failedEmptyResults checks that an empty result set carrying errors
+// is printed by every format even when showEmpty is false, so failures stay visible.
+func Test_printers_failedEmptyResults(t *testing.T) {
+	failed := &testResults{
+		Profile: "bad",
+		Region:  "r1",
+		Errors:  []string{"api error InvalidClientTokenId"},
+	}
+	tests := []struct {
+		name    string
+		printer func(Results, bool, bool, []string) string
+	}{
+		{name: "json", printer: toJSON},
+		{name: "json-pretty", printer: toJSONPretty},
+		{name: "table", printer: toTable},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.printer(failed, false, false, nil)
+			for _, want := range []string{"bad", "r1", "InvalidClientTokenId"} {
+				if !strings.Contains(got, want) {
+					t.Errorf("%s output = %q, want it to contain %q", tt.name, got, want)
+				}
 			}
 		})
 	}
