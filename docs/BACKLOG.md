@@ -40,12 +40,11 @@ Coverage per package as of 2026-09-09 (`go test -cover ./...`):
 | `search/ebs`    |    42.9% | `Search()`, `collectVolumeRows`, `enrichInstanceNames`       |
 | `cmd`           |    40.1% | `Execute`, `persistentPreRun`, `runSearch` happy path        |
 | `search/eni`    |    37.5% | `Search()` and the instance-name enrichment                  |
-| `search`        |    18.3% | `Execute` fan-out                                            |
+| `search`        |   100.0% | —                                                            |
 
 - [ ] **Inject the EC2 client** the way `search/s3` and `search/s3obj` do (the SDK's
   `Describe*APIClient` interfaces), so the `Search()` bodies of ec2, eni, ebs, vpc and subnet
   can be tested with a fake and every search package reaches the 80% target.
-- [ ] **`search.Execute`**: test the fan-out with a mocked engine and a mocked `WhoAmI`.
 - [ ] **`cmd`**: drive `rootCmd` with `ExecuteC()` in tests and capture stdout.
 - [ ] **Race check in CI**: `go test -race ./...` passes locally; add it to
   `.github/workflows/common.yml`.

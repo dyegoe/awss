@@ -24,6 +24,7 @@ package search
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 
@@ -156,19 +157,12 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 
 	go common.PrintResults(os.Stdout, resultsChan, done, opts.Output, opts.ShowEmpty, opts.ShowTags, opts.TagsKeys)
 
-	runOnce := true
+	if len(profiles) > 0 && len(regions) > 0 {
+		preAuthenticate(profiles[0], regions[0])
+	}
 
 	for _, profile := range profiles {
 		for _, region := range regions {
-			// Workaround to avoid to spam Okta with too many requests.
-			// It will run once just to pre-authenticate.
-			if runOnce {
-				if _, err := common.WhoAmI(profile, region); err != nil {
-					return err
-				}
-				runOnce = false
-			}
-
 			searchResults := eng.new(profile, region, filters, opts)
 
 			wg.Add(1)
@@ -189,6 +183,24 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 	close(done)
 
 	return nil
+}
+
+// whoAmIFn wraps common.WhoAmI so tests can replace the STS call.
+var whoAmIFn = common.WhoAmI
+
+// warnings is where non-fatal problems are reported. It is a variable so tests can capture it.
+var warnings io.Writer = os.Stderr
+
+// preAuthenticate calls STS once with the first profile and region before the parallel fan-out,
+// so a login flow (e.g. Okta) is triggered once instead of by every goroutine at the same time.
+//
+// A failure is only a warning: the searches still run, and each failing profile and region
+// reports its own error in its result set. One bad profile must not stop the whole run.
+func preAuthenticate(profile, region string) {
+	if _, err := whoAmIFn(profile, region); err != nil {
+		fmt.Fprintf(warnings, "warning: pre-authentication with profile %q in region %s failed, continuing: %v\n",
+			profile, region, err)
+	}
 }
 
 // CheckSortField checks if the given sort field is valid for the given command.
