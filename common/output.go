@@ -99,6 +99,13 @@ func toBold(s string) string {
 	return fmt.Sprintf("\033[1m%s\033[0m", s)
 }
 
+// hidden reports whether a result set is left out of the output: it has no rows,
+// no errors, and showEmpty is false. A failed search always prints, so a broken
+// profile or region never disappears silently.
+func hidden(r Results, showEmpty bool) bool {
+	return r.Len() == 0 && len(r.GetErrors()) == 0 && !showEmpty
+}
+
 // toJSON returns the results in JSON format.
 //
 // showEmpty indicates if empty results should be shown.
@@ -109,7 +116,7 @@ func toJSON(r Results, showEmpty, showTags bool, tagsKeys []string) string {
 	if err != nil {
 		return ""
 	}
-	if r.Len() == 0 && !showEmpty {
+	if hidden(r, showEmpty) {
 		return ""
 	}
 	return string(b)
@@ -125,7 +132,7 @@ func toJSONPretty(r Results, showEmpty, showTags bool, tagsKeys []string) string
 	if err != nil {
 		return ""
 	}
-	if r.Len() == 0 && !showEmpty {
+	if hidden(r, showEmpty) {
 		return ""
 	}
 	return string(b)
@@ -137,7 +144,7 @@ func toJSONPretty(r Results, showEmpty, showTags bool, tagsKeys []string) string
 // showTags indicates if the tags should be shown.
 // tagsKeys, when non-empty, restricts the Tags column to those keys.
 func toTable(r Results, showEmpty, showTags bool, tagsKeys []string) string {
-	if r.Len() == 0 && !showEmpty {
+	if hidden(r, showEmpty) {
 		return ""
 	}
 

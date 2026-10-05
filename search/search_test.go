@@ -22,7 +22,12 @@ limitations under the License.
 package search
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"fmt"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/dyegoe/awss/common"
@@ -139,5 +144,102 @@ func TestSortFieldNames(t *testing.T) {
 	}
 	if got := SortFieldNames("nope"); got != nil {
 		t.Errorf("SortFieldNames(nope) = %v, want nil", got)
+	}
+}
+
+// fakeResults is an empty, error-free result set, so Execute prints nothing for it.
+type fakeResults struct{ common.BaseResults }
+
+func (f *fakeResults) Search(_ context.Context)  {}
+func (f *fakeResults) Len() int                  { return 0 }
+func (f *fakeResults) GetHeaders() []interface{} { return nil }
+func (f *fakeResults) GetRows() []interface{}    { return nil }
+
+// mockCountingEngine registers a "test" engine returning fakeResults and counts how many it built.
+func mockCountingEngine(t *testing.T) *int {
+	t.Helper()
+	var mu sync.Mutex
+	calls := 0
+	mockEngines(t, func(profile, region string, _ map[string][]string, _ *Options) common.Results {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		return &fakeResults{common.BaseResults{Profile: profile, Region: region}}
+	})
+	return &calls
+}
+
+// mockPreAuth replaces the STS call with one returning err and captures the warnings.
+// It returns the number of STS calls made and the warnings buffer.
+func mockPreAuth(t *testing.T, err error) (*int, *bytes.Buffer) {
+	t.Helper()
+	oldWhoAmI, oldWarnings := whoAmIFn, warnings
+	t.Cleanup(func() { whoAmIFn, warnings = oldWhoAmI, oldWarnings })
+	calls := 0
+	whoAmIFn = func(_, _ string) (string, error) {
+		calls++
+		return "", err
+	}
+	buf := &bytes.Buffer{}
+	warnings = buf
+	return &calls, buf
+}
+
+// TestExecute_preAuth checks that a failing pre-authentication is a warning naming the
+// profile and region, and that every profile x region is still searched.
+func TestExecute_preAuth(t *testing.T) {
+	tests := []struct {
+		name        string
+		whoAmIErr   error
+		profiles    []string
+		regions     []string
+		wantWarning []string
+		wantCalls   int
+	}{
+		{
+			name:        "first profile fails, the run continues",
+			whoAmIErr:   errors.New("api error InvalidClientTokenId"),
+			profiles:    []string{"default", "good-1", "good-2"},
+			regions:     []string{"us-east-1", "eu-west-1"},
+			wantWarning: []string{`"default"`, "us-east-1", "InvalidClientTokenId"},
+			wantCalls:   6,
+		},
+		{
+			name:      "pre-auth succeeds, no warning",
+			profiles:  []string{"p1"},
+			regions:   []string{"us-east-1"},
+			wantCalls: 1,
+		},
+		{
+			name:      "no profiles, no pre-auth and no searches",
+			profiles:  []string{},
+			regions:   []string{"us-east-1"},
+			wantCalls: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := mockCountingEngine(t)
+			preAuthCalls, buf := mockPreAuth(t, tt.whoAmIErr)
+
+			opts := &Options{Output: common.JSON}
+			if err := Execute("test", tt.profiles, tt.regions, map[string][]string{}, opts); err != nil {
+				t.Fatalf("Execute() error = %v, want nil", err)
+			}
+			if *calls != tt.wantCalls {
+				t.Errorf("searches built = %d, want %d", *calls, tt.wantCalls)
+			}
+			if wantPreAuth := min(tt.wantCalls, 1); *preAuthCalls != wantPreAuth {
+				t.Errorf("pre-auth calls = %d, want %d", *preAuthCalls, wantPreAuth)
+			}
+			if len(tt.wantWarning) == 0 && buf.Len() > 0 {
+				t.Errorf("unexpected warning: %q", buf.String())
+			}
+			for _, want := range tt.wantWarning {
+				if !strings.Contains(buf.String(), want) {
+					t.Errorf("warning = %q, want it to contain %q", buf.String(), want)
+				}
+			}
+		})
 	}
 }
