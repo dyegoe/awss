@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.13.0](https://github.com/dyegoe/awss/compare/v0.12.0...v0.13.0) (2026-10-05)
+
+
+### Features
+
+* **cmd:** add all-profiles config key to scope --profiles all ([#131](https://github.com/dyegoe/awss/issues/131)) ([#133](https://github.com/dyegoe/awss/issues/133)) ([0b2fc4a](https://github.com/dyegoe/awss/commit/0b2fc4a23ae13f98533a8f6e37d0ad2d56096cad))
+
+
+### Bug Fixes
+
+* **search:** do not abort the run when pre-authentication fails ([#130](https://github.com/dyegoe/awss/issues/130)) ([#132](https://github.com/dyegoe/awss/issues/132)) ([b11ed22](https://github.com/dyegoe/awss/commit/b11ed224121a750be64fe3b6342f78930069afb2))
+
 ## [0.12.0](https://github.com/dyegoe/awss/compare/v0.11.0...v0.12.0) (2026-09-09)
 
 
