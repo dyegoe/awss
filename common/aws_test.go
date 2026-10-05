@@ -115,58 +115,69 @@ func TestGetAwsProfiles(t *testing.T) {
 	}
 }
 
-// Test_CheckProfiles tests the CheckProfiles function.
-func Test_CheckProfiles(t *testing.T) {
-	// save the original variable, defer the restore and mock the variable
-	oldGetAwsProfilesFn := getAwsProfilesFn
-	defer func() { getAwsProfilesFn = oldGetAwsProfilesFn }()
+// mockAwsProfiles makes ~/.aws/config contain the default and profile1 profiles for one test.
+func mockAwsProfiles(t *testing.T) {
+	t.Helper()
+	old := getAwsProfilesFn
+	t.Cleanup(func() { getAwsProfilesFn = old })
 	getAwsProfilesFn = func() ([]string, error) {
 		return []string{"default", "profile1"}, nil
 	}
+}
 
-	type args struct {
-		profiles []string
-	}
+// Test_CheckProfiles tests the CheckProfiles function without an all-profiles list.
+func Test_CheckProfiles(t *testing.T) {
+	mockAwsProfiles(t)
+
 	tests := []struct {
-		name    string
-		args    args
-		want    []string
-		wantErr bool
+		name     string
+		profiles []string
+		want     []string
+		wantErr  bool
 	}{
-		{
-			name:    "empty",
-			args:    args{profiles: []string{}},
-			want:    []string{""},
-			wantErr: false,
-		},
-		{
-			name:    "all",
-			args:    args{profiles: []string{"all"}},
-			want:    []string{"default", "profile1"},
-			wantErr: false,
-		},
-		{
-			name:    "default",
-			args:    args{profiles: []string{"default"}},
-			want:    []string{"default"},
-			wantErr: false,
-		},
-		{
-			name:    "default,profile1",
-			args:    args{profiles: []string{"default", "profile1"}},
-			want:    []string{"default", "profile1"},
-			wantErr: false,
-		},
-		{
-			name:    "default,profile1,profile2",
-			args:    args{profiles: []string{"default", "profile1", "profile2"}},
-			want:    nil,
-			wantErr: true,
-		},
+		{name: "empty", profiles: []string{}, want: []string{""}},
+		{name: "all falls back to ~/.aws/config", profiles: []string{"all"}, want: []string{"default", "profile1"}},
+		{name: "default", profiles: []string{"default"}, want: []string{"default"}},
+		{name: "default,profile1", profiles: []string{"default", "profile1"}, want: []string{"default", "profile1"}},
+		{name: "default,profile1,profile2", profiles: []string{"default", "profile1", "profile2"}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := CheckProfiles(tt.args.profiles)
+			got, err := CheckProfiles(tt.profiles, nil)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CheckProfiles() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CheckProfiles()\n%#v\nwant\n%#v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Test_CheckProfiles_allProfiles tests how the all-profiles list of the awss config changes `all`.
+func Test_CheckProfiles_allProfiles(t *testing.T) {
+	mockAwsProfiles(t)
+
+	tests := []struct {
+		name        string
+		profiles    []string
+		allProfiles []string
+		want        []string
+		wantErr     bool
+	}{
+		{name: "all uses all-profiles", profiles: []string{"all"}, allProfiles: []string{"profile1"},
+			want: []string{"profile1"}},
+		{name: "unknown all-profiles entry", profiles: []string{"all"}, allProfiles: []string{"profile1", "typo"},
+			wantErr: true},
+		{name: "ignored without all", profiles: []string{"default"}, allProfiles: []string{"profile1"},
+			want: []string{"default"}},
+		{name: "ignored without profiles", profiles: []string{}, allProfiles: []string{"profile1"},
+			want: []string{""}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CheckProfiles(tt.profiles, tt.allProfiles)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CheckProfiles() error = %v, wantErr %v", err, tt.wantErr)
 				return

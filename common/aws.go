@@ -190,10 +190,11 @@ var getAwsProfilesFn = GetAwsProfiles
 // AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars, or the `default` profile.
 // This is intentionally not validated against ~/.aws/config, since that file
 // may not exist when credentials come purely from the environment.
-// If the user passes the `all` profile, it will return all the profiles.
+// If the user passes the `all` profile, it returns allProfiles (the `all-profiles`
+// list of the awss config) when it is not empty, or else every profile in ~/.aws/config.
 // If the user passes a list of profiles, it will check if they are valid and return them.
-// It compares the profiles passed by the user with the profiles found in the config file.
-func CheckProfiles(profiles []string) ([]string, error) {
+// Every returned profile, including the allProfiles list, must exist in ~/.aws/config.
+func CheckProfiles(profiles, allProfiles []string) ([]string, error) {
 	if len(profiles) == 0 {
 		return []string{""}, nil
 	}
@@ -204,15 +205,29 @@ func CheckProfiles(profiles []string) ([]string, error) {
 	}
 
 	if len(profiles) == 1 && profiles[0] == "all" {
-		return awsProfiles, nil
+		if len(allProfiles) == 0 {
+			return awsProfiles, nil
+		}
+		if err := profilesExist(allProfiles, awsProfiles); err != nil {
+			return nil, fmt.Errorf("checking all-profiles: %w", err)
+		}
+		return allProfiles, nil
 	}
 
-	for _, profile := range profiles {
-		if !StringInSlice(profile, awsProfiles) {
-			return nil, fmt.Errorf("profile %s not found", profile)
-		}
+	if err := profilesExist(profiles, awsProfiles); err != nil {
+		return nil, err
 	}
 	return profiles, nil
+}
+
+// profilesExist returns an error naming the first profile that is not in awsProfiles.
+func profilesExist(profiles, awsProfiles []string) error {
+	for _, profile := range profiles {
+		if !StringInSlice(profile, awsProfiles) {
+			return fmt.Errorf("profile %s not found", profile)
+		}
+	}
+	return nil
 }
 
 // getAwsRegionEnvFn returns the region from the AWS_REGION or AWS_DEFAULT_REGION

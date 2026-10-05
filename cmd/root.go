@@ -44,6 +44,7 @@ const (
 	labelTagsKeysCobra  = "show-tags-keys"
 	labelTagsKeys       = "show.tags.keys"
 	labelAllRegions     = "all-regions"
+	labelAllProfiles    = "all-profiles"
 
 	// flagIDs, flagTags, flagTagsKey, and flagAvailabilityZones name the flags
 	// shared by the ec2, eni, and ebs commands' sort-field lists.
@@ -144,7 +145,7 @@ func persistentPreRun(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	profiles, err := common.CheckProfiles(viper.GetStringSlice(labelProfiles))
+	profiles, err := common.CheckProfiles(viper.GetStringSlice(labelProfiles), viper.GetStringSlice(labelAllProfiles))
 	if err != nil {
 		return err
 	}
@@ -173,7 +174,8 @@ func initFlags() {
 		"config file path (default is $HOME/.awss/config.yaml)")
 	rootCmd.PersistentFlags().StringSlice(labelProfiles, []string{},
 		"Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. "+
-			"e.g. `profile1,profile2`. If not set, falls back to the AWS SDK's default credential "+
+			"e.g. `profile1,profile2`. `all` uses the all-profiles list of the config file, or every "+
+			"profile in ~/.aws/config when that list is not set. If not set, falls back to the AWS SDK's default credential "+
 			"resolution (AWS_PROFILE, static env credentials, or the `default` profile).")
 	rootCmd.PersistentFlags().StringSlice(labelRegions, []string{},
 		fmt.Sprintf(

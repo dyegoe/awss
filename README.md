@@ -7,7 +7,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 ## Features
 
 - Parallel search across profiles and regions
-- Multiple AWS profiles: `--profiles default,dev` or `--profiles all`
+- Multiple AWS profiles: `--profiles default,dev` or `--profiles all` (scoped by `all-profiles` in the config file)
 - Multiple regions: `--regions us-east-1,eu-west-1` or `--regions all`
 - Output formats: `--output table` (default), `--output json`, `--output json-pretty`
 - Show empty results: `--show-empty`
@@ -232,6 +232,7 @@ AWSS uses a YAML configuration file to set defaults. The default path is `~/.aws
 ```yaml
 profiles:
   - default
+all-profiles: []      # what --profiles all expands to; empty means every profile in ~/.aws/config
 regions:
   - us-east-1
 output: table
@@ -279,7 +280,11 @@ s3obj:
 ```
 
 Every key mirrors a flag: the flag wins when both are set. `all-regions` is the list
-`--regions all` expands to.
+`--regions all` expands to. `all-profiles` is the list `--profiles all` expands to; when it is
+empty or missing, `--profiles all` uses every `[default]` and `[profile ...]` section of
+`~/.aws/config`. Set it when `~/.aws/config` holds profiles you do not want to search, such as
+several privilege variants per account or MFA source profiles. Each entry must exist in
+`~/.aws/config`.
 
 ## Usage
 
@@ -344,5 +349,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and guidelines.
 - [Cobra](https://github.com/spf13/cobra)
 - [Viper](https://github.com/spf13/viper)
 - [Go-Pretty](https://github.com/jedib0t/go-pretty)
-- [ini.v1](https://github.com/go-ini/ini) (reads `~/.aws/config` for `--profiles all`)
+- [ini.v1](https://github.com/go-ini/ini) (reads `~/.aws/config` for `--profiles all` and profile validation)
 - [golang.org/x/term](https://pkg.go.dev/golang.org/x/term) (terminal width for tables)
