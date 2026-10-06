@@ -28,6 +28,7 @@ import (
 	"github.com/dyegoe/awss/common"
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
@@ -109,6 +110,14 @@ func New(profile, region string, filters map[string][]string, sortField string, 
 	}
 }
 
+// ec2API is the part of the EC2 client used by the ENI search.
+//
+// Search builds the real client; tests pass a fake to collect.
+type ec2API interface {
+	ec2.DescribeNetworkInterfacesAPIClient
+	ec2.DescribeInstancesAPIClient
+}
+
 // Search performs the ENIs search.
 //
 // results are stored in the Data field.
@@ -127,40 +136,77 @@ func (r *Results) Search(ctx context.Context) {
 		return
 	}
 
-	// Get AWS client and describe network interfaces.
-	client := ec2.NewFromConfig(cfg)
-	response, err := client.DescribeNetworkInterfaces(ctx, input)
+	r.collect(ctx, ec2.NewFromConfig(cfg), input)
+}
+
+// collect describes the network interfaces, looks up their instance names and sorts the rows.
+func (r *Results) collect(ctx context.Context, client ec2API, input *ec2.DescribeNetworkInterfacesInput) {
+	instanceIDs, err := r.collectENIs(ctx, client, input)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error describing network interfaces: %v", err))
+		r.Errors = append(r.Errors, err.Error())
 		return
 	}
 
-	// Parse response and collect instance IDs for batch lookup.
-	var instanceIDs []string
-	for _, eni := range response.NetworkInterfaces { //nolint:gocritic
-		r.Data = append(r.Data, parseENIRow(&eni))
-		if eni.Attachment != nil && eni.Attachment.InstanceId != nil {
-			instanceIDs = append(instanceIDs, *eni.Attachment.InstanceId)
-		}
-	}
-
-	// Batch lookup instance names in a single API call.
 	if len(instanceIDs) > 0 && !r.NoInstanceName {
-		names, err := searchEC2.SearchInstanceNames(r.Profile, r.Region, instanceIDs)
-		if err != nil {
-			r.Errors = append(r.Errors, err.Error())
-		} else {
-			for i := range r.Data {
-				if id := r.Data[i].InterfaceInfo.InstanceID; id != "" {
-					r.Data[i].InterfaceInfo.InstanceName = names[id]
-				}
-			}
-		}
+		r.enrichInstanceNames(ctx, client, instanceIDs)
 	}
 
 	if r.SortField != "" {
 		if err := r.sortResults(r.SortField); err != nil {
 			r.Errors = append(r.Errors, err.Error())
+		}
+	}
+}
+
+// pageSize is the number of network interfaces asked per DescribeNetworkInterfaces call.
+//
+// AWS recommends paginated calls only (unpaginated ones are more exposed to throttling and
+// timeouts), so every search that does not name the interfaces asks for pages. 1000 is the
+// largest page AWS allows.
+const pageSize int32 = 1000
+
+// collectENIs appends one row per network interface to r.Data, following every page.
+//
+// It returns the IDs of the instances the interfaces are attached to.
+func (r *Results) collectENIs(
+	ctx context.Context, client ec2.DescribeNetworkInterfacesAPIClient, input *ec2.DescribeNetworkInterfacesInput,
+) ([]string, error) {
+	paged := *input
+	// AWS rejects MaxResults together with NetworkInterfaceIds.
+	if len(paged.NetworkInterfaceIds) == 0 && paged.MaxResults == nil {
+		paged.MaxResults = aws.Int32(pageSize)
+	}
+
+	var instanceIDs []string
+	paginator := ec2.NewDescribeNetworkInterfacesPaginator(client, &paged)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error describing network interfaces: %w", err)
+		}
+		for i := range page.NetworkInterfaces {
+			row := parseENIRow(&page.NetworkInterfaces[i])
+			r.Data = append(r.Data, row)
+			if row.InterfaceInfo.InstanceID != "" {
+				instanceIDs = append(instanceIDs, row.InterfaceInfo.InstanceID)
+			}
+		}
+	}
+	return instanceIDs, nil
+}
+
+// enrichInstanceNames fills the instance name of every row attached to an instance.
+//
+// A failed lookup is reported in r.Errors and leaves the names empty; the rows are kept.
+func (r *Results) enrichInstanceNames(ctx context.Context, client ec2.DescribeInstancesAPIClient, ids []string) {
+	names, err := searchEC2.InstanceNames(ctx, client, ids)
+	if err != nil {
+		r.Errors = append(r.Errors, err.Error())
+		return
+	}
+	for i := range r.Data {
+		if id := r.Data[i].InterfaceInfo.InstanceID; id != "" {
+			r.Data[i].InterfaceInfo.InstanceName = names[id]
 		}
 	}
 }
