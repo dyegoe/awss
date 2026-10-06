@@ -30,9 +30,9 @@ Coverage per package as of 2026-10-06 (`go test -cover ./...`):
 | --------------- | -------: | ------------------------------------------------------------ |
 | `search/eni`    |    98.8% | —                                                            |
 | `search/ebs`    |    97.8% | —                                                            |
+| `search/ec2`    |    97.5% | —                                                            |
 | `common`        |    91.3% | —                                                            |
 | `search/s3obj`  |    85.5% | —                                                            |
-| `search/ec2`    |    82.3% | `Search()` DescribeInstances call (not paginated)            |
 | `search/s3`     |    80.8% | `Search()` (AWS config + client construction)                |
 | `search/subnet` |    73.8% | `Search()` paginator loop                                    |
 | `search/vpc`    |    62.3% | `Search()` paginator loop                                    |
@@ -40,12 +40,10 @@ Coverage per package as of 2026-10-06 (`go test -cover ./...`):
 | `search`        |   100.0% | —                                                            |
 
 - [ ] **Inject the EC2 client.** Use the SDK's `Describe*APIClient` interfaces the way
-  `search/eni`, `search/ebs`, `search/s3` and `search/s3obj` do, so the `Search()` bodies can be
-  tested with a fake and every search package reaches the 80% target. `search/eni` and
-  `search/ebs` are done and show the pattern, including the shared `ec2.InstanceNames` lookup
-  and the page size. Remaining package issues:
-  [EC2](https://github.com/dyegoe/awss/issues/146),
-  [VPC](https://github.com/dyegoe/awss/issues/147), and
+  `search/ec2`, `search/eni`, `search/ebs`, `search/s3` and `search/s3obj` do, so the `Search()`
+  bodies can be tested with a fake and every search package reaches the 80% target. The done
+  packages show the pattern, including the page size. Remaining package issues:
+  [VPC](https://github.com/dyegoe/awss/issues/147) and
   [subnet](https://github.com/dyegoe/awss/issues/148).
 - [ ] [**`cmd`: test root command execution.**](https://github.com/dyegoe/awss/issues/149)
   Drive `rootCmd` with `ExecuteC()` in tests and capture stdout.
