@@ -788,3 +788,90 @@ func TestFiltersToInput_subnetAndVpc(t *testing.T) {
 		t.Errorf("filtersToInput() filters = %v, want %v", got, want)
 	}
 }
+
+// fakeDescribeInstances is a DescribeInstancesAPIClient that serves one page of instances per
+// entry of pages and records the inputs it receives.
+type fakeDescribeInstances struct {
+	pages  [][]types.Instance
+	err    error
+	inputs []*ec2.DescribeInstancesInput
+}
+
+func (f *fakeDescribeInstances) DescribeInstances(
+	_ context.Context, in *ec2.DescribeInstancesInput, _ ...func(*ec2.Options),
+) (*ec2.DescribeInstancesOutput, error) {
+	f.inputs = append(f.inputs, in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	page := len(f.inputs) - 1
+	out := &ec2.DescribeInstancesOutput{Reservations: []types.Reservation{{Instances: f.pages[page]}}}
+	if page < len(f.pages)-1 {
+		out.NextToken = common.String(fmt.Sprint(page + 1))
+	}
+	return out, nil
+}
+
+// namedInstance returns an instance with the given ID and, when name is not empty, a Name tag.
+func namedInstance(id, name string) types.Instance {
+	inst := types.Instance{InstanceId: common.String(id)}
+	if name != "" {
+		inst.Tags = []types.Tag{{Key: common.String("Name"), Value: common.String(name)}}
+	}
+	return inst
+}
+
+// TestInstanceNames tests the instance-name lookup through a fake client.
+func TestInstanceNames(t *testing.T) {
+	tests := []struct {
+		name      string
+		ids       []string
+		client    *fakeDescribeInstances
+		want      map[string]string
+		wantErr   string
+		wantCalls int
+		wantIDs   []string
+	}{
+		{
+			name: "follows every page and dedupes the IDs",
+			ids:  []string{"i-2", "i-1", "i-2"},
+			client: &fakeDescribeInstances{pages: [][]types.Instance{
+				{namedInstance("i-1", "web")}, {namedInstance("i-2", "")},
+			}},
+			want:      map[string]string{"i-1": "web", "i-2": ""},
+			wantCalls: 2,
+			wantIDs:   []string{"i-1", "i-2"},
+		},
+		{
+			name:   "no IDs makes no call",
+			client: &fakeDescribeInstances{},
+			want:   map[string]string{},
+		},
+		{
+			name:      "api error is wrapped",
+			ids:       []string{"i-1"},
+			client:    &fakeDescribeInstances{err: errors.New("denied")},
+			wantErr:   "error searching instance names: denied",
+			wantCalls: 1,
+			wantIDs:   []string{"i-1"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := InstanceNames(context.Background(), tt.client, tt.ids)
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Errorf("InstanceNames() error = %v, want %q", err, tt.wantErr)
+				}
+			} else if err != nil || !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("InstanceNames() = %v, %v, want %v", got, err, tt.want)
+			}
+			if len(tt.client.inputs) != tt.wantCalls {
+				t.Fatalf("DescribeInstances calls = %d, want %d", len(tt.client.inputs), tt.wantCalls)
+			}
+			if tt.wantCalls > 0 && !reflect.DeepEqual(tt.client.inputs[0].InstanceIds, tt.wantIDs) {
+				t.Errorf("InstanceIds = %v, want %v", tt.client.inputs[0].InstanceIds, tt.wantIDs)
+			}
+		})
+	}
+}

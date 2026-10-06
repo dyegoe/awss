@@ -20,7 +20,12 @@ limitations under the License.
 package eni
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dyegoe/awss/common"
@@ -460,6 +465,303 @@ func TestParseENIRow(t *testing.T) {
 			got := parseENIRow(tt.eni).InterfaceInfo
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseENIRow().InterfaceInfo = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+// fakeEC2 is an ec2API that serves the given pages of network interfaces and instances, and
+// records the inputs it receives.
+type fakeEC2 struct {
+	eniPages   [][]types.NetworkInterface
+	eniErr     error
+	eniInputs  []*ec2.DescribeNetworkInterfacesInput
+	instances  []types.Instance
+	instErr    error
+	instInputs []*ec2.DescribeInstancesInput
+}
+
+func (f *fakeEC2) DescribeNetworkInterfaces(
+	_ context.Context, in *ec2.DescribeNetworkInterfacesInput, _ ...func(*ec2.Options),
+) (*ec2.DescribeNetworkInterfacesOutput, error) {
+	f.eniInputs = append(f.eniInputs, in)
+	if f.eniErr != nil {
+		return nil, f.eniErr
+	}
+	out := &ec2.DescribeNetworkInterfacesOutput{}
+	page := len(f.eniInputs) - 1
+	if page < len(f.eniPages) {
+		out.NetworkInterfaces = f.eniPages[page]
+	}
+	if page < len(f.eniPages)-1 {
+		out.NextToken = common.String(fmt.Sprint(page + 1))
+	}
+	return out, nil
+}
+
+func (f *fakeEC2) DescribeInstances(
+	_ context.Context, in *ec2.DescribeInstancesInput, _ ...func(*ec2.Options),
+) (*ec2.DescribeInstancesOutput, error) {
+	f.instInputs = append(f.instInputs, in)
+	if f.instErr != nil {
+		return nil, f.instErr
+	}
+	return &ec2.DescribeInstancesOutput{Reservations: []types.Reservation{{Instances: f.instances}}}, nil
+}
+
+// iface returns a network interface, attached to instanceID unless it is empty.
+func iface(id, instanceID string) types.NetworkInterface {
+	n := types.NetworkInterface{NetworkInterfaceId: common.String(id)}
+	if instanceID != "" {
+		n.Attachment = &types.NetworkInterfaceAttachment{InstanceId: common.String(instanceID)}
+	}
+	return n
+}
+
+// instance returns an instance with the given ID and Name tag.
+func instance(id, name string) types.Instance {
+	return types.Instance{
+		InstanceId: common.String(id),
+		Tags:       []types.Tag{{Key: common.String("Name"), Value: common.String(name)}},
+	}
+}
+
+// collectCase is one table entry of TestResults_collect.
+type collectCase struct {
+	name           string
+	sortField      string
+	noInstanceName bool
+	client         *fakeEC2
+	wantIDs        []string
+	wantNames      []string
+	wantErrors     []string
+	wantLookupIDs  []string // InstanceIds sent to DescribeInstances; nil means no call
+}
+
+func collectCases() []collectCase {
+	return append(collectOKCases(), collectErrorCases()...)
+}
+
+// collectErrorCases are the collectCase entries where an AWS call fails.
+func collectErrorCases() []collectCase {
+	return []collectCase{
+		{
+			name:       "describe error is reported with no rows",
+			client:     &fakeEC2{eniErr: errors.New("boom")},
+			wantIDs:    []string{},
+			wantNames:  []string{},
+			wantErrors: []string{"error describing network interfaces: boom"},
+		},
+		{
+			name: "failed name lookup keeps the rows",
+			client: &fakeEC2{
+				eniPages: [][]types.NetworkInterface{{iface("eni-a", "i-1")}},
+				instErr:  errors.New("denied"),
+			},
+			wantIDs:       []string{"eni-a"},
+			wantNames:     []string{""},
+			wantErrors:    []string{"error searching instance names: denied"},
+			wantLookupIDs: []string{"i-1"},
+		},
+	}
+}
+
+// collectOKCases are the collectCase entries where every AWS call succeeds.
+func collectOKCases() []collectCase {
+	webDB := []types.Instance{instance("i-1", "web"), instance("i-2", "db")}
+	return []collectCase{
+		{
+			name: "follows every page and fills instance names",
+			client: &fakeEC2{
+				eniPages:  [][]types.NetworkInterface{{iface("eni-a", "i-1"), iface("eni-b", "")}, {iface("eni-c", "i-2")}},
+				instances: webDB,
+			},
+			wantIDs:       []string{"eni-a", "eni-b", "eni-c"},
+			wantNames:     []string{"web", "", "db"},
+			wantLookupIDs: []string{"i-1", "i-2"},
+		},
+		{
+			name: "an instance with several interfaces is looked up once",
+			client: &fakeEC2{
+				eniPages:  [][]types.NetworkInterface{{iface("eni-a", "i-1"), iface("eni-b", "i-1")}},
+				instances: webDB[:1],
+			},
+			wantIDs:       []string{"eni-a", "eni-b"},
+			wantNames:     []string{"web", "web"},
+			wantLookupIDs: []string{"i-1"},
+		},
+		{
+			name:      "empty result makes no instance lookup",
+			client:    &fakeEC2{},
+			wantIDs:   []string{},
+			wantNames: []string{},
+		},
+		{
+			name:           "no-instance-name skips the lookup",
+			noInstanceName: true,
+			client:         &fakeEC2{eniPages: [][]types.NetworkInterface{{iface("eni-a", "i-1")}}},
+			wantIDs:        []string{"eni-a"},
+			wantNames:      []string{""},
+		},
+		{
+			name:      "rows are sorted by the sort field",
+			sortField: "instance-name",
+			client: &fakeEC2{
+				eniPages:  [][]types.NetworkInterface{{iface("eni-a", "i-1"), iface("eni-b", "i-2")}},
+				instances: webDB,
+			},
+			wantIDs:       []string{"eni-b", "eni-a"},
+			wantNames:     []string{"db", "web"},
+			wantLookupIDs: []string{"i-1", "i-2"},
+		},
+	}
+}
+
+// TestResults_collect tests the paginated describe, the instance-name lookup and the sorting
+// through a fake EC2 client.
+func TestResults_collect(t *testing.T) {
+	for _, tt := range collectCases() {
+		t.Run(tt.name, func(t *testing.T) {
+			r := New("default", "us-east-1", nil, tt.sortField, tt.noInstanceName)
+			input := &ec2.DescribeNetworkInterfacesInput{Filters: common.FilterDefault("vpc-id", []string{"vpc-1"})}
+
+			r.collect(context.Background(), tt.client, input)
+
+			ids, names := []string{}, []string{}
+			for _, row := range r.Data {
+				ids = append(ids, row.InterfaceInfo.NetworkInterfaceID)
+				names = append(names, row.InterfaceInfo.InstanceName)
+			}
+			if !reflect.DeepEqual(ids, tt.wantIDs) || !reflect.DeepEqual(names, tt.wantNames) {
+				t.Errorf("rows = %v %v, want %v %v", ids, names, tt.wantIDs, tt.wantNames)
+			}
+			if !reflect.DeepEqual(r.Errors, append([]string{}, tt.wantErrors...)) {
+				t.Errorf("Errors = %q, want %q", r.Errors, tt.wantErrors)
+			}
+			for _, in := range tt.client.eniInputs {
+				if !reflect.DeepEqual(in.Filters, input.Filters) {
+					t.Errorf("DescribeNetworkInterfaces filters = %#v, want %#v", in.Filters, input.Filters)
+				}
+			}
+			assertLookup(t, tt.client.instInputs, tt.wantLookupIDs)
+		})
+	}
+}
+
+// assertLookup checks the DescribeInstances calls: none when want is nil, else one call with want.
+func assertLookup(t *testing.T, inputs []*ec2.DescribeInstancesInput, want []string) {
+	t.Helper()
+	if want == nil {
+		if len(inputs) != 0 {
+			t.Errorf("DescribeInstances called %d times, want none", len(inputs))
+		}
+		return
+	}
+	if len(inputs) != 1 || !reflect.DeepEqual(inputs[0].InstanceIds, want) {
+		t.Errorf("DescribeInstances inputs = %#v, want one call with %v", inputs, want)
+	}
+}
+
+// TestParseENIRow_ips tests that private IPs and their associated public IPs are collected.
+func TestParseENIRow_ips(t *testing.T) {
+	eni := &types.NetworkInterface{
+		PrivateIpAddresses: []types.NetworkInterfacePrivateIpAddress{
+			{
+				PrivateIpAddress: common.String("10.0.0.1"),
+				Association:      &types.NetworkInterfaceAssociation{PublicIp: common.String("203.0.113.1")},
+			},
+			{PrivateIpAddress: common.String("10.0.0.2")},
+		},
+	}
+	row := parseENIRow(eni)
+	if want := []string{"10.0.0.1", "10.0.0.2"}; !reflect.DeepEqual(row.PrivateIPAddresses, want) {
+		t.Errorf("PrivateIPAddresses = %v, want %v", row.PrivateIPAddresses, want)
+	}
+	if want := []string{"203.0.113.1"}; !reflect.DeepEqual(row.PublicIPAddresses, want) {
+		t.Errorf("PublicIPAddresses = %v, want %v", row.PublicIPAddresses, want)
+	}
+}
+
+// TestResults_collect_badSortField tests that an unknown sort field is reported and the rows kept.
+func TestResults_collect_badSortField(t *testing.T) {
+	r := New("default", "us-east-1", nil, "nope", true)
+	client := &fakeEC2{eniPages: [][]types.NetworkInterface{{iface("eni-a", "")}}}
+
+	r.collect(context.Background(), client, &ec2.DescribeNetworkInterfacesInput{})
+
+	if len(r.Data) != 1 || len(r.Errors) != 1 {
+		t.Errorf("Data = %v, Errors = %q, want one row and one error", r.Data, r.Errors)
+	}
+}
+
+// TestSortFieldNames tests that every sort tag of eniInfo is listed.
+func TestSortFieldNames(t *testing.T) {
+	want := []string{"az", "id", "instance-id", "instance-name", "owner", "status", "subnet-id", "type"}
+	if got := SortFieldNames(); !reflect.DeepEqual(got, want) {
+		t.Errorf("SortFieldNames() = %v, want %v", got, want)
+	}
+}
+
+// TestResults_Search_earlyErrors tests the errors Search reports before any AWS call.
+func TestResults_Search_earlyErrors(t *testing.T) {
+	// An empty AWS config file: the profile does not exist and nothing is read from the user's files.
+	empty := filepath.Join(t.TempDir(), "config")
+	t.Setenv("AWS_CONFIG_FILE", empty)
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", empty)
+
+	tests := []struct {
+		name       string
+		filters    map[string][]string
+		wantPrefix string
+	}{
+		{
+			name:       "invalid tag filter",
+			filters:    map[string][]string{"tag": {"no-equals-sign"}},
+			wantPrefix: "error building filters:",
+		},
+		{
+			name:       "unknown profile",
+			filters:    map[string][]string{},
+			wantPrefix: "error getting aws config:",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := New("awss-test-missing-profile", "us-east-1", tt.filters, "", false)
+			r.Search(context.Background())
+			if len(r.Errors) != 1 || !strings.HasPrefix(r.Errors[0], tt.wantPrefix) {
+				t.Errorf("Errors = %q, want one error starting with %q", r.Errors, tt.wantPrefix)
+			}
+		})
+	}
+}
+
+// TestResults_collectENIs_pageSize tests that a page size is sent unless interface IDs are named,
+// since AWS rejects MaxResults together with NetworkInterfaceIds.
+func TestResults_collectENIs_pageSize(t *testing.T) {
+	tests := []struct {
+		name  string
+		input *ec2.DescribeNetworkInterfacesInput
+		want  *int32
+	}{
+		{name: "no IDs asks for pages", input: &ec2.DescribeNetworkInterfacesInput{}, want: aws.Int32(pageSize)},
+		{
+			name:  "named IDs send no page size",
+			input: &ec2.DescribeNetworkInterfacesInput{NetworkInterfaceIds: []string{"eni-a"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeEC2{}
+			r := New("default", "us-east-1", nil, "", true)
+			if _, err := r.collectENIs(context.Background(), client, tt.input); err != nil {
+				t.Fatalf("collectENIs() error = %v", err)
+			}
+			if got := client.eniInputs[0].MaxResults; !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("MaxResults = %v, want %v", got, tt.want)
+			}
+			if tt.input.MaxResults != nil {
+				t.Errorf("collectENIs changed the caller's input")
 			}
 		})
 	}
