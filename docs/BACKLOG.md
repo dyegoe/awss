@@ -50,8 +50,6 @@ Coverage per package as of 2026-10-06 (`go test -cover ./...`):
   [subnet](https://github.com/dyegoe/awss/issues/148).
 - [ ] [**`cmd`: test root command execution.**](https://github.com/dyegoe/awss/issues/149)
   Drive `rootCmd` with `ExecuteC()` in tests and capture stdout.
-- [ ] [**Race check in CI.**](https://github.com/dyegoe/awss/issues/150) `go test -race ./...`
-  passes locally; add it to `.github/workflows/common.yml`.
 
 ## Architecture
 
