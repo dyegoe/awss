@@ -27,6 +27,7 @@ import (
 	"github.com/dyegoe/awss/common"
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
@@ -93,6 +94,21 @@ func New(profile, region string, filters map[string][]string, sortField string, 
 	}
 }
 
+// ec2API is the part of the EC2 client used by the EBS search.
+//
+// Search builds the real client; tests pass a fake to collect.
+type ec2API interface {
+	ec2.DescribeVolumesAPIClient
+	ec2.DescribeInstancesAPIClient
+}
+
+// pageSize is the number of volumes asked per DescribeVolumes call.
+//
+// AWS recommends paginated calls only, so every search that does not name the volumes asks
+// for pages. The DescribeVolumes docs give no maximum; 500 was its documented cap and fits the
+// EC2-wide range.
+const pageSize int32 = 500
+
 // Search performs the EBS volumes search.
 //
 // Results are stored in the Data field.
@@ -103,37 +119,42 @@ func (r *Results) Search(ctx context.Context) {
 		return
 	}
 
-	client, err := r.newEC2Client()
+	cfg, err := common.AwsConfig(r.Profile, r.Region)
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 
+	r.collect(ctx, ec2.NewFromConfig(cfg), input)
+}
+
+// collect describes the volumes, looks up their instance names and sorts the rows.
+func (r *Results) collect(ctx context.Context, client ec2API, input *ec2.DescribeVolumesInput) {
 	instanceIDSet, err := r.collectVolumeRows(ctx, client, input)
 	if err != nil {
 		r.Errors = append(r.Errors, err.Error())
 		return
 	}
 
-	r.enrichInstanceNames(instanceIDSet)
+	r.enrichInstanceNames(ctx, client, instanceIDSet)
 	r.sortIfRequested()
 }
 
-func (r *Results) newEC2Client() (*ec2.Client, error) {
-	cfg, err := common.AwsConfig(r.Profile, r.Region)
-	if err != nil {
-		return nil, fmt.Errorf("error getting aws config: %w", err)
-	}
-
-	return ec2.NewFromConfig(cfg), nil
-}
-
+// collectVolumeRows appends the rows of every volume to r.Data, following every page.
+//
+// It returns the set of instance IDs the volumes are attached to.
 func (r *Results) collectVolumeRows(
 	ctx context.Context,
-	client *ec2.Client,
+	client ec2.DescribeVolumesAPIClient,
 	input *ec2.DescribeVolumesInput,
 ) (map[string]struct{}, error) {
-	paginator := ec2.NewDescribeVolumesPaginator(client, input)
+	paged := *input
+	// AWS rejects MaxResults together with VolumeIds.
+	if len(paged.VolumeIds) == 0 && paged.MaxResults == nil {
+		paged.MaxResults = aws.Int32(pageSize)
+	}
+
+	paginator := ec2.NewDescribeVolumesPaginator(client, &paged)
 	instanceIDSet := make(map[string]struct{})
 
 	for paginator.HasMorePages() {
@@ -159,7 +180,12 @@ func (r *Results) appendVolumeRows(volumes []types.Volume, instanceIDSet map[str
 	}
 }
 
-func (r *Results) enrichInstanceNames(instanceIDSet map[string]struct{}) {
+// enrichInstanceNames fills the instance name of every row attached to an instance.
+//
+// A failed lookup is reported in r.Errors and leaves the names empty; the rows are kept.
+func (r *Results) enrichInstanceNames(
+	ctx context.Context, client ec2.DescribeInstancesAPIClient, instanceIDSet map[string]struct{},
+) {
 	if len(instanceIDSet) == 0 || r.NoInstanceName {
 		return
 	}
@@ -169,7 +195,7 @@ func (r *Results) enrichInstanceNames(instanceIDSet map[string]struct{}) {
 		instanceIDs = append(instanceIDs, id)
 	}
 
-	names, err := searchEC2.SearchInstanceNames(r.Profile, r.Region, instanceIDs)
+	names, err := searchEC2.InstanceNames(ctx, client, instanceIDs)
 	if err != nil {
 		r.Errors = append(r.Errors, err.Error())
 		return
