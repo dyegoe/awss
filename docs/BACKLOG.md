@@ -60,11 +60,7 @@ Coverage per package as of 2026-10-06 (`go test -cover ./...`):
   `BaseResults`, the reflection row helpers and the `Matcher`. Proposed split, rename-only:
   `awsutil/` (config, STS, profiles, filter builders), `output/` (printers), `results/`
   (interface, `BaseResults`, row helpers), `common/` (the rest).
-- [ ] **`--all` for `s3obj`?** Today `--buckets` is required. Decide whether scanning every
-  bucket of a region without naming them is wanted, and what `--max-keys` should default to then.
 
 ## CI / release
 
-- [ ] [Cache Go modules and build cache](https://github.com/dyegoe/awss/issues/153) in
-  `common.yml` (`actions/setup-go` `cache: true`).
 - [ ] [Run the unit tests on the two latest Go minors as a matrix](https://github.com/dyegoe/awss/issues/154).
