@@ -348,28 +348,10 @@ func SortFieldNames() []string {
 	return common.SortFieldNames(dataRow{})
 }
 
-// SearchInstanceNames returns a map of instanceID to instance name for all given IDs.
-// It makes a single DescribeInstances API call instead of one per ID.
-func SearchInstanceNames(profile, region string, instanceIDs []string) (map[string]string, error) {
-	if len(instanceIDs) == 0 {
-		return map[string]string{}, nil
-	}
-	r := New(profile, region, map[string][]string{filterKeyInstanceID: instanceIDs}, "id")
-	r.Search(context.Background())
-	if len(r.Errors) > 0 {
-		return nil, fmt.Errorf("error searching instance names: %v", r.Errors)
-	}
-	names := make(map[string]string, len(r.Data))
-	for i := range r.Data {
-		names[r.Data[i].InstanceID] = r.Data[i].InstanceName
-	}
-	return names, nil
-}
-
 // InstanceNames returns a map of instance ID to instance name (tag:Name) for the given IDs.
 //
-// Unlike SearchInstanceNames it uses the caller's client and context, so a search reuses its own
-// EC2 client and tests can pass a fake. Duplicate IDs are sent once.
+// It uses the caller's client and context, so a search reuses its own EC2 client and tests can
+// pass a fake. Duplicate IDs are sent once.
 func InstanceNames(
 	ctx context.Context, client ec2.DescribeInstancesAPIClient, instanceIDs []string,
 ) (map[string]string, error) {
