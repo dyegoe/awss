@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.14.0](https://github.com/dyegoe/awss/compare/v0.13.0...v0.14.0) (2026-10-06)
+
+
+### Features
+
+* **search/ec2:** match --cidrs by IP range, including secondary ENIs ([#128](https://github.com/dyegoe/awss/issues/128)) ([#139](https://github.com/dyegoe/awss/issues/139)) ([58a05c1](https://github.com/dyegoe/awss/commit/58a05c17417615adba6a0a36bc674cc8da5712ae))
+* **search/eni:** show and filter ENIs by owner account ([#135](https://github.com/dyegoe/awss/issues/135)) ([278ab8e](https://github.com/dyegoe/awss/commit/278ab8ee2980ea66f3f1debbaaf9f003c382615e))
+* **search/eni:** show and filter ENIs by owner account ([#135](https://github.com/dyegoe/awss/issues/135)) ([9e37a64](https://github.com/dyegoe/awss/commit/9e37a6485907d802c09d8ca729ef4ae88e1fcc29))
+* **search/s3:** show bucket tags with --show-tags ([#127](https://github.com/dyegoe/awss/issues/127)) ([#138](https://github.com/dyegoe/awss/issues/138)) ([687156c](https://github.com/dyegoe/awss/commit/687156c9ba37ed878ce40f8c5bc7229fb92be4e4))
+
 ## [0.13.0](https://github.com/dyegoe/awss/compare/v0.12.0...v0.13.0) (2026-10-05)
 
 
