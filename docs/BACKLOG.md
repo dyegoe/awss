@@ -60,7 +60,3 @@ Coverage per package as of 2026-10-06 (`go test -cover ./...`):
   `BaseResults`, the reflection row helpers and the `Matcher`. Proposed split, rename-only:
   `awsutil/` (config, STS, profiles, filter builders), `output/` (printers), `results/`
   (interface, `BaseResults`, row helpers), `common/` (the rest).
-
-## CI / release
-
-- [ ] [Run the unit tests on the two latest Go minors as a matrix](https://github.com/dyegoe/awss/issues/154).
