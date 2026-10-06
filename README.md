@@ -13,6 +13,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Show empty results: `--show-empty`
 - Show tags in table output: `--show-tags`
 - Restrict which tag keys are shown in table output: `--show-tags-keys Name,Environment` (implies `--show-tags`)
+- Timeout: `--timeout 90s` (default `5m`, `0` disables it); see [Common behavior](#common-behavior)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
 
@@ -193,6 +194,11 @@ to S3 so only that part of the bucket is listed.
 - `--all` cannot be combined with any filter flag
 - Wildcard `*` matches all values in a filter
 - Tags format: `Key=Value1:Value2,AnotherKey=Value`
+- `--timeout` (default `5m`) bounds the whole run, pre-authentication included. A profile and
+  region still searching at the deadline is printed with the error
+  `search timed out after <duration>` and no rows, since its rows could be incomplete; the profiles
+  and regions that finished are printed as usual, and the command still exits 0. Use a duration
+  with a unit (`90s`, `5m`); `0` disables the timeout. Set it in the config file with `timeout:`.
 
 ## Installation
 
@@ -256,6 +262,7 @@ all-profiles: []      # what --profiles all expands to; empty means every profil
 regions:
   - us-east-1
 output: table
+timeout: 5m           # --timeout; a duration with a unit (90s, 5m), 0 disables it
 show:
   empty: false        # --show-empty
   tags: false         # --show-tags
