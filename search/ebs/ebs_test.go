@@ -20,11 +20,17 @@ limitations under the License.
 package ebs
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dyegoe/awss/common"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
@@ -559,6 +565,262 @@ func TestGetSortFields(t *testing.T) {
 			_, err := GetSortFields(tt.field)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetSortFields() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// fakeEC2 is an ec2API that serves the given pages of volumes and the given instances, and
+// records the inputs it receives.
+type fakeEC2 struct {
+	volPages   [][]types.Volume
+	volErr     error
+	volInputs  []*ec2.DescribeVolumesInput
+	instances  []types.Instance
+	instErr    error
+	instInputs []*ec2.DescribeInstancesInput
+}
+
+func (f *fakeEC2) DescribeVolumes(
+	_ context.Context, in *ec2.DescribeVolumesInput, _ ...func(*ec2.Options),
+) (*ec2.DescribeVolumesOutput, error) {
+	f.volInputs = append(f.volInputs, in)
+	if f.volErr != nil {
+		return nil, f.volErr
+	}
+	out := &ec2.DescribeVolumesOutput{}
+	page := len(f.volInputs) - 1
+	if page < len(f.volPages) {
+		out.Volumes = f.volPages[page]
+	}
+	if page < len(f.volPages)-1 {
+		out.NextToken = common.String(fmt.Sprint(page + 1))
+	}
+	return out, nil
+}
+
+func (f *fakeEC2) DescribeInstances(
+	_ context.Context, in *ec2.DescribeInstancesInput, _ ...func(*ec2.Options),
+) (*ec2.DescribeInstancesOutput, error) {
+	f.instInputs = append(f.instInputs, in)
+	if f.instErr != nil {
+		return nil, f.instErr
+	}
+	return &ec2.DescribeInstancesOutput{Reservations: []types.Reservation{{Instances: f.instances}}}, nil
+}
+
+// volume returns a volume attached to each of instanceIDs, or unattached when there are none.
+func volume(id string, instanceIDs ...string) types.Volume {
+	v := types.Volume{VolumeId: common.String(id)}
+	for _, inst := range instanceIDs {
+		v.Attachments = append(v.Attachments, types.VolumeAttachment{InstanceId: common.String(inst)})
+	}
+	return v
+}
+
+// instance returns an instance with the given ID and Name tag.
+func instance(id, name string) types.Instance {
+	return types.Instance{
+		InstanceId: common.String(id),
+		Tags:       []types.Tag{{Key: common.String("Name"), Value: common.String(name)}},
+	}
+}
+
+// collectCase is one table entry of TestResults_collect.
+type collectCase struct {
+	name           string
+	sortField      string
+	noInstanceName bool
+	client         *fakeEC2
+	wantRows       []string // "volume/instance-name" per row
+	wantErrors     []string
+	wantLookupIDs  []string // InstanceIds sent to DescribeInstances; nil means no call
+}
+
+func collectCases() []collectCase {
+	return append(collectOKCases(), collectErrorCases()...)
+}
+
+// collectOKCases are the collectCase entries where every AWS call succeeds.
+func collectOKCases() []collectCase {
+	webDB := []types.Instance{instance("i-1", "web"), instance("i-2", "db")}
+	return []collectCase{
+		{
+			name: "follows every page and fills instance names",
+			client: &fakeEC2{
+				volPages:  [][]types.Volume{{volume("vol-a", "i-1"), volume("vol-b")}, {volume("vol-c", "i-2")}},
+				instances: webDB,
+			},
+			wantRows:      []string{"vol-a/web", "vol-b/", "vol-c/db"},
+			wantLookupIDs: []string{"i-1", "i-2"},
+		},
+		{
+			name: "multi-attach volume gives one row per instance, each instance looked up once",
+			client: &fakeEC2{
+				volPages:  [][]types.Volume{{volume("vol-a", "i-1", "i-2"), volume("vol-b", "i-1")}},
+				instances: webDB,
+			},
+			wantRows:      []string{"vol-a/web", "vol-a/db", "vol-b/web"},
+			wantLookupIDs: []string{"i-1", "i-2"},
+		},
+		{
+			name:     "empty result makes no instance lookup",
+			client:   &fakeEC2{},
+			wantRows: []string{},
+		},
+		{
+			name:           "no-instance-name skips the lookup",
+			noInstanceName: true,
+			client:         &fakeEC2{volPages: [][]types.Volume{{volume("vol-a", "i-1")}}},
+			wantRows:       []string{"vol-a/"},
+		},
+		{
+			name:      "rows are sorted by the sort field",
+			sortField: "instance-name",
+			client: &fakeEC2{
+				volPages:  [][]types.Volume{{volume("vol-a", "i-1"), volume("vol-b", "i-2")}},
+				instances: webDB,
+			},
+			wantRows:      []string{"vol-b/db", "vol-a/web"},
+			wantLookupIDs: []string{"i-1", "i-2"},
+		},
+	}
+}
+
+// collectErrorCases are the collectCase entries where an AWS call fails or the sort field is bad.
+func collectErrorCases() []collectCase {
+	return []collectCase{
+		{
+			name:       "describe error is reported with no rows",
+			client:     &fakeEC2{volErr: errors.New("boom")},
+			wantRows:   []string{},
+			wantErrors: []string{"error describing volumes: boom"},
+		},
+		{
+			name: "failed name lookup keeps the rows",
+			client: &fakeEC2{
+				volPages: [][]types.Volume{{volume("vol-a", "i-1")}},
+				instErr:  errors.New("denied"),
+			},
+			wantRows:      []string{"vol-a/"},
+			wantErrors:    []string{"error searching instance names: denied"},
+			wantLookupIDs: []string{"i-1"},
+		},
+		{
+			name:           "unknown sort field is reported and the rows kept",
+			sortField:      "nope",
+			noInstanceName: true,
+			client:         &fakeEC2{volPages: [][]types.Volume{{volume("vol-a")}}},
+			wantRows:       []string{"vol-a/"},
+			wantErrors: []string{
+				"invalid sort field: nope. The options are: " +
+					"az, device, encrypted, id, instance-id, instance-name, size, state, type",
+			},
+		},
+	}
+}
+
+// TestResults_collect tests the paginated describe, the instance-name lookup and the sorting
+// through a fake EC2 client.
+func TestResults_collect(t *testing.T) {
+	for _, tt := range collectCases() {
+		t.Run(tt.name, func(t *testing.T) {
+			r := New("default", "us-east-1", nil, tt.sortField, tt.noInstanceName)
+			input := &ec2.DescribeVolumesInput{Filters: common.FilterDefault("volume-type", []string{"gp3"})}
+
+			r.collect(context.Background(), tt.client, input)
+
+			rows := []string{}
+			for _, row := range r.Data {
+				rows = append(rows, row.VolumeID+"/"+row.InstanceName)
+			}
+			if !reflect.DeepEqual(rows, tt.wantRows) {
+				t.Errorf("rows = %v, want %v", rows, tt.wantRows)
+			}
+			if !reflect.DeepEqual(r.Errors, append([]string{}, tt.wantErrors...)) {
+				t.Errorf("Errors = %q, want %q", r.Errors, tt.wantErrors)
+			}
+			for _, in := range tt.client.volInputs {
+				if !reflect.DeepEqual(in.Filters, input.Filters) {
+					t.Errorf("DescribeVolumes filters = %#v, want %#v", in.Filters, input.Filters)
+				}
+			}
+			assertLookup(t, tt.client.instInputs, tt.wantLookupIDs)
+		})
+	}
+}
+
+// assertLookup checks the DescribeInstances calls: none when want is nil, else one call with want.
+func assertLookup(t *testing.T, inputs []*ec2.DescribeInstancesInput, want []string) {
+	t.Helper()
+	if want == nil {
+		if len(inputs) != 0 {
+			t.Errorf("DescribeInstances called %d times, want none", len(inputs))
+		}
+		return
+	}
+	if len(inputs) != 1 || !reflect.DeepEqual(inputs[0].InstanceIds, want) {
+		t.Errorf("DescribeInstances inputs = %#v, want one call with %v", inputs, want)
+	}
+}
+
+// TestResults_collectVolumeRows_pageSize tests that a page size is sent unless volume IDs are
+// named, since AWS rejects MaxResults together with VolumeIds.
+func TestResults_collectVolumeRows_pageSize(t *testing.T) {
+	tests := []struct {
+		name  string
+		input *ec2.DescribeVolumesInput
+		want  *int32
+	}{
+		{name: "no IDs asks for pages", input: &ec2.DescribeVolumesInput{}, want: aws.Int32(pageSize)},
+		{name: "named IDs send no page size", input: &ec2.DescribeVolumesInput{VolumeIds: []string{"vol-a"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeEC2{}
+			r := New("default", "us-east-1", nil, "", true)
+			if _, err := r.collectVolumeRows(context.Background(), client, tt.input); err != nil {
+				t.Fatalf("collectVolumeRows() error = %v", err)
+			}
+			if got := client.volInputs[0].MaxResults; !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("MaxResults = %v, want %v", got, tt.want)
+			}
+			if tt.input.MaxResults != nil {
+				t.Errorf("collectVolumeRows changed the caller's input")
+			}
+		})
+	}
+}
+
+// TestResults_Search_earlyErrors tests the errors Search reports before any AWS call.
+func TestResults_Search_earlyErrors(t *testing.T) {
+	// An empty AWS config file: the profile does not exist and nothing is read from the user's files.
+	empty := filepath.Join(t.TempDir(), "config")
+	t.Setenv("AWS_CONFIG_FILE", empty)
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", empty)
+
+	tests := []struct {
+		name       string
+		filters    map[string][]string
+		wantPrefix string
+	}{
+		{
+			name:       "invalid tag filter",
+			filters:    map[string][]string{"tag": {"no-equals-sign"}},
+			wantPrefix: "error building filters:",
+		},
+		{
+			name:       "unknown profile",
+			filters:    map[string][]string{},
+			wantPrefix: "error getting aws config:",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := New("awss-test-missing-profile", "us-east-1", tt.filters, "", false)
+			r.Search(context.Background())
+			if len(r.Errors) != 1 || !strings.HasPrefix(r.Errors[0], tt.wantPrefix) {
+				t.Errorf("Errors = %q, want one error starting with %q", r.Errors, tt.wantPrefix)
 			}
 		})
 	}
