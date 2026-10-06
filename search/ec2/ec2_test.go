@@ -22,6 +22,8 @@ package ec2
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"reflect"
 	"strings"
 	"testing"
@@ -570,43 +572,47 @@ func TestResults_sortResults_sliceField(t *testing.T) {
 	}
 }
 
-// mockCIDRLookups replaces the subnet and VPC lookups for the duration of the test.
+// mockSubnetsInCIDRs replaces the subnet lookup for the duration of the test.
 //
-// Each lookup returns the given ids and error. It also records whether each was called.
-func mockCIDRLookups(
-	t *testing.T, subnetIDs []string, subnetErr error, vpcIDs []string, vpcErr error,
-) (called *[2]bool) {
+// It returns the given ids and error, and records whether it was called.
+func mockSubnetsInCIDRs(t *testing.T, subnetIDs, vpcIDs []string, lookupErr error) (called *bool) {
 	t.Helper()
-	oldSubnet, oldVpc := subnetIDsByCIDR, vpcIDsByCIDR
-	t.Cleanup(func() { subnetIDsByCIDR, vpcIDsByCIDR = oldSubnet, oldVpc })
-	called = &[2]bool{}
-	subnetIDsByCIDR = func(_ context.Context, _, _ string, _ []string) ([]string, error) {
-		called[0] = true
-		return subnetIDs, subnetErr
-	}
-	vpcIDsByCIDR = func(_ context.Context, _, _ string, _ []string) ([]string, error) {
-		called[1] = true
-		return vpcIDs, vpcErr
+	old := subnetsInCIDRs
+	t.Cleanup(func() { subnetsInCIDRs = old })
+	called = new(bool)
+	subnetsInCIDRs = func(_ context.Context, _, _ string, _ []*net.IPNet) ([]string, []string, error) {
+		*called = true
+		return subnetIDs, vpcIDs, lookupErr
 	}
 	return called
 }
 
-// resolveCIDRCase is one table entry of TestResults_resolveCIDRFilter.
-type resolveCIDRCase struct {
-	name      string
-	filters   map[string][]string
-	subnetIDs []string
-	subnetErr error
-	vpcIDs    []string
-	vpcErr    error
-	want      map[string][]string
-	wantErr   string
-	wantCalls [2]bool
+// manyIDs returns n IDs with the given prefix.
+func manyIDs(prefix string, n int) []string {
+	ids := make([]string, 0, n)
+	for i := range n {
+		ids = append(ids, fmt.Sprintf("%s-%d", prefix, i))
+	}
+	return ids
 }
 
-// resolveCIDRCases covers the subnet-then-VPC cascade of resolveCIDRFilter.
+// resolveCIDRCase is one table entry of TestResults_resolveCIDRFilter.
+type resolveCIDRCase struct {
+	name       string
+	filters    map[string][]string
+	subnetIDs  []string
+	vpcIDs     []string
+	lookupErr  error
+	want       map[string][]string
+	wantNets   []string
+	wantErr    string
+	wantCalled bool
+}
+
+// resolveCIDRCases covers resolveCIDRFilter: subnets, the VPC fallback for many subnets, and errors.
 func resolveCIDRCases() []resolveCIDRCase {
-	base := map[string][]string{"cidr": {"10.0.1.0/24"}, "instance-state-name": {"running"}}
+	base := map[string][]string{"cidr": {"100.64.0.0/16"}, "instance-state-name": {"running"}}
+	running := []string{"running"}
 	return []resolveCIDRCase{
 		{
 			name:    "no cidr filter returns filters untouched and calls nothing",
@@ -614,60 +620,48 @@ func resolveCIDRCases() []resolveCIDRCase {
 			want:    map[string][]string{"instance-id": {"i-1"}},
 		},
 		{
-			name:      "subnet match becomes subnet-id",
-			filters:   base,
-			subnetIDs: []string{"subnet-1", "subnet-2"},
-			want:      map[string][]string{"subnet-id": {"subnet-1", "subnet-2"}, "instance-state-name": {"running"}},
-			wantCalls: [2]bool{true, false},
+			name: "overlapping subnets become network-interface.subnet-id", filters: base,
+			subnetIDs: []string{"subnet-1", "subnet-2"}, vpcIDs: []string{"vpc-1"},
+			want:     map[string][]string{filterKeySubnetID: {"subnet-1", "subnet-2"}, "instance-state-name": running},
+			wantNets: []string{"100.64.0.0/16"}, wantCalled: true,
 		},
 		{
-			name:      "no subnet but vpc match becomes vpc-id",
-			filters:   base,
-			subnetIDs: []string{},
-			vpcIDs:    []string{"vpc-1"},
-			want:      map[string][]string{"vpc-id": {"vpc-1"}, "instance-state-name": {"running"}},
-			wantCalls: [2]bool{true, true},
+			name: "too many subnets fall back to their vpcs", filters: base,
+			subnetIDs: manyIDs("subnet", maxCIDRSubnets+1), vpcIDs: []string{"vpc-1", "vpc-2"},
+			want:     map[string][]string{filterKeyVpcID: {"vpc-1", "vpc-2"}, "instance-state-name": running},
+			wantNets: []string{"100.64.0.0/16"}, wantCalled: true,
 		},
 		{
-			name:      "no subnet and no vpc is an error",
-			filters:   base,
-			subnetIDs: []string{},
-			vpcIDs:    []string{},
-			wantErr:   "no subnet or VPC found for CIDR 10.0.1.0/24 in us-east-1",
-			wantCalls: [2]bool{true, true},
+			name: "no overlapping subnet is an error", filters: base,
+			subnetIDs: []string{}, vpcIDs: []string{},
+			wantErr: "no subnet found in CIDR 100.64.0.0/16 in us-east-1", wantCalled: true,
 		},
 		{
-			name:      "subnet lookup error stops before vpc lookup",
-			filters:   base,
-			subnetErr: errors.New("boom"),
-			wantErr:   "resolving CIDR filter: boom",
-			wantCalls: [2]bool{true, false},
+			name: "lookup error is returned", filters: base, lookupErr: errors.New("boom"),
+			wantErr: "resolving CIDR filter: boom", wantCalled: true,
 		},
 		{
-			name:      "vpc lookup error is returned",
-			filters:   base,
-			subnetIDs: []string{},
-			vpcErr:    errors.New("boom"),
-			wantErr:   "resolving CIDR filter: boom",
-			wantCalls: [2]bool{true, true},
+			name:    "wildcard is rejected before any lookup",
+			filters: map[string][]string{"cidr": {"10.0.*"}},
+			wantErr: "resolving CIDR filter: invalid CIDR 10.0.*: it must be an IPv4 range such as 10.0.0.0/16",
 		},
 	}
 }
 
-// TestResults_resolveCIDRFilter tests the subnet-then-VPC cascade and the untouched shared filters map.
+// TestResults_resolveCIDRFilter tests the CIDR resolution and the untouched shared filters map.
 func TestResults_resolveCIDRFilter(t *testing.T) {
 	for _, tt := range resolveCIDRCases() {
 		t.Run(tt.name, func(t *testing.T) {
-			called := mockCIDRLookups(t, tt.subnetIDs, tt.subnetErr, tt.vpcIDs, tt.vpcErr)
+			called := mockSubnetsInCIDRs(t, tt.subnetIDs, tt.vpcIDs, tt.lookupErr)
 			original := map[string][]string{}
 			for k, v := range tt.filters {
 				original[k] = append([]string(nil), v...)
 			}
 			r := New("default", "us-east-1", tt.filters, "id")
 
-			got, err := r.resolveCIDRFilter(context.Background())
-			if *called != tt.wantCalls {
-				t.Errorf("lookups called (subnet, vpc) = %v, want %v", *called, tt.wantCalls)
+			got, nets, err := r.resolveCIDRFilter(context.Background())
+			if *called != tt.wantCalled {
+				t.Errorf("subnet lookup called = %v, want %v", *called, tt.wantCalled)
 			}
 			if !reflect.DeepEqual(r.Filters, original) {
 				t.Errorf("resolveCIDRFilter() mutated the shared filters: %v, want %v", r.Filters, original)
@@ -684,13 +678,25 @@ func TestResults_resolveCIDRFilter(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("resolveCIDRFilter() = %v, want %v", got, tt.want)
 			}
+			if gotNets := netStrings(nets); !reflect.DeepEqual(gotNets, tt.wantNets) {
+				t.Errorf("resolveCIDRFilter() nets = %v, want %v", gotNets, tt.wantNets)
+			}
 		})
 	}
 }
 
+// netStrings returns the networks as strings, or nil when there are none.
+func netStrings(nets []*net.IPNet) []string {
+	var out []string
+	for _, n := range nets {
+		out = append(out, n.String())
+	}
+	return out
+}
+
 // TestResults_Search_cidrNoMatch checks Search records the error and makes no AWS call when no CIDR matches.
 func TestResults_Search_cidrNoMatch(t *testing.T) {
-	mockCIDRLookups(t, []string{}, nil, []string{}, nil)
+	mockSubnetsInCIDRs(t, []string{}, []string{}, nil)
 	r := New("default", "us-east-1", map[string][]string{"cidr": {"10.9.0.0/16"}}, "id")
 
 	r.Search(context.Background())
@@ -698,9 +704,61 @@ func TestResults_Search_cidrNoMatch(t *testing.T) {
 	if len(r.Data) != 0 {
 		t.Errorf("Search() Data = %v, want empty", r.Data)
 	}
-	want := "no subnet or VPC found for CIDR 10.9.0.0/16 in us-east-1"
+	want := "no subnet found in CIDR 10.9.0.0/16 in us-east-1"
 	if len(r.Errors) != 1 || r.Errors[0] != want {
 		t.Errorf("Search() Errors = %v, want [%q]", r.Errors, want)
+	}
+}
+
+// instanceWithIPs returns an instance whose network interfaces have the given private IPs, one ENI per slice.
+func instanceWithIPs(id string, enis ...[]string) types.Instance {
+	inst := types.Instance{InstanceId: common.String(id)}
+	for _, ips := range enis {
+		eni := types.InstanceNetworkInterface{}
+		for _, ip := range ips {
+			eni.PrivateIpAddresses = append(eni.PrivateIpAddresses,
+				types.InstancePrivateIpAddress{PrivateIpAddress: common.String(ip)})
+		}
+		inst.NetworkInterfaces = append(inst.NetworkInterfaces, eni)
+	}
+	return inst
+}
+
+// TestResults_collectInstances tests that only instances with a private IP in the ranges are kept.
+func TestResults_collectInstances(t *testing.T) {
+	reservations := []types.Reservation{{Instances: []types.Instance{
+		instanceWithIPs("i-primary-only", []string{"10.121.224.10"}),
+		instanceWithIPs("i-both", []string{"10.121.224.11"}, []string{"100.64.1.5"}),
+		instanceWithIPs("i-secondary-ip", []string{"10.121.224.12", "100.64.2.9"}),
+		instanceWithIPs("i-no-ip"),
+	}}}
+	tests := []struct {
+		name  string
+		cidrs []string
+		want  []string
+	}{
+		{name: "no ranges keeps every instance", want: []string{"i-primary-only", "i-both", "i-secondary-ip", "i-no-ip"}},
+		{name: "primary vpc block", cidrs: []string{"10.121.224.0/20"},
+			want: []string{"i-primary-only", "i-both", "i-secondary-ip"}},
+		{name: "secondary vpc block", cidrs: []string{"100.64.0.0/16"}, want: []string{"i-both", "i-secondary-ip"}},
+		{name: "range smaller than a subnet", cidrs: []string{"100.64.2.0/28"}, want: []string{"i-secondary-ip"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nets, err := common.ParseIPv4CIDRs(tt.cidrs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r := New("default", "us-east-1", map[string][]string{}, "id")
+			r.collectInstances(reservations, nets)
+			got := make([]string, 0, len(r.Data))
+			for i := range r.Data {
+				got = append(got, r.Data[i].InstanceID)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("collectInstances() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

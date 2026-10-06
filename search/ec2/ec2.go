@@ -22,10 +22,10 @@ package ec2
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"github.com/dyegoe/awss/common"
 	searchSubnet "github.com/dyegoe/awss/search/subnet"
-	searchVPC "github.com/dyegoe/awss/search/vpc"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -37,23 +37,24 @@ const (
 
 	// FilterKeyCIDR is the pseudo-filter key carrying --cidrs values.
 	//
-	// It is not an AWS filter: Search resolves it into "subnet-id" or "vpc-id" per profile
-	// and region before calling DescribeInstances.
+	// It is not an AWS filter: Search resolves it per profile and region into the subnets
+	// that overlap the ranges, then keeps only the instances with a private IP inside them.
 	FilterKeyCIDR = "cidr"
 
 	// filterKeySubnetID and filterKeyVpcID are the AWS EC2 filter keys the CIDR resolves into.
-	// They match the instance's primary network interface.
-	filterKeySubnetID = "subnet-id"
-	filterKeyVpcID    = "vpc-id"
+	// They match any network interface of the instance, not only the primary one.
+	filterKeySubnetID = "network-interface.subnet-id"
+	filterKeyVpcID    = "network-interface.vpc-id"
+
+	// maxCIDRSubnets is the number of overlapping subnets above which the search filters by
+	// their VPCs instead, to stay well below the AWS limit on values per request.
+	maxCIDRSubnets = 200
 )
 
-// subnetIDsByCIDR and vpcIDsByCIDR look up subnet and VPC IDs by CIDR.
+// subnetsInCIDRs looks up the subnets, and their VPCs, that overlap the given ranges.
 //
-// They are variables so tests can replace the AWS calls.
-var (
-	subnetIDsByCIDR = searchSubnet.IDsByCIDR
-	vpcIDsByCIDR    = searchVPC.IDsByCIDR
-)
+// It is a variable so tests can replace the AWS call.
+var subnetsInCIDRs = searchSubnet.InCIDRs
 
 // Results describes results of the EC2 instances search.
 type Results struct {
@@ -118,7 +119,7 @@ func New(profile, region string, filters map[string][]string, sortField string) 
 // results are stored in the Data field.
 func (r *Results) Search(ctx context.Context) {
 	// Resolve the CIDR pseudo-filter, if any, into subnet or VPC IDs for this region.
-	filters, err := r.resolveCIDRFilter(ctx)
+	filters, nets, err := r.resolveCIDRFilter(ctx)
 	if err != nil {
 		r.Errors = append(r.Errors, err.Error())
 		return
@@ -146,15 +147,47 @@ func (r *Results) Search(ctx context.Context) {
 		return
 	}
 
-	// Parse response.
-	for _, i := range response.Reservations {
-		for _, inst := range i.Instances { //nolint:gocritic
-			r.Data = append(r.Data, parseInstance(&inst))
-		}
-	}
+	r.collectInstances(response.Reservations, nets)
 	if err = r.sortResults(r.SortField); err != nil {
 		r.Errors = append(r.Errors, err.Error())
 	}
+}
+
+// collectInstances appends the instances of the reservations to r.Data.
+//
+// When nets is not empty, only instances with a private IP inside one of the ranges are kept.
+func (r *Results) collectInstances(reservations []types.Reservation, nets []*net.IPNet) {
+	for _, res := range reservations {
+		for i := range res.Instances {
+			if len(nets) > 0 && !hasPrivateIPIn(&res.Instances[i], nets) {
+				continue
+			}
+			r.Data = append(r.Data, parseInstance(&res.Instances[i]))
+		}
+	}
+}
+
+// hasPrivateIPIn reports whether any private IP of any network interface of inst is inside nets.
+func hasPrivateIPIn(inst *types.Instance, nets []*net.IPNet) bool {
+	for _, eni := range inst.NetworkInterfaces { //nolint:gocritic // rangeValCopy: AWS SDK struct is not pointer-based
+		for _, addr := range eni.PrivateIpAddresses {
+			ip := net.ParseIP(common.StringValue(addr.PrivateIpAddress))
+			if ip != nil && ipInAny(ip, nets) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ipInAny reports whether ip is inside any of nets.
+func ipInAny(ip net.IP, nets []*net.IPNet) bool {
+	for _, n := range nets {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 // parseInstance converts a single EC2 Instance into a dataRow.
@@ -210,16 +243,32 @@ func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) 
 // GetRows returns the results as a slice of interface{}.
 func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
 
-// resolveCIDRFilter returns the filters to search with, replacing the CIDR pseudo-filter.
+// resolveCIDRFilter returns the filters to search with, replacing the CIDR pseudo-filter,
+// and the parsed ranges the instances must have a private IP in.
 //
-// Without a CIDR filter it returns r.Filters untouched. Otherwise it returns a copy where
-// "cidr" is replaced by "subnet-id" when at least one subnet has one of the CIDRs, or by
-// "vpc-id" when no subnet matches but at least one VPC does. When neither matches it returns
-// an error, since no instance can match. r.Filters is shared across goroutines and never mutated.
-func (r *Results) resolveCIDRFilter(ctx context.Context) (map[string][]string, error) {
+// Without a CIDR filter it returns r.Filters untouched and no ranges. Otherwise it returns a
+// copy where "cidr" is replaced by "network-interface.subnet-id" with the subnets that overlap
+// the ranges, or by "network-interface.vpc-id" with their VPCs when more than maxCIDRSubnets
+// subnets overlap. When no subnet overlaps it returns an error, since no instance can match.
+// r.Filters is shared across goroutines and never mutated.
+func (r *Results) resolveCIDRFilter(ctx context.Context) (map[string][]string, []*net.IPNet, error) {
 	cidrs, ok := r.Filters[FilterKeyCIDR]
 	if !ok {
-		return r.Filters, nil
+		return r.Filters, nil, nil
+	}
+
+	nets, err := common.ParseIPv4CIDRs(cidrs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolving CIDR filter: %w", err)
+	}
+
+	subnetIDs, vpcIDs, err := subnetsInCIDRs(ctx, r.Profile, r.Region, nets)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolving CIDR filter: %w", err)
+	}
+	if len(subnetIDs) == 0 {
+		return nil, nil, fmt.Errorf("no subnet found in CIDR %s in %s",
+			common.StringSliceToString(cidrs, ", "), r.Region)
 	}
 
 	resolved := make(map[string][]string, len(r.Filters))
@@ -228,27 +277,12 @@ func (r *Results) resolveCIDRFilter(ctx context.Context) (map[string][]string, e
 			resolved[key] = values
 		}
 	}
-
-	subnetIDs, err := subnetIDsByCIDR(ctx, r.Profile, r.Region, cidrs)
-	if err != nil {
-		return nil, fmt.Errorf("resolving CIDR filter: %w", err)
-	}
-	if len(subnetIDs) > 0 {
-		resolved[filterKeySubnetID] = subnetIDs
-		return resolved, nil
-	}
-
-	vpcIDs, err := vpcIDsByCIDR(ctx, r.Profile, r.Region, cidrs)
-	if err != nil {
-		return nil, fmt.Errorf("resolving CIDR filter: %w", err)
-	}
-	if len(vpcIDs) > 0 {
+	if len(subnetIDs) > maxCIDRSubnets {
 		resolved[filterKeyVpcID] = vpcIDs
-		return resolved, nil
+	} else {
+		resolved[filterKeySubnetID] = subnetIDs
 	}
-
-	return nil, fmt.Errorf("no subnet or VPC found for CIDR %s in %s",
-		common.StringSliceToString(cidrs, ", "), r.Region)
+	return resolved, nets, nil
 }
 
 // getFilters returns the DescribeInstances input built from r.Filters.

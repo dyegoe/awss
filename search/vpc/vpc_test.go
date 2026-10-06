@@ -17,9 +17,7 @@ limitations under the License.
 package vpc
 
 import (
-	"context"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/dyegoe/awss/common"
@@ -287,88 +285,5 @@ func TestGetSortFields(t *testing.T) {
 	wantNames := []string{"cidr", "cidrs", "default", "dhcp", "id", "name", "owner", "state"}
 	if names := SortFieldNames(); !reflect.DeepEqual(names, wantNames) {
 		t.Errorf("SortFieldNames() = %v, want %v", names, wantNames)
-	}
-}
-
-// idsByCIDRCase is one table entry of TestIDsByCIDR.
-type idsByCIDRCase struct {
-	name     string
-	cidrs    []string
-	mock     func(ctx context.Context, r *Results)
-	want     []string
-	wantErr  string
-	wantCall bool
-}
-
-var idsByCIDRCases = []idsByCIDRCase{
-	{
-		name:  "no cidrs skips the search",
-		cidrs: []string{},
-		want:  []string{},
-	},
-	{
-		name:  "returns the ids found",
-		cidrs: []string{"10.0.0.0/16"},
-		mock: func(_ context.Context, r *Results) {
-			r.Data = append(r.Data, dataRow{VpcID: "vpc-1"}, dataRow{VpcID: "vpc-2"})
-		},
-		want:     []string{"vpc-1", "vpc-2"},
-		wantCall: true,
-	},
-	{
-		name:     "no match returns empty slice",
-		cidrs:    []string{"10.9.0.0/16"},
-		mock:     func(_ context.Context, _ *Results) {},
-		want:     []string{},
-		wantCall: true,
-	},
-	{
-		name:  "search errors are returned",
-		cidrs: []string{"10.0.0.0/16"},
-		mock: func(_ context.Context, r *Results) {
-			r.Errors = append(r.Errors, "boom")
-		},
-		wantErr:  "searching VPCs by CIDR: boom",
-		wantCall: true,
-	},
-}
-
-// TestIDsByCIDR tests the CIDR to VPC ID lookup with the AWS call mocked.
-func TestIDsByCIDR(t *testing.T) {
-	for _, tt := range idsByCIDRCases {
-		t.Run(tt.name, func(t *testing.T) {
-			old := searchFn
-			t.Cleanup(func() { searchFn = old })
-			called := false
-			var gotFilters map[string][]string
-			searchFn = func(ctx context.Context, r *Results) {
-				called = true
-				gotFilters = r.Filters
-				if tt.mock != nil {
-					tt.mock(ctx, r)
-				}
-			}
-
-			got, err := IDsByCIDR(context.Background(), "default", "us-east-1", tt.cidrs)
-			if called != tt.wantCall {
-				t.Errorf("search called = %v, want %v", called, tt.wantCall)
-			}
-			if tt.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
-					t.Fatalf("IDsByCIDR() error = %v, want containing %q", err, tt.wantErr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("IDsByCIDR() unexpected error: %v", err)
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("IDsByCIDR() = %v, want %v", got, tt.want)
-			}
-			wantFilters := map[string][]string{FilterKeyCIDR: tt.cidrs}
-			if tt.wantCall && !reflect.DeepEqual(gotFilters, wantFilters) {
-				t.Errorf("IDsByCIDR() searched with filters %v, want %v", gotFilters, wantFilters)
-			}
-		})
 	}
 }

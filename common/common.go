@@ -90,6 +90,30 @@ func CheckCIDRs(cidrs []string) error {
 	return nil
 }
 
+// ParseIPv4CIDRs parses IPv4 CIDRs such as 10.0.0.0/16 into networks.
+//
+// Unlike CheckCIDRs it rejects wildcards and IPv6, because the result is used to test whether
+// IPv4 addresses and subnets fall inside a range.
+func ParseIPv4CIDRs(cidrs []string) ([]*net.IPNet, error) {
+	nets := make([]*net.IPNet, 0, len(cidrs))
+	for _, cidr := range cidrs {
+		_, n, err := net.ParseCIDR(cidr)
+		if err != nil || n.IP.To4() == nil {
+			return nil, fmt.Errorf("invalid CIDR %s: it must be an IPv4 range such as 10.0.0.0/16", cidr)
+		}
+		nets = append(nets, n)
+	}
+	return nets, nil
+}
+
+// CIDRsOverlap reports whether the networks a and b share at least one address.
+//
+// Two CIDR ranges either are disjoint or one contains the other, so it is enough to check
+// whether either one contains the first address of the other.
+func CIDRsOverlap(a, b *net.IPNet) bool {
+	return a.Contains(b.IP) || b.Contains(a.IP)
+}
+
 // StringValue returns an empty string if the pointer is nil.
 func StringValue(s *string) string {
 	if s != nil {

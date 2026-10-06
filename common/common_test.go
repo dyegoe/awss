@@ -177,6 +177,65 @@ func TestCheckCIDRs(t *testing.T) {
 	}
 }
 
+// TestParseIPv4CIDRs tests the ParseIPv4CIDRs function.
+func TestParseIPv4CIDRs(t *testing.T) {
+	tests := []struct {
+		name    string
+		cidrs   []string
+		want    []string
+		wantErr bool
+	}{
+		{name: "empty list", cidrs: []string{}, want: []string{}},
+		{name: "valid", cidrs: []string{"10.0.0.0/16", "100.64.0.0/16"}, want: []string{"10.0.0.0/16", "100.64.0.0/16"}},
+		{name: "host bits normalized", cidrs: []string{"10.0.1.5/24"}, want: []string{"10.0.1.0/24"}},
+		{name: "wildcard rejected", cidrs: []string{"10.0.*"}, wantErr: true},
+		{name: "ipv6 rejected", cidrs: []string{"2001:db8::/32"}, wantErr: true},
+		{name: "missing prefix length", cidrs: []string{"10.0.0.0"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseIPv4CIDRs(tt.cidrs)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ParseIPv4CIDRs() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				return
+			}
+			gotStrings := make([]string, 0, len(got))
+			for _, n := range got {
+				gotStrings = append(gotStrings, n.String())
+			}
+			if !reflect.DeepEqual(gotStrings, tt.want) {
+				t.Errorf("ParseIPv4CIDRs() = %v, want %v", gotStrings, tt.want)
+			}
+		})
+	}
+}
+
+// TestCIDRsOverlap tests the CIDRsOverlap function.
+func TestCIDRsOverlap(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b string
+		want bool
+	}{
+		{name: "equal", a: "10.0.1.0/24", b: "10.0.1.0/24", want: true},
+		{name: "a contains b", a: "10.0.0.0/16", b: "10.0.1.0/24", want: true},
+		{name: "b contains a", a: "10.0.1.0/28", b: "10.0.1.0/24", want: true},
+		{name: "disjoint", a: "10.121.224.0/20", b: "100.64.0.0/16", want: false},
+		{name: "adjacent", a: "10.0.0.0/24", b: "10.0.1.0/24", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, a, _ := net.ParseCIDR(tt.a)
+			_, b, _ := net.ParseCIDR(tt.b)
+			if got := CIDRsOverlap(a, b); got != tt.want {
+				t.Errorf("CIDRsOverlap(%s, %s) = %v, want %v", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestStringValue tests the StringValue function.
 func TestStringValue(t *testing.T) {
 	// Variables to test the pointer

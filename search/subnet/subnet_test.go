@@ -18,7 +18,7 @@ package subnet
 
 import (
 	"context"
-	"errors"
+	"net"
 	"reflect"
 	"testing"
 
@@ -281,7 +281,7 @@ func TestGetSortFields(t *testing.T) {
 	}
 }
 
-// mockSearch replaces the AWS call of IDsByCIDR for the duration of the test.
+// mockSearch replaces the AWS call of InCIDRs for the duration of the test.
 //
 // It returns a getter for the filters the last search was called with.
 func mockSearch(t *testing.T, fill func(r *Results)) func() map[string][]string {
@@ -296,53 +296,78 @@ func mockSearch(t *testing.T, fill func(r *Results)) func() map[string][]string 
 	return func() map[string][]string { return used }
 }
 
-// TestIDsByCIDR_found checks that matching subnet IDs are returned and the CIDR filter is used.
-func TestIDsByCIDR_found(t *testing.T) {
-	used := mockSearch(t, func(r *Results) {
-		r.Data = append(r.Data, dataRow{SubnetID: "subnet-1"}, dataRow{SubnetID: "subnet-2"})
-	})
-	got, err := IDsByCIDR(context.Background(), "default", "us-east-1", []string{"10.0.1.0/24"})
+// mustNets parses CIDRs for tests.
+func mustNets(t *testing.T, cidrs ...string) []*net.IPNet {
+	t.Helper()
+	nets, err := common.ParseIPv4CIDRs(cidrs)
 	if err != nil {
-		t.Fatalf("IDsByCIDR() unexpected error: %v", err)
+		t.Fatal(err)
 	}
-	if want := []string{"subnet-1", "subnet-2"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("IDsByCIDR() = %v, want %v", got, want)
+	return nets
+}
+
+// regionSubnets is a VPC with a primary (10.121.224.0/20) and a secondary (100.64.0.0/16)
+// CIDR block, plus a subnet of another VPC and one without a CIDR block.
+func regionSubnets(r *Results) {
+	r.Data = append(r.Data,
+		dataRow{SubnetID: "subnet-p1", VpcID: "vpc-1", CidrBlock: "10.121.224.0/24"},
+		dataRow{SubnetID: "subnet-p2", VpcID: "vpc-1", CidrBlock: "10.121.225.0/24"},
+		dataRow{SubnetID: "subnet-s1", VpcID: "vpc-1", CidrBlock: "100.64.0.0/18"},
+		dataRow{SubnetID: "subnet-o1", VpcID: "vpc-2", CidrBlock: "100.64.64.0/18"},
+		dataRow{SubnetID: "subnet-x", VpcID: "vpc-3"},
+	)
+}
+
+// TestInCIDRs checks which subnets and VPCs a range resolves into.
+func TestInCIDRs(t *testing.T) {
+	tests := []struct {
+		name        string
+		cidrs       []string
+		wantSubnets []string
+		wantVPCs    []string
+	}{
+		{name: "vpc primary block", cidrs: []string{"10.121.224.0/20"},
+			wantSubnets: []string{"subnet-p1", "subnet-p2"}, wantVPCs: []string{"vpc-1"}},
+		{name: "vpc secondary block", cidrs: []string{"100.64.0.0/18"},
+			wantSubnets: []string{"subnet-s1"}, wantVPCs: []string{"vpc-1"}},
+		{name: "range across vpcs", cidrs: []string{"100.64.0.0/16"},
+			wantSubnets: []string{"subnet-s1", "subnet-o1"}, wantVPCs: []string{"vpc-1", "vpc-2"}},
+		{name: "range smaller than a subnet", cidrs: []string{"10.121.225.16/28"},
+			wantSubnets: []string{"subnet-p2"}, wantVPCs: []string{"vpc-1"}},
+		{name: "no overlap", cidrs: []string{"192.168.0.0/16"}, wantSubnets: []string{}, wantVPCs: []string{}},
 	}
-	if want := map[string][]string{FilterKeyCIDR: {"10.0.1.0/24"}}; !reflect.DeepEqual(used(), want) {
-		t.Errorf("IDsByCIDR() searched with %v, want %v", used(), want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			used := mockSearch(t, regionSubnets)
+			subnets, vpcs, err := InCIDRs(context.Background(), "default", "us-east-1", mustNets(t, tt.cidrs...))
+			if err != nil {
+				t.Fatalf("InCIDRs() unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(subnets, tt.wantSubnets) || !reflect.DeepEqual(vpcs, tt.wantVPCs) {
+				t.Errorf("InCIDRs() = %v, %v; want %v, %v", subnets, vpcs, tt.wantSubnets, tt.wantVPCs)
+			}
+			if len(used()) != 0 {
+				t.Errorf("InCIDRs() searched with filters %v, want none", used())
+			}
+		})
 	}
 }
 
-// TestIDsByCIDR_noMatch checks that an empty (non-nil) slice is returned when nothing matches.
-func TestIDsByCIDR_noMatch(t *testing.T) {
-	mockSearch(t, func(_ *Results) {})
-	got, err := IDsByCIDR(context.Background(), "default", "us-east-1", []string{"10.9.0.0/24"})
-	if err != nil {
-		t.Fatalf("IDsByCIDR() unexpected error: %v", err)
-	}
-	if got == nil || len(got) != 0 {
-		t.Errorf("IDsByCIDR() = %#v, want empty non-nil slice", got)
-	}
-}
-
-// TestIDsByCIDR_error checks that search errors are wrapped and returned.
-func TestIDsByCIDR_error(t *testing.T) {
+// TestInCIDRs_error checks that search errors are wrapped and returned.
+func TestInCIDRs_error(t *testing.T) {
 	mockSearch(t, func(r *Results) { r.Errors = append(r.Errors, "boom") })
-	_, err := IDsByCIDR(context.Background(), "default", "us-east-1", []string{"10.0.1.0/24"})
+	_, _, err := InCIDRs(context.Background(), "default", "us-east-1", mustNets(t, "10.0.1.0/24"))
 	if err == nil || err.Error() != "searching subnets by CIDR: boom" {
-		t.Errorf("IDsByCIDR() error = %v, want %q", err, "searching subnets by CIDR: boom")
-	}
-	if errors.Is(err, nil) {
-		t.Error("IDsByCIDR() must return a non-nil error")
+		t.Errorf("InCIDRs() error = %v, want %q", err, "searching subnets by CIDR: boom")
 	}
 }
 
-// TestIDsByCIDR_empty checks that no search runs when no CIDR is given.
-func TestIDsByCIDR_empty(t *testing.T) {
+// TestInCIDRs_empty checks that no search runs when no CIDR is given.
+func TestInCIDRs_empty(t *testing.T) {
 	called := false
 	mockSearch(t, func(_ *Results) { called = true })
-	got, err := IDsByCIDR(context.Background(), "default", "us-east-1", nil)
-	if err != nil || len(got) != 0 || called {
-		t.Errorf("IDsByCIDR(nil) = %v, %v, called=%v; want empty, nil, false", got, err, called)
+	subnets, vpcs, err := InCIDRs(context.Background(), "default", "us-east-1", nil)
+	if err != nil || len(subnets) != 0 || len(vpcs) != 0 || called {
+		t.Errorf("InCIDRs(nil) = %v, %v, %v, called=%v; want empty, empty, nil, false", subnets, vpcs, err, called)
 	}
 }

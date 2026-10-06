@@ -23,8 +23,8 @@ search/              — engine registry (engines map, Options) and the parallel
 search/ec2/          — EC2-specific search logic and result type
 search/eni/          — ENI-specific search logic and result type
 search/ebs/          — EBS volume search logic and result type
-search/vpc/          — VPC search logic, result type, and IDsByCIDR lookup
-search/subnet/       — Subnet search logic, result type, and IDsByCIDR lookup
+search/vpc/          — VPC search logic and result type
+search/subnet/       — Subnet search logic, result type, and InCIDRs (overlapping subnets) lookup
 search/s3/           — S3 bucket search (per region, client-side name matching)
 search/s3obj/        — S3 object (key) search inside given buckets, capped by --max-keys
 common/              — shared: Results interface, BaseResults, AWS helpers, filter builders,
@@ -108,7 +108,7 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
 - Use table-driven tests with named cases (`name string` as first field).
 - Mock AWS calls one of two ways, never with real credentials:
   - a package-level function variable that tests replace (`getAwsProfilesFn` in `common/aws.go`,
-    `searchFn` in `search/vpc`, `subnetIDsByCIDR` in `search/ec2`);
+    `searchFn` in `search/subnet`, `subnetsInCIDRs` in `search/ec2`);
   - the SDK's `*APIClient` interfaces, so a fake client drives the paginator (`search/s3`, `search/s3obj`).
     Prefer this for new packages: it lets the whole `Search()` body be tested.
 - Test files for output live in `common/output_test.go` — use `output_test_data.go` for fixtures.
