@@ -46,6 +46,7 @@ type eniFilters struct {
 	AvailabilityZones []string `filter:"availability-zone"`
 	PrivateIPs        []net.IP `filter:"addresses.private-ip-address"`
 	PublicIPs         []net.IP `filter:"association.public-ip"`
+	OwnerIDs          []string `filter:"owner-id"`
 }
 
 var eniF = eniFilters{}
@@ -56,7 +57,8 @@ var eniCmd = &cobra.Command{
 	Short: "Search for ENIs (Elastic Network Interfaces).",
 	Long: `
 Search for ENIs (Elastic Network Interfaces).
-You can search ENIs using the following filters: ids, tags, instance-ids, availability-zones, private-ips, public-ips.
+You can search ENIs using the following filters: ids, tags, instance-ids, availability-zones, private-ips, public-ips,
+owner-ids.
 You can use multiple values for each filter, separated by comma. Example: --ids eni-1230456078901,eni-1230456078902
 
 You can use multiple filters at same time, for example:
@@ -82,7 +84,7 @@ func eniRunE(cmd *cobra.Command, _ []string) error {
 // eniFilterFlags lists all ENI filter flag names for mutual exclusivity with --all.
 var eniFilterFlags = []string{
 	flagIDs, flagTags, flagTagsKey, "instance-ids",
-	flagAvailabilityZones, "private-ips", "public-ips",
+	flagAvailabilityZones, "private-ips", "public-ips", "owner-ids",
 }
 
 func eniInitFlags() {
@@ -104,6 +106,8 @@ func eniInitFlags() {
 		"Filter ENIs by private IPs. `172.16.0.1,172.17.1.254`")
 	eniCmd.Flags().IPSliceVarP(&eniF.PublicIPs, "public-ips", "P", []net.IP{},
 		"Filter ENIs by public IPs. `52.28.19.20,52.30.31.32`")
+	eniCmd.Flags().StringSliceVarP(&eniF.OwnerIDs, "owner-ids", "o", []string{},
+		"Filter ENIs by owner account IDs. `123456789012`")
 	eniCmd.Flags().String("sort", "id", sortHelp("eni", "ENIs", "id"))
 	eniCmd.Flags().Bool("no-instance-name", false,
 		"Skip the instance name lookup to speed up the ENI search.")

@@ -83,6 +83,15 @@ type eniInfo struct {
 
 	// InstanceName is the name of the instance that this interface is associate.
 	InstanceName string `json:"instance_name,omitempty" header:"Instance Name" sort:"instance-name"`
+
+	// OwnerID is the ID of the AWS account that owns the network interface.
+	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
+
+	// RequesterID is the account or service that created the network interface (JSON output only).
+	RequesterID string `json:"requester_id,omitempty"`
+
+	// RequesterManaged reports whether an AWS service manages the network interface (JSON output only).
+	RequesterManaged bool `json:"requester_managed,omitempty"`
 }
 
 // New initiates and returns a new instance of ENI results.
@@ -165,11 +174,16 @@ func parseENIRow(eni *types.NetworkInterface) dataRow {
 			AvailabilityZone:   common.StringValue(eni.AvailabilityZone),
 			SubnetID:           common.StringValue(eni.SubnetId),
 			Status:             string(eni.Status),
+			OwnerID:            common.StringValue(eni.OwnerId),
+			RequesterID:        common.StringValue(eni.RequesterId),
 		},
 		Tags: common.TagsToMap(eni.TagSet),
 	}
 	if eni.Attachment != nil && eni.Attachment.InstanceId != nil {
 		row.InterfaceInfo.InstanceID = *eni.Attachment.InstanceId
+	}
+	if eni.RequesterManaged != nil {
+		row.InterfaceInfo.RequesterManaged = *eni.RequesterManaged
 	}
 	for _, ip := range eni.PrivateIpAddresses {
 		row.PrivateIPAddresses = append(row.PrivateIPAddresses, common.StringValue(ip.PrivateIpAddress))

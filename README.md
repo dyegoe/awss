@@ -59,12 +59,18 @@ Filter by:
 | `--availability-zones` | `-z` | Availability zones |
 | `--private-ips` | `-p` | Private IP addresses |
 | `--public-ips` | `-P` | Public IP addresses |
+| `--owner-ids` | `-o` | Owner account IDs |
 
-Sort by: `--sort id|type|az|status|subnet-id|instance-id|instance-name` (default: `id`)
+Sort by: `--sort id|type|az|status|subnet-id|instance-id|instance-name|owner` (default: `id`)
 
 Additional flags:
 
 - `--no-instance-name` -- skip instance name lookup for faster results
+
+The table shows the owner account of each ENI, which tells ENIs of other accounts apart in a
+shared VPC. The JSON output also carries `requester_id` and `requester_managed`, which identify
+ENIs created by AWS services (Lambda, EKS, VPC endpoints, NAT gateways). Instance names of ENIs
+owned by another account stay empty: look them up with that account's profile.
 
 #### EBS volumes (`awss ebs`)
 
