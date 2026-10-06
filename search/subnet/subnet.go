@@ -22,6 +22,8 @@ package subnet
 import (
 	"context"
 	"fmt"
+	"net"
+	"sort"
 	"strconv"
 
 	"github.com/dyegoe/awss/common"
@@ -224,24 +226,50 @@ func SortFieldNames() []string {
 // searchFn runs the search of r. It is a variable so tests can replace the AWS call.
 var searchFn = func(ctx context.Context, r *Results) { r.Search(ctx) }
 
-// IDsByCIDR returns the IDs of the subnets whose IPv4 CIDR block is one of the given CIDRs.
+// InCIDRs returns the IDs of the subnets whose IPv4 CIDR block overlaps any of the given
+// networks, and the IDs of the VPCs those subnets belong to (sorted, without duplicates).
 //
-// It is used by the ec2 search to resolve --cidrs into subnet IDs, per profile and region.
-// It returns an empty slice when nothing matches and an error when the search failed.
-func IDsByCIDR(ctx context.Context, profile, region string, cidrs []string) ([]string, error) {
-	if len(cidrs) == 0 {
-		return []string{}, nil
+// It is used by the ec2 search to resolve --cidrs per profile and region: every address of a
+// range lives in a subnet that overlaps it, whatever VPC CIDR block the subnet was carved from.
+// AWS has no overlap filter, so all subnets of the region are listed and matched here.
+// It returns empty slices when nothing overlaps and an error when the search failed.
+func InCIDRs(ctx context.Context, profile, region string, nets []*net.IPNet) (subnetIDs, vpcIDs []string, err error) {
+	subnetIDs, vpcIDs = []string{}, []string{}
+	if len(nets) == 0 {
+		return subnetIDs, vpcIDs, nil
 	}
 
-	r := New(profile, region, map[string][]string{FilterKeyCIDR: cidrs}, "id")
+	r := New(profile, region, map[string][]string{}, "id")
 	searchFn(ctx, r)
 	if len(r.Errors) > 0 {
-		return nil, fmt.Errorf("searching subnets by CIDR: %s", common.StringSliceToString(r.Errors, "; "))
+		return nil, nil, fmt.Errorf("searching subnets by CIDR: %s", common.StringSliceToString(r.Errors, "; "))
 	}
 
-	ids := make([]string, 0, len(r.Data))
+	seenVPC := map[string]bool{}
 	for i := range r.Data {
-		ids = append(ids, r.Data[i].SubnetID)
+		if !overlapsAny(r.Data[i].CidrBlock, nets) {
+			continue
+		}
+		subnetIDs = append(subnetIDs, r.Data[i].SubnetID)
+		if vpc := r.Data[i].VpcID; vpc != "" && !seenVPC[vpc] {
+			seenVPC[vpc] = true
+			vpcIDs = append(vpcIDs, vpc)
+		}
 	}
-	return ids, nil
+	sort.Strings(vpcIDs)
+	return subnetIDs, vpcIDs, nil
+}
+
+// overlapsAny reports whether the CIDR block overlaps any of nets. An unparsable block never does.
+func overlapsAny(cidrBlock string, nets []*net.IPNet) bool {
+	_, block, err := net.ParseCIDR(cidrBlock)
+	if err != nil {
+		return false
+	}
+	for _, n := range nets {
+		if common.CIDRsOverlap(block, n) {
+			return true
+		}
+	}
+	return false
 }

@@ -57,14 +57,15 @@ func Test_ec2Filters_cidrs(t *testing.T) {
 	}
 }
 
-// Test_ec2RunE_invalidCIDR checks that a malformed --cidrs value is rejected before searching.
+// Test_ec2RunE_invalidCIDR checks that a --cidrs value that is not an IPv4 range is rejected before searching.
 func Test_ec2RunE_invalidCIDR(t *testing.T) {
 	old := ec2F
 	t.Cleanup(func() { ec2F = old })
-	ec2F = ec2Filters{CIDRs: []string{"10.0.1.0"}}
-
-	if err := ec2RunE(ec2Cmd, nil); err == nil {
-		t.Error("ec2RunE() error = nil, want invalid CIDR error")
+	for _, cidr := range []string{"10.0.1.0", "10.0.*", "2001:db8::/32"} {
+		ec2F = ec2Filters{CIDRs: []string{cidr}}
+		if err := ec2RunE(ec2Cmd, nil); err == nil {
+			t.Errorf("ec2RunE(--cidrs %s) error = nil, want invalid CIDR error", cidr)
+		}
 	}
 }
 

@@ -28,12 +28,12 @@ Coverage per package as of 2026-10-06 (`go test -cover ./...`):
 
 | Package         | Coverage | Gap                                                          |
 | --------------- | -------: | ------------------------------------------------------------ |
-| `common`        |    91.1% | —                                                            |
+| `common`        |    91.3% | —                                                            |
 | `search/s3obj`  |    85.5% | —                                                            |
 | `search/s3`     |    80.8% | `Search()` (AWS config + client construction)                |
-| `search/subnet` |    68.2% | `Search()` paginator loop                                    |
-| `search/vpc`    |    67.2% | `Search()` paginator loop                                    |
-| `search/ec2`    |    65.6% | `Search()` DescribeInstances call                            |
+| `search/subnet` |    73.8% | `Search()` paginator loop                                    |
+| `search/ec2`    |    72.2% | `Search()` DescribeInstances call                            |
+| `search/vpc`    |    62.3% | `Search()` paginator loop                                    |
 | `search/eni`    |    48.5% | `Search()` and the instance-name enrichment                  |
 | `search/ebs`    |    42.9% | `Search()`, `collectVolumeRows`, `enrichInstanceNames`       |
 | `cmd`           |    39.5% | `Execute`, `persistentPreRun`, `runSearch` happy path        |

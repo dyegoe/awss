@@ -209,28 +209,3 @@ func GetSortFields(f string) (map[string]string, error) {
 func SortFieldNames() []string {
 	return common.SortFieldNames(dataRow{})
 }
-
-// searchFn runs the search of r. It is a variable so tests can replace the AWS call.
-var searchFn = func(ctx context.Context, r *Results) { r.Search(ctx) }
-
-// IDsByCIDR returns the IDs of the VPCs that have any of the given IPv4 CIDR blocks associated.
-//
-// It is used by the ec2 search to resolve --cidrs into VPC IDs, per profile and region.
-// It returns an empty slice when nothing matches and an error when the search failed.
-func IDsByCIDR(ctx context.Context, profile, region string, cidrs []string) ([]string, error) {
-	if len(cidrs) == 0 {
-		return []string{}, nil
-	}
-
-	r := New(profile, region, map[string][]string{FilterKeyCIDR: cidrs}, "id")
-	searchFn(ctx, r)
-	if len(r.Errors) > 0 {
-		return nil, fmt.Errorf("searching VPCs by CIDR: %s", common.StringSliceToString(r.Errors, "; "))
-	}
-
-	ids := make([]string, 0, len(r.Data))
-	for i := range r.Data {
-		ids = append(ids, r.Data[i].VpcID)
-	}
-	return ids, nil
-}

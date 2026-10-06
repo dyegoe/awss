@@ -35,18 +35,26 @@ Filter by:
 | `--private-ips` | `-p` | Private IP addresses |
 | `--public-ips` | `-P` | Public IP addresses |
 | `--volume-ids` | `-v` | Attached EBS volume IDs |
-| `--cidrs` | `-c` | CIDR block of the subnet, or of the VPC when no subnet matches (`10.0.1.0/24`) |
+| `--cidrs` | `-c` | IPv4 ranges: instances with a private IP inside them (`100.64.0.0/16`) |
 
 Sort by: `--sort id|name|type|az|state|private-ip|public-ip|enis|volumes` (default: `name`)
 
 The output also lists the EBS volumes attached to each instance.
 
-`--cidrs` resolves the CIDR per profile and region: it looks for subnets whose CIDR block matches
-exactly and searches instances in them; if none matches, it looks for VPCs with that CIDR block
-associated. If neither matches, the region reports an error and no instance is returned.
-Any network interface counts, not only the primary one: an instance whose secondary ENI sits in
-the subnet or VPC is found too, even though its Private IP column shows the primary interface's
-address.
+`--cidrs` finds the instances that have a private IP inside the range, on any network interface
+(primary or secondary, and secondary IPs of an interface count too). The range can be a subnet, a
+VPC CIDR block, primary or secondary, or any other IPv4 range, larger or smaller than a subnet.
+Wildcards and IPv6 are not accepted.
+
+For example, in a VPC with the CIDR blocks `10.121.224.0/20` and `100.64.0.0/16`,
+`--cidrs 100.64.0.0/16` returns only the instances with an interface in the `100.64.0.0/16` subnets,
+not every instance of the VPC. The Private IP column still shows the primary interface's address;
+the ENIs column lists every interface.
+
+How it works, per profile and region: awss lists the subnets and keeps those that overlap the
+range, searches the instances with an interface in them (in their VPCs instead when more than 200
+subnets overlap), then keeps the instances with a private IP inside the range. If no subnet
+overlaps, the region reports an error and no instance is returned.
 
 #### ENI (`awss eni`)
 
@@ -323,8 +331,8 @@ awss ebs --instance-ids i-1234567890abcdef0
 # Find the instance an EBS volume is attached to
 awss ec2 --volume-ids vol-1234567890abcdef0
 
-# Find the running instances in the subnet (or VPC) that owns a CIDR block
-awss ec2 --cidrs 10.0.1.0/24 --instance-states running
+# Find the running instances with a private IP in a range (a subnet, a VPC CIDR block or any range)
+awss ec2 --cidrs 100.64.0.0/16 --instance-states running
 
 # Find the VPC that owns a CIDR block
 awss vpc --cidrs 10.0.0.0/16
