@@ -29,6 +29,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 // fakeListBuckets is a ListBucketsAPIClient that serves the given pages and records the inputs.
@@ -53,6 +54,22 @@ func (f *fakeListBuckets) ListBuckets(
 	return out, nil
 }
 
+// fakeGetBucketTagging is a getBucketTaggingAPIClient that serves tags or errors per bucket.
+type fakeGetBucketTagging struct {
+	tags map[string][]types.Tag
+	errs map[string]error
+}
+
+func (f *fakeGetBucketTagging) GetBucketTagging(
+	_ context.Context, in *s3.GetBucketTaggingInput, _ ...func(*s3.Options),
+) (*s3.GetBucketTaggingOutput, error) {
+	name := common.StringValue(in.Bucket)
+	if err := f.errs[name]; err != nil {
+		return nil, err
+	}
+	return &s3.GetBucketTaggingOutput{TagSet: f.tags[name]}, nil
+}
+
 func bucket(name string) types.Bucket {
 	return types.Bucket{Name: common.String(name), BucketRegion: common.String("us-east-1")}
 }
@@ -67,18 +84,19 @@ func TestNew(t *testing.T) {
 			Errors:    []string{},
 			SortField: "name",
 		},
-		Data:    []dataRow{},
-		Filters: filters,
-		Regex:   true,
+		Data:     []dataRow{},
+		Filters:  filters,
+		Regex:    true,
+		ShowTags: true,
 	}
-	if got := New("default", "us-east-1", filters, "name", true); !reflect.DeepEqual(got, want) {
+	if got := New("default", "us-east-1", filters, "name", true, true); !reflect.DeepEqual(got, want) {
 		t.Errorf("New()\n%#v\nwant\n%#v", got, want)
 	}
 }
 
 // TestResults_accessors tests Len, GetHeaders, GetRows and the BaseResults getters.
 func TestResults_accessors(t *testing.T) {
-	r := New("default", "us-east-1", map[string][]string{}, "name", false)
+	r := New("default", "us-east-1", map[string][]string{}, "name", false, false)
 	r.Data = []dataRow{{Name: "a"}, {Name: "b"}}
 	if got := r.Len(); got != 2 {
 		t.Errorf("Len() = %d, want 2", got)
@@ -86,7 +104,7 @@ func TestResults_accessors(t *testing.T) {
 	if r.GetProfile() != "default" || r.GetRegion() != "us-east-1" || r.GetSortField() != "name" {
 		t.Errorf("getters = %q %q %q, want default us-east-1 name", r.GetProfile(), r.GetRegion(), r.GetSortField())
 	}
-	wantHeaders := []interface{}{"Name", "Region", "Created", "ARN"}
+	wantHeaders := []interface{}{"Name", "Region", "Created", "ARN", "Tags"}
 	if got := r.GetHeaders(); !reflect.DeepEqual(got, wantHeaders) {
 		t.Errorf("GetHeaders() = %#v, want %#v", got, wantHeaders)
 	}
@@ -180,7 +198,7 @@ func collectCases() []collectCase {
 func TestResults_collectBuckets(t *testing.T) {
 	for _, tt := range collectCases() {
 		t.Run(tt.name, func(t *testing.T) {
-			r := New("default", "us-east-1", map[string][]string{FilterKeyName: tt.patterns}, "", tt.regex)
+			r := New("default", "us-east-1", map[string][]string{FilterKeyName: tt.patterns}, "", tt.regex, false)
 			matcher, err := r.matcher()
 			if err != nil {
 				t.Fatalf("matcher() error = %v", err)
@@ -220,7 +238,7 @@ func TestResults_collectBuckets(t *testing.T) {
 
 // TestResults_Search_invalidPattern checks an invalid pattern is reported without calling AWS.
 func TestResults_Search_invalidPattern(t *testing.T) {
-	r := New("default", "us-east-1", map[string][]string{FilterKeyName: {"(unclosed"}}, "name", true)
+	r := New("default", "us-east-1", map[string][]string{FilterKeyName: {"(unclosed"}}, "name", true, false)
 	r.Search(context.Background())
 	if len(r.Errors) != 1 || !strings.Contains(r.Errors[0], "invalid regular expression") {
 		t.Errorf("Search() Errors = %v, want one invalid regular expression error", r.Errors)
@@ -246,7 +264,7 @@ func TestResults_sortResults(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := New("default", "us-east-1", map[string][]string{}, "", false)
+			r := New("default", "us-east-1", map[string][]string{}, "", false, false)
 			r.Data = append([]dataRow(nil), rows...)
 			err := r.sortResults(tt.field)
 			if (err != nil) != tt.wantErr {
@@ -279,4 +297,80 @@ func TestGetSortFields(t *testing.T) {
 	if names := SortFieldNames(); !reflect.DeepEqual(names, []string{"arn", "created", "name", "region"}) {
 		t.Errorf("SortFieldNames() = %v", names)
 	}
+}
+
+// TestResults_collectTags tests tag fetching, including buckets without tags and failures.
+func TestResults_collectTags(t *testing.T) {
+	noTags := &smithy.GenericAPIError{Code: errCodeNoSuchTagSet, Message: "The TagSet does not exist"}
+	tests := []struct {
+		name       string
+		buckets    []string
+		client     *fakeGetBucketTagging
+		wantTags   []map[string]string
+		wantErrors []string
+	}{
+		{
+			name:    "tags read",
+			buckets: []string{"a", "b"},
+			client: &fakeGetBucketTagging{tags: map[string][]types.Tag{
+				"a": {{Key: common.String("Env"), Value: common.String("prod")}},
+				"b": {{Key: common.String("Team"), Value: common.String("net")}},
+			}},
+			wantTags:   []map[string]string{{"Env": "prod"}, {"Team": "net"}},
+			wantErrors: []string{},
+		},
+		{
+			name:       "bucket without tags is not an error",
+			buckets:    []string{"a"},
+			client:     &fakeGetBucketTagging{errs: map[string]error{"a": noTags}},
+			wantTags:   []map[string]string{{}},
+			wantErrors: []string{},
+		},
+		{
+			name:    "failure reported per bucket",
+			buckets: []string{"a", "b", "c"},
+			client: &fakeGetBucketTagging{errs: map[string]error{
+				"a": errors.New("access denied"),
+				"c": errors.New("access denied"),
+			}},
+			wantTags:   []map[string]string{nil, {}, nil},
+			wantErrors: []string{tagErr("a"), tagErr("c")},
+		},
+		{
+			name:       "no buckets",
+			client:     &fakeGetBucketTagging{},
+			wantTags:   []map[string]string{},
+			wantErrors: []string{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := New("default", "us-east-1", map[string][]string{}, "", false, true)
+			for _, b := range tt.buckets {
+				r.Data = append(r.Data, dataRow{Name: b})
+			}
+			r.collectTags(context.Background(), tt.client)
+
+			if gotTags := rowTags(r.Data); !reflect.DeepEqual(gotTags, tt.wantTags) {
+				t.Errorf("tags = %#v, want %#v", gotTags, tt.wantTags)
+			}
+			if !reflect.DeepEqual(r.Errors, tt.wantErrors) {
+				t.Errorf("errors = %#v, want %#v", r.Errors, tt.wantErrors)
+			}
+		})
+	}
+}
+
+// rowTags returns the Tags of each row, in row order.
+func rowTags(rows []dataRow) []map[string]string {
+	tags := make([]map[string]string, 0, len(rows))
+	for i := range rows {
+		tags = append(tags, rows[i].Tags)
+	}
+	return tags
+}
+
+// tagErr is the error collectTags reports for a bucket whose tags failed with "access denied".
+func tagErr(bucket string) string {
+	return "error getting tags of bucket " + bucket + ": access denied"
 }

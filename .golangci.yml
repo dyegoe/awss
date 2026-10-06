@@ -42,6 +42,7 @@ linters:
             - github.com/spf13/cobra
             - github.com/spf13/viper
             - github.com/aws/aws-sdk-go-v2/
+            - github.com/aws/smithy-go
             - github.com/jedib0t/go-pretty/v6/table
             - github.com/jedib0t/go-pretty/v6/text
             - golang.org/x/term

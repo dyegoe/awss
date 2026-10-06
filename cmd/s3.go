@@ -60,6 +60,9 @@ patterns still go in --names:
 	awss s3 -n '^prod-.*-(logs|backups)$' --regex
 
 Use --all to list all buckets without any filter. This flag cannot be combined with --names.
+
+Bucket tags need one API call per bucket, so they are fetched only with --show-tags or
+--show-tags-keys (also for JSON output).
 `,
 	Args: cobra.NoArgs,
 	RunE: s3RunE,
