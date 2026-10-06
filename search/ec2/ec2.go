@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
 
 	"github.com/dyegoe/awss/common"
 	searchSubnet "github.com/dyegoe/awss/search/subnet"
@@ -361,6 +362,36 @@ func SearchInstanceNames(profile, region string, instanceIDs []string) (map[stri
 	names := make(map[string]string, len(r.Data))
 	for i := range r.Data {
 		names[r.Data[i].InstanceID] = r.Data[i].InstanceName
+	}
+	return names, nil
+}
+
+// InstanceNames returns a map of instance ID to instance name (tag:Name) for the given IDs.
+//
+// Unlike SearchInstanceNames it uses the caller's client and context, so a search reuses its own
+// EC2 client and tests can pass a fake. Duplicate IDs are sent once.
+func InstanceNames(
+	ctx context.Context, client ec2.DescribeInstancesAPIClient, instanceIDs []string,
+) (map[string]string, error) {
+	names := map[string]string{}
+	if len(instanceIDs) == 0 {
+		return names, nil
+	}
+
+	ids := slices.Clone(instanceIDs)
+	slices.Sort(ids)
+	input := &ec2.DescribeInstancesInput{InstanceIds: slices.Compact(ids)}
+	paginator := ec2.NewDescribeInstancesPaginator(client, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error searching instance names: %w", err)
+		}
+		for _, res := range page.Reservations {
+			for i := range res.Instances {
+				names[common.StringValue(res.Instances[i].InstanceId)] = common.TagName(res.Instances[i].Tags)
+			}
+		}
 	}
 	return names, nil
 }

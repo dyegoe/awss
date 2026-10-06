@@ -28,23 +28,23 @@ Coverage per package as of 2026-10-06 (`go test -cover ./...`):
 
 | Package         | Coverage | Gap                                                          |
 | --------------- | -------: | ------------------------------------------------------------ |
+| `search/eni`    |    98.7% | —                                                            |
 | `common`        |    91.3% | —                                                            |
 | `search/s3obj`  |    85.5% | —                                                            |
 | `search/s3`     |    80.8% | `Search()` (AWS config + client construction)                |
+| `search/ec2`    |    75.6% | `Search()` DescribeInstances call                            |
 | `search/subnet` |    73.8% | `Search()` paginator loop                                    |
-| `search/ec2`    |    72.2% | `Search()` DescribeInstances call                            |
 | `search/vpc`    |    62.3% | `Search()` paginator loop                                    |
-| `search/eni`    |    48.5% | `Search()` and the instance-name enrichment                  |
 | `search/ebs`    |    42.9% | `Search()`, `collectVolumeRows`, `enrichInstanceNames`       |
 | `cmd`           |    39.5% | `Execute`, `persistentPreRun`, `runSearch` happy path        |
 | `search`        |   100.0% | —                                                            |
 
-- [ ] [**Inject the EC2 client.**](https://github.com/dyegoe/awss/issues/144) Use the SDK's
-  `Describe*APIClient` interfaces the way `search/s3` and `search/s3obj` do, so the
-  `Search()` bodies of ec2, eni, ebs, vpc and subnet can be tested with a fake and every search
-  package reaches the 80% target. Start with `search/eni` (48.5%): its `Search()` body,
-  including the instance-name lookup, is untested. Follow-up package issues:
-  [EBS](https://github.com/dyegoe/awss/issues/145),
+- [ ] **Inject the EC2 client.** Use the SDK's `Describe*APIClient` interfaces the way
+  `search/eni`, `search/s3` and `search/s3obj` do, so the `Search()` bodies can be tested with a
+  fake and every search package reaches the 80% target. `search/eni` is done and shows the
+  pattern, including the shared `ec2.InstanceNames` lookup. Remaining package issues:
+  [EBS](https://github.com/dyegoe/awss/issues/145) (also switches to `ec2.InstanceNames` and
+  removes `SearchInstanceNames`),
   [EC2](https://github.com/dyegoe/awss/issues/146),
   [VPC](https://github.com/dyegoe/awss/issues/147), and
   [subnet](https://github.com/dyegoe/awss/issues/148).
