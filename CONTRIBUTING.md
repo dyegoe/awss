@@ -117,7 +117,7 @@ Before you submit a pull request, check that it meets these guidelines:
 1. All three verify commands must pass: `make build`, `make test`, `make lint`.
 2. If the pull request adds functionality, update the docs and add tests. A new flag, command,
    sort field or config key must appear in `README.md`; a new resource type must follow the
-   "Adding new resource types" checklist in `CLAUDE.md`.
+   "Adding new resource types" checklist in `AGENTS.md`.
 3. New exported symbols must have doc comments (see `docs/CODESTYLE.md`).
 4. Follow the coding conventions described in `docs/CODESTYLE.md`.
 
