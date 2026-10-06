@@ -24,12 +24,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/dyegoe/awss/common"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
@@ -805,7 +807,10 @@ func (f *fakeDescribeInstances) DescribeInstances(
 		return nil, f.err
 	}
 	page := len(f.inputs) - 1
-	out := &ec2.DescribeInstancesOutput{Reservations: []types.Reservation{{Instances: f.pages[page]}}}
+	out := &ec2.DescribeInstancesOutput{}
+	if page < len(f.pages) {
+		out.Reservations = []types.Reservation{{Instances: f.pages[page]}}
+	}
 	if page < len(f.pages)-1 {
 		out.NextToken = common.String(fmt.Sprint(page + 1))
 	}
@@ -871,6 +876,161 @@ func TestInstanceNames(t *testing.T) {
 			}
 			if tt.wantCalls > 0 && !reflect.DeepEqual(tt.client.inputs[0].InstanceIds, tt.wantIDs) {
 				t.Errorf("InstanceIds = %v, want %v", tt.client.inputs[0].InstanceIds, tt.wantIDs)
+			}
+		})
+	}
+}
+
+// collectCase is one table entry of TestResults_collect.
+type collectCase struct {
+	name        string
+	sortField   string
+	cidrs       []string
+	input       *ec2.DescribeInstancesInput
+	client      *fakeDescribeInstances
+	wantIDs     []string
+	wantErrors  []string
+	wantCalls   int
+	wantMaxSize *int32
+}
+
+func collectCases() []collectCase {
+	twoPages := [][]types.Instance{
+		{instanceWithIPs("i-3", []string{"10.0.0.3"}), instanceWithIPs("i-1", []string{"192.168.0.1"})},
+		{instanceWithIPs("i-2", []string{"10.0.0.2"})},
+	}
+	return []collectCase{
+		{
+			name:        "follows every page, asks for pages and sorts",
+			sortField:   "id",
+			client:      &fakeDescribeInstances{pages: twoPages},
+			wantIDs:     []string{"i-1", "i-2", "i-3"},
+			wantCalls:   2,
+			wantMaxSize: aws.Int32(pageSize),
+		},
+		{
+			name:        "ranges keep only matching instances on every page",
+			sortField:   "id",
+			cidrs:       []string{"10.0.0.0/24"},
+			client:      &fakeDescribeInstances{pages: twoPages},
+			wantIDs:     []string{"i-2", "i-3"},
+			wantCalls:   2,
+			wantMaxSize: aws.Int32(pageSize),
+		},
+		{
+			name:      "named instance IDs send no page size",
+			sortField: "id",
+			input:     &ec2.DescribeInstancesInput{InstanceIds: []string{"i-1"}},
+			client:    &fakeDescribeInstances{pages: [][]types.Instance{{instanceWithIPs("i-1")}}},
+			wantIDs:   []string{"i-1"},
+			wantCalls: 1,
+		},
+		{
+			name:        "empty result",
+			sortField:   "id",
+			client:      &fakeDescribeInstances{},
+			wantIDs:     []string{},
+			wantCalls:   1,
+			wantMaxSize: aws.Int32(pageSize),
+		},
+		{
+			name:        "describe error is reported with no rows",
+			sortField:   "id",
+			client:      &fakeDescribeInstances{err: errors.New("boom")},
+			wantIDs:     []string{},
+			wantErrors:  []string{"error describing instances: boom"},
+			wantCalls:   1,
+			wantMaxSize: aws.Int32(pageSize),
+		},
+		{
+			name:        "unknown sort field is reported and the rows kept",
+			sortField:   "nope",
+			client:      &fakeDescribeInstances{pages: [][]types.Instance{{instanceWithIPs("i-1")}}},
+			wantIDs:     []string{"i-1"},
+			wantErrors:  []string{"invalid sort field: nope. The options are: " + strings.Join(SortFieldNames(), ", ")},
+			wantCalls:   1,
+			wantMaxSize: aws.Int32(pageSize),
+		},
+	}
+}
+
+// TestResults_collect tests the paginated describe, the page size, the range check and the
+// sorting through a fake EC2 client.
+func TestResults_collect(t *testing.T) {
+	for _, tt := range collectCases() {
+		t.Run(tt.name, func(t *testing.T) {
+			nets, err := common.ParseIPv4CIDRs(tt.cidrs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			input := tt.input
+			if input == nil {
+				input = &ec2.DescribeInstancesInput{Filters: common.FilterDefault("instance-state-name", []string{"running"})}
+			}
+			r := New("default", "us-east-1", map[string][]string{}, tt.sortField)
+
+			r.collect(context.Background(), tt.client, input, nets)
+
+			got := []string{}
+			for i := range r.Data {
+				got = append(got, r.Data[i].InstanceID)
+			}
+			if !reflect.DeepEqual(got, tt.wantIDs) {
+				t.Errorf("rows = %v, want %v", got, tt.wantIDs)
+			}
+			if !reflect.DeepEqual(r.Errors, append([]string{}, tt.wantErrors...)) {
+				t.Errorf("Errors = %q, want %q", r.Errors, tt.wantErrors)
+			}
+			if len(tt.client.inputs) != tt.wantCalls {
+				t.Fatalf("DescribeInstances calls = %d, want %d", len(tt.client.inputs), tt.wantCalls)
+			}
+			for _, in := range tt.client.inputs {
+				if !reflect.DeepEqual(in.MaxResults, tt.wantMaxSize) || !reflect.DeepEqual(in.Filters, input.Filters) {
+					t.Errorf("input MaxResults = %v, Filters = %#v; want %v, %#v",
+						in.MaxResults, in.Filters, tt.wantMaxSize, input.Filters)
+				}
+			}
+			if input.MaxResults != nil {
+				t.Errorf("collect changed the caller's input")
+			}
+		})
+	}
+}
+
+// TestResults_Search_earlyErrors tests the errors Search reports before any EC2 call.
+func TestResults_Search_earlyErrors(t *testing.T) {
+	// An empty AWS config file: the profile does not exist and nothing is read from the user's files.
+	empty := filepath.Join(t.TempDir(), "config")
+	t.Setenv("AWS_CONFIG_FILE", empty)
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", empty)
+
+	tests := []struct {
+		name       string
+		filters    map[string][]string
+		wantPrefix string
+	}{
+		{
+			name:       "invalid CIDR",
+			filters:    map[string][]string{FilterKeyCIDR: {"not-a-cidr"}},
+			wantPrefix: "resolving CIDR filter:",
+		},
+		{
+			name:       "invalid tag filter",
+			filters:    map[string][]string{"tag": {"no-equals-sign"}},
+			wantPrefix: "error building filters:",
+		},
+		{
+			name:       "unknown profile",
+			filters:    map[string][]string{},
+			wantPrefix: "error getting aws config:",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := New("awss-test-missing-profile", "us-east-1", tt.filters, "id")
+			r.Search(context.Background())
+			if len(r.Errors) != 1 || !strings.HasPrefix(r.Errors[0], tt.wantPrefix) {
+				t.Errorf("Errors = %q, want one error starting with %q", r.Errors, tt.wantPrefix)
 			}
 		})
 	}

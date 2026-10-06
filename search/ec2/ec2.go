@@ -28,6 +28,7 @@ import (
 	"github.com/dyegoe/awss/common"
 	searchSubnet "github.com/dyegoe/awss/search/subnet"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
@@ -136,20 +137,43 @@ func (r *Results) Search(ctx context.Context) {
 	// Get AWS config.
 	cfg, err := common.AwsConfig(r.Profile, r.Region)
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 
-	// Get AWS client and describe instances.
-	client := ec2.NewFromConfig(cfg)
-	response, err := client.DescribeInstances(ctx, input)
-	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
-		return
+	r.collect(ctx, ec2.NewFromConfig(cfg), input, nets)
+}
+
+// pageSize is the number of instances asked per DescribeInstances call.
+//
+// AWS recommends paginated calls only, so every search that does not name the instances asks
+// for pages. 1000 is the largest page AWS allows.
+const pageSize int32 = 1000
+
+// collect describes the instances, following every page, and sorts the rows.
+//
+// When nets is not empty, only instances with a private IP inside one of the ranges are kept.
+// Search builds the real client; tests pass a fake.
+func (r *Results) collect(
+	ctx context.Context, client ec2.DescribeInstancesAPIClient, input *ec2.DescribeInstancesInput, nets []*net.IPNet,
+) {
+	paged := *input
+	// AWS rejects MaxResults together with InstanceIds.
+	if len(paged.InstanceIds) == 0 && paged.MaxResults == nil {
+		paged.MaxResults = aws.Int32(pageSize)
 	}
 
-	r.collectInstances(response.Reservations, nets)
-	if err = r.sortResults(r.SortField); err != nil {
+	paginator := ec2.NewDescribeInstancesPaginator(client, &paged)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			r.Errors = append(r.Errors, fmt.Sprintf("error describing instances: %v", err))
+			return
+		}
+		r.collectInstances(page.Reservations, nets)
+	}
+
+	if err := r.sortResults(r.SortField); err != nil {
 		r.Errors = append(r.Errors, err.Error())
 	}
 }
