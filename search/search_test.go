@@ -24,11 +24,14 @@ package search
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/dyegoe/awss/common"
 )
@@ -176,7 +179,7 @@ func mockPreAuth(t *testing.T, err error) (*int, *bytes.Buffer) {
 	oldWhoAmI, oldWarnings := whoAmIFn, warnings
 	t.Cleanup(func() { whoAmIFn, warnings = oldWhoAmI, oldWarnings })
 	calls := 0
-	whoAmIFn = func(_, _ string) (string, error) {
+	whoAmIFn = func(_ context.Context, _, _ string) (string, error) {
 		calls++
 		return "", err
 	}
@@ -241,5 +244,190 @@ func TestExecute_preAuth(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// timedResults is a result set whose search is given per profile, so one run can mix searches
+// that finish, honor the deadline or hang.
+type timedResults struct {
+	common.BaseResults
+	Data   []string                                   `json:"data"`
+	search func(ctx context.Context, r *timedResults) `json:"-"`
+}
+
+func (f *timedResults) Search(ctx context.Context) { f.search(ctx, f) }
+func (f *timedResults) Len() int                   { return len(f.Data) }
+func (f *timedResults) GetHeaders() []interface{}  { return nil }
+func (f *timedResults) GetRows() []interface{}     { return nil }
+
+// mockTimedEngine registers a "test" engine whose searches are looked up by profile.
+func mockTimedEngine(t *testing.T, searches map[string]func(ctx context.Context, r *timedResults)) {
+	t.Helper()
+	mockEngines(t, func(profile, region string, _ map[string][]string, _ *Options) common.Results {
+		return &timedResults{
+			BaseResults: common.BaseResults{Profile: profile, Region: region},
+			Data:        []string{},
+			search:      searches[profile],
+		}
+	})
+}
+
+// captureStdout sends the printed results to a buffer for the duration of the test.
+func captureStdout(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	old := stdout
+	t.Cleanup(func() { stdout = old })
+	buf := &bytes.Buffer{}
+	stdout = buf
+	return buf
+}
+
+// printedSet is one result set as printed in JSON.
+type printedSet struct {
+	Profile string   `json:"profile"`
+	Region  string   `json:"region"`
+	Errors  []string `json:"errors"`
+	Data    []string `json:"data"`
+}
+
+// decodePrinted parses the JSON result sets printed by Execute, keyed by profile.
+func decodePrinted(t *testing.T, out *bytes.Buffer) map[string]printedSet {
+	t.Helper()
+	got := map[string]printedSet{}
+	dec := json.NewDecoder(out)
+	for dec.More() {
+		var set printedSet
+		if err := dec.Decode(&set); err != nil {
+			t.Fatalf("decoding output %q: %v", out.String(), err)
+		}
+		got[set.Profile] = set
+	}
+	return got
+}
+
+// TestExecute_timeoutReachesSearch checks that every search gets a context that expires at the
+// timeout, and that a timeout of 0 sets no deadline.
+func TestExecute_timeoutReachesSearch(t *testing.T) {
+	tests := []struct {
+		name         string
+		timeout      time.Duration
+		wantDeadline bool
+	}{
+		{name: "timeout sets a deadline", timeout: time.Hour, wantDeadline: true},
+		{name: "zero disables the deadline", timeout: 0, wantDeadline: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var mu sync.Mutex
+			deadlines := map[string]bool{}
+			record := func(ctx context.Context, r *timedResults) {
+				_, ok := ctx.Deadline()
+				mu.Lock()
+				deadlines[r.Profile+"/"+r.Region] = ok
+				mu.Unlock()
+			}
+			mockTimedEngine(t, map[string]func(context.Context, *timedResults){"p1": record, "p2": record})
+			mockPreAuth(t, nil)
+			captureStdout(t)
+
+			opts := &Options{Output: common.JSON, Timeout: tt.timeout}
+			if err := Execute("test", []string{"p1", "p2"}, []string{"r1", "r2"}, map[string][]string{}, opts); err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			if len(deadlines) != 4 {
+				t.Fatalf("searches run = %d, want 4", len(deadlines))
+			}
+			for key, ok := range deadlines {
+				if ok != tt.wantDeadline {
+					t.Errorf("%s: context has deadline = %v, want %v", key, ok, tt.wantDeadline)
+				}
+			}
+		})
+	}
+}
+
+// TestExecute_timeout checks that the finished result sets are printed as they are, and that a
+// search still running at the deadline is printed as timed out, without rows, whether it honors
+// the context or ignores it.
+func TestExecute_timeout(t *testing.T) {
+	hang := make(chan struct{})
+	t.Cleanup(func() { close(hang) })
+	ctxErr := make(chan error, 1)
+
+	mockTimedEngine(t, map[string]func(context.Context, *timedResults){
+		"fast": func(_ context.Context, r *timedResults) { r.Data = append(r.Data, "row-1") },
+		"failed": func(_ context.Context, r *timedResults) {
+			r.Errors = append(r.Errors, "error describing instances: AccessDenied")
+		},
+		// Honors the context: returns at the deadline with a partial page and the SDK error.
+		"cut-short": func(ctx context.Context, r *timedResults) {
+			r.Data = append(r.Data, "partial-row")
+			<-ctx.Done()
+			ctxErr <- ctx.Err()
+			r.Errors = append(r.Errors, "error describing instances: "+ctx.Err().Error())
+		},
+		// Ignores the context and never returns during the run.
+		"hung": func(_ context.Context, r *timedResults) {
+			<-hang
+			r.Data = append(r.Data, "too-late")
+		},
+	})
+	mockPreAuth(t, nil)
+	out := captureStdout(t)
+
+	opts := &Options{Output: common.JSON, Timeout: 100 * time.Millisecond}
+	profiles := []string{"fast", "failed", "cut-short", "hung"}
+	if err := Execute("test", profiles, []string{"us-east-1"}, map[string][]string{}, opts); err != nil {
+		t.Fatalf("Execute() error = %v, want nil", err)
+	}
+
+	if err := <-ctxErr; !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("search context error = %v, want %v", err, context.DeadlineExceeded)
+	}
+	timedOut := []string{"search timed out after 100ms; raise --timeout, or set it to 0 to disable it"}
+	want := map[string]printedSet{
+		"fast": {Profile: "fast", Region: "us-east-1", Data: []string{"row-1"}},
+		"failed": {
+			Profile: "failed", Region: "us-east-1", Data: []string{},
+			Errors: []string{"error describing instances: AccessDenied"},
+		},
+		"cut-short": {Profile: "cut-short", Region: "us-east-1", Data: []string{}, Errors: timedOut},
+		"hung":      {Profile: "hung", Region: "us-east-1", Data: []string{}, Errors: timedOut},
+	}
+	if got := decodePrinted(t, out); !reflect.DeepEqual(got, want) {
+		t.Errorf("printed result sets\n%+v\nwant\n%+v", got, want)
+	}
+}
+
+// TestExecute_preAuthTimeout checks that a pre-authentication stuck on a stalled STS endpoint is
+// cut by the deadline: the run returns, warns, and reports every search as timed out.
+func TestExecute_preAuthTimeout(t *testing.T) {
+	oldWhoAmI, oldWarnings := whoAmIFn, warnings
+	t.Cleanup(func() { whoAmIFn, warnings = oldWhoAmI, oldWarnings })
+	whoAmIFn = func(ctx context.Context, _, _ string) (string, error) {
+		<-ctx.Done()
+		return "", ctx.Err()
+	}
+	warn := &bytes.Buffer{}
+	warnings = warn
+	mockTimedEngine(t, map[string]func(context.Context, *timedResults){
+		"p1": func(ctx context.Context, _ *timedResults) { <-ctx.Done() },
+	})
+	out := captureStdout(t)
+
+	opts := &Options{Output: common.JSON, Timeout: 50 * time.Millisecond}
+	if err := Execute("test", []string{"p1"}, []string{"us-east-1"}, map[string][]string{}, opts); err != nil {
+		t.Fatalf("Execute() error = %v, want nil", err)
+	}
+
+	if !strings.Contains(warn.String(), context.DeadlineExceeded.Error()) {
+		t.Errorf("warning = %q, want the pre-authentication deadline error", warn.String())
+	}
+	want := map[string]printedSet{"p1": {
+		Profile: "p1", Region: "us-east-1", Data: []string{},
+		Errors: []string{"search timed out after 50ms; raise --timeout, or set it to 0 to disable it"},
+	}}
+	if got := decodePrinted(t, out); !reflect.DeepEqual(got, want) {
+		t.Errorf("printed result sets\n%+v\nwant\n%+v", got, want)
 	}
 }

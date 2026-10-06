@@ -60,17 +60,18 @@ func AwsConfig(profile, region string) (aws.Config, error) {
 // The profile and region are used to create the AWS config.
 // The AWS account ID is returned by the STS GetCallerIdentity API.
 // This function is used as workaround to pre-authenticate the AWS config.
-func WhoAmI(profile, region string) (string, error) {
+// ctx bounds the STS call, so a stalled endpoint cannot block the caller forever.
+func WhoAmI(ctx context.Context, profile, region string) (string, error) {
 	cfg, err := AwsConfig(profile, region)
 	if err != nil {
 		return "", err
 	}
 	client := sts.NewFromConfig(cfg)
-	resp, err := client.GetCallerIdentity(context.Background(), &sts.GetCallerIdentityInput{})
+	resp, err := client.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return "", err
 	}
-	return *resp.Account, nil
+	return StringValue(resp.Account), nil
 }
 
 // defaultSharedConfigFilename is the default location of the AWS config file.
