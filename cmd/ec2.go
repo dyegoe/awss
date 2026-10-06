@@ -51,7 +51,8 @@ type ec2Filters struct {
 	PublicIPs         []net.IP `filter:"network-interface.addresses.association.public-ip"`
 	VolumeIDs         []string `filter:"block-device-mapping.volume-id"`
 
-	// CIDRs is a pseudo-filter: search/ec2 resolves it into subnet-id or vpc-id per region.
+	// CIDRs is a pseudo-filter: search/ec2 resolves it into network-interface.subnet-id
+	// or network-interface.vpc-id per region.
 	CIDRs []string `filter:"cidr"`
 }
 

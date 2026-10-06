@@ -10,8 +10,7 @@ Legend: [ ] to do · [~] in progress
 
 ## Feature follow-ups (tracked as issues)
 
-- [ ] [#128](https://github.com/dyegoe/awss/issues/128) `awss ec2 --cidrs` also matching
-  secondary network interfaces (`network-interface.subnet-id` / `network-interface.vpc-id`).
+None open.
 
 ## Reliability
 

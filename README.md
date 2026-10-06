@@ -44,6 +44,9 @@ The output also lists the EBS volumes attached to each instance.
 `--cidrs` resolves the CIDR per profile and region: it looks for subnets whose CIDR block matches
 exactly and searches instances in them; if none matches, it looks for VPCs with that CIDR block
 associated. If neither matches, the region reports an error and no instance is returned.
+Any network interface counts, not only the primary one: an instance whose secondary ENI sits in
+the subnet or VPC is found too, even though its Private IP column shows the primary interface's
+address.
 
 #### ENI (`awss eni`)
 

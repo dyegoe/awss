@@ -614,18 +614,18 @@ func resolveCIDRCases() []resolveCIDRCase {
 			want:    map[string][]string{"instance-id": {"i-1"}},
 		},
 		{
-			name:      "subnet match becomes subnet-id",
+			name:      "subnet match becomes network-interface.subnet-id",
 			filters:   base,
 			subnetIDs: []string{"subnet-1", "subnet-2"},
-			want:      map[string][]string{"subnet-id": {"subnet-1", "subnet-2"}, "instance-state-name": {"running"}},
+			want:      map[string][]string{filterKeySubnetID: {"subnet-1", "subnet-2"}, "instance-state-name": {"running"}},
 			wantCalls: [2]bool{true, false},
 		},
 		{
-			name:      "no subnet but vpc match becomes vpc-id",
+			name:      "no subnet but vpc match becomes network-interface.vpc-id",
 			filters:   base,
 			subnetIDs: []string{},
 			vpcIDs:    []string{"vpc-1"},
-			want:      map[string][]string{"vpc-id": {"vpc-1"}, "instance-state-name": {"running"}},
+			want:      map[string][]string{filterKeyVpcID: {"vpc-1"}, "instance-state-name": {"running"}},
 			wantCalls: [2]bool{true, true},
 		},
 		{

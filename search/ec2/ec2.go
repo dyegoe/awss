@@ -37,14 +37,15 @@ const (
 
 	// FilterKeyCIDR is the pseudo-filter key carrying --cidrs values.
 	//
-	// It is not an AWS filter: Search resolves it into "subnet-id" or "vpc-id" per profile
-	// and region before calling DescribeInstances.
+	// It is not an AWS filter: Search resolves it into "network-interface.subnet-id" or
+	// "network-interface.vpc-id" per profile and region before calling DescribeInstances.
 	FilterKeyCIDR = "cidr"
 
 	// filterKeySubnetID and filterKeyVpcID are the AWS EC2 filter keys the CIDR resolves into.
-	// They match the instance's primary network interface.
-	filterKeySubnetID = "subnet-id"
-	filterKeyVpcID    = "vpc-id"
+	// They match any network interface of the instance, not only the primary one, so an
+	// instance with a secondary ENI in the subnet or VPC is found too.
+	filterKeySubnetID = "network-interface.subnet-id"
+	filterKeyVpcID    = "network-interface.vpc-id"
 )
 
 // subnetIDsByCIDR and vpcIDsByCIDR look up subnet and VPC IDs by CIDR.
@@ -213,9 +214,10 @@ func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
 // resolveCIDRFilter returns the filters to search with, replacing the CIDR pseudo-filter.
 //
 // Without a CIDR filter it returns r.Filters untouched. Otherwise it returns a copy where
-// "cidr" is replaced by "subnet-id" when at least one subnet has one of the CIDRs, or by
-// "vpc-id" when no subnet matches but at least one VPC does. When neither matches it returns
-// an error, since no instance can match. r.Filters is shared across goroutines and never mutated.
+// "cidr" is replaced by "network-interface.subnet-id" when at least one subnet has one of the
+// CIDRs, or by "network-interface.vpc-id" when no subnet matches but at least one VPC does.
+// When neither matches it returns an error, since no instance can match. r.Filters is shared
+// across goroutines and never mutated.
 func (r *Results) resolveCIDRFilter(ctx context.Context) (map[string][]string, error) {
 	cidrs, ok := r.Filters[FilterKeyCIDR]
 	if !ok {
