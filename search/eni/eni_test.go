@@ -25,6 +25,7 @@ import (
 
 	"github.com/dyegoe/awss/common"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
@@ -102,6 +103,7 @@ var mockResults = &Results{
 		"tag":                  {"key=value:value3", "key2=value2"},
 		"availability-zone":    {"a", "b"},
 		"private-ip-address":   {"172.16.0.1"},
+		"owner-id":             {"123456789012"},
 	},
 }
 
@@ -360,6 +362,7 @@ func TestResults_getFilters(t *testing.T) {
 					{Name: common.String("tag:key2"), Values: []string{"value2"}},
 					{Name: common.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b"}},
 					{Name: common.String("private-ip-address"), Values: []string{"172.16.0.1"}},
+					{Name: common.String("owner-id"), Values: []string{"123456789012"}},
 				},
 			},
 		},
@@ -389,9 +392,9 @@ func TestResults_getFilters(t *testing.T) {
 func TestResults_sortResults(t *testing.T) {
 	r := New("default", "us-east-1", map[string][]string{}, "id", false)
 	r.Data = []dataRow{
-		{InterfaceInfo: eniInfo{NetworkInterfaceID: "eni-b", SubnetID: "subnet-2"}},
-		{InterfaceInfo: eniInfo{NetworkInterfaceID: "eni-a", SubnetID: "subnet-3"}},
-		{InterfaceInfo: eniInfo{NetworkInterfaceID: "eni-c", SubnetID: "subnet-1"}},
+		{InterfaceInfo: eniInfo{NetworkInterfaceID: "eni-b", SubnetID: "subnet-2", OwnerID: "333333333333"}},
+		{InterfaceInfo: eniInfo{NetworkInterfaceID: "eni-a", SubnetID: "subnet-3", OwnerID: "111111111111"}},
+		{InterfaceInfo: eniInfo{NetworkInterfaceID: "eni-c", SubnetID: "subnet-1", OwnerID: "222222222222"}},
 	}
 	tests := []struct {
 		name    string
@@ -401,6 +404,7 @@ func TestResults_sortResults(t *testing.T) {
 	}{
 		{name: "id", field: "id", want: []string{"eni-a", "eni-b", "eni-c"}},
 		{name: "subnet-id", field: "subnet-id", want: []string{"eni-c", "eni-b", "eni-a"}},
+		{name: "owner", field: "owner", want: []string{"eni-a", "eni-c", "eni-b"}},
 		{name: "invalid", field: "nope", wantErr: true},
 	}
 	for _, tt := range tests {
@@ -418,6 +422,44 @@ func TestResults_sortResults(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("sortResults(%q) order = %v, want %v", tt.field, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestParseENIRow tests the conversion of a NetworkInterface into a dataRow.
+func TestParseENIRow(t *testing.T) {
+	tests := []struct {
+		name string
+		eni  *types.NetworkInterface
+		want eniInfo
+	}{
+		{
+			name: "owner and requester",
+			eni: &types.NetworkInterface{
+				NetworkInterfaceId: common.String("eni-1"),
+				OwnerId:            common.String("111111111111"),
+				RequesterId:        common.String("AROAEXAMPLE:lambda"),
+				RequesterManaged:   aws.Bool(true),
+			},
+			want: eniInfo{
+				NetworkInterfaceID: "eni-1",
+				OwnerID:            "111111111111",
+				RequesterID:        "AROAEXAMPLE:lambda",
+				RequesterManaged:   true,
+			},
+		},
+		{
+			name: "nil owner and requester",
+			eni:  &types.NetworkInterface{NetworkInterfaceId: common.String("eni-2")},
+			want: eniInfo{NetworkInterfaceID: "eni-2"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseENIRow(tt.eni).InterfaceInfo
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseENIRow().InterfaceInfo = %#v, want %#v", got, tt.want)
 			}
 		})
 	}
