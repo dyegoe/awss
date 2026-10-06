@@ -52,6 +52,7 @@ type Results interface {
 	GetProfile() string
 	GetRegion() string
 	GetErrors() []string
+	AddError(msg string)
 	GetSortField() string
 	GetHeaders() []interface{}
 	GetRows() []interface{}
