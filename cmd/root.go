@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/dyegoe/awss/common"
 	"github.com/dyegoe/awss/search"
@@ -45,6 +46,10 @@ const (
 	labelTagsKeys       = "show.tags.keys"
 	labelAllRegions     = "all-regions"
 	labelAllProfiles    = "all-profiles"
+	labelTimeout        = "timeout"
+
+	// defaultTimeout is generous so --profiles all over many regions is not cut short.
+	defaultTimeout = 5 * time.Minute
 
 	// flagIDs, flagTags, flagTagsKey, and flagAvailabilityZones name the flags
 	// shared by the ec2, eni, and ebs commands' sort-field lists.
@@ -163,7 +168,26 @@ func persistentPreRun(cmd *cobra.Command, _ []string) error {
 			viper.GetString(labelOutput), validList)
 	}
 
+	timeout, err := parseTimeout(viper.Get(labelTimeout))
+	if err != nil {
+		return err
+	}
+	viper.Set(labelTimeout, timeout)
+
 	return nil
+}
+
+// parseTimeout reads the --timeout flag or the timeout config key.
+//
+// The value must be a duration with a unit, such as 90s or 5m, or 0. A bare number is rejected:
+// it would be read as nanoseconds and time out every search.
+func parseTimeout(v interface{}) (time.Duration, error) {
+	s := fmt.Sprint(v)
+	d, err := time.ParseDuration(s)
+	if err != nil || d < 0 {
+		return 0, fmt.Errorf("invalid timeout: %s. Use a duration such as 90s or 5m, or 0 to disable it", s)
+	}
+	return d, nil
 }
 
 // initFlags initializes cobras flags.
@@ -191,6 +215,9 @@ func initFlags() {
 		"Show tags for resources. Default is false.")
 	rootCmd.PersistentFlags().StringSlice(labelTagsKeysCobra, []string{},
 		"Restrict the tags shown to these keys. Implies --show-tags. e.g. `Name,Environment`")
+	rootCmd.PersistentFlags().Duration(labelTimeout, defaultTimeout,
+		"Stop waiting for the searches after this `duration` (e.g. 90s, 5m). The profiles and regions "+
+			"that did not finish are reported as timed out; the others are printed. 0 disables it.")
 }
 
 // initViper binds the flags to viper.
@@ -232,6 +259,9 @@ func initViper() error {
 	}
 	if err := viper.BindPFlag(labelTagsKeys, rootCmd.PersistentFlags().Lookup(labelTagsKeysCobra)); err != nil {
 		return fmt.Errorf("error binding flag %s: %w", labelTagsKeys, err)
+	}
+	if err := viper.BindPFlag(labelTimeout, rootCmd.PersistentFlags().Lookup(labelTimeout)); err != nil {
+		return fmt.Errorf("error binding flag %s: %w", labelTimeout, err)
 	}
 	viper.SetDefault(labelAllRegions, allRegionsDefault)
 
@@ -387,6 +417,7 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 			NoInstanceName: boolLabel(spec.noInstanceNameLabel),
 			Regex:          boolLabel(spec.regexLabel),
 			MaxKeys:        intLabel(spec.maxKeysLabel),
+			Timeout:        viper.GetDuration(labelTimeout),
 		},
 	)
 }

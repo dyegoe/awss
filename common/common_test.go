@@ -436,3 +436,12 @@ func TestStructToFilters(t *testing.T) {
 		})
 	}
 }
+
+// TestBaseResults_AddError checks that AddError appends to the errors already recorded.
+func TestBaseResults_AddError(t *testing.T) {
+	b := &BaseResults{Errors: []string{"first"}}
+	b.AddError("second")
+	if want := []string{"first", "second"}; !reflect.DeepEqual(b.GetErrors(), want) {
+		t.Errorf("GetErrors() = %v, want %v", b.GetErrors(), want)
+	}
+}

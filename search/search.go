@@ -27,6 +27,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/dyegoe/awss/common"
 	searchEBS "github.com/dyegoe/awss/search/ebs"
@@ -63,6 +64,10 @@ type Options struct {
 
 	// MaxKeys caps the keys scanned per bucket in the s3obj search. Zero means the search's default.
 	MaxKeys int
+
+	// Timeout is how long the run may take, pre-authentication included. A profile and region
+	// still searching at the deadline is reported as timed out. Zero disables it.
+	Timeout time.Duration
 }
 
 // constructor builds the results object of one search for a single profile and region.
@@ -140,13 +145,15 @@ var engines = map[string]engine{
 //
 // It searches for the given command in the given profiles and regions, in parallel.
 // The filters are used to filter the results and opts holds every other setting.
+//
+// When opts.Timeout is set, a profile and region still searching at the deadline is reported as
+// timed out in its own result set; the result sets that finished are printed as usual.
 func Execute(cmd string, profiles, regions []string, filters map[string][]string, opts *Options) error {
 	eng, ok := engines[cmd]
 	if !ok {
 		return fmt.Errorf("command %s not found", cmd)
 	}
 
-	ctx := context.Background()
 	wg := sync.WaitGroup{}
 
 	numInteractions := len(profiles) * len(regions)
@@ -155,24 +162,24 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 
 	done := make(chan bool)
 
-	go common.PrintResults(os.Stdout, resultsChan, done, opts.Output, opts.ShowEmpty, opts.ShowTags, opts.TagsKeys)
+	go common.PrintResults(stdout, resultsChan, done, opts.Output, opts.ShowEmpty, opts.ShowTags, opts.TagsKeys)
+
+	// The deadline covers the pre-authentication too: a stalled STS endpoint must not block the run.
+	ctx, cancel := withTimeout(context.Background(), opts.Timeout)
+	defer cancel()
 
 	if len(profiles) > 0 && len(regions) > 0 {
-		preAuthenticate(profiles[0], regions[0])
+		preAuthenticate(ctx, profiles[0], regions[0])
 	}
 
 	for _, profile := range profiles {
 		for _, region := range regions {
-			searchResults := eng.new(profile, region, filters, opts)
-
 			wg.Add(1)
 
 			go func() {
 				defer wg.Done()
 
-				searchResults.Search(ctx)
-
-				resultsChan <- searchResults
+				resultsChan <- searchOne(ctx, eng, profile, region, filters, opts)
 			}()
 		}
 	}
@@ -183,6 +190,55 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 	close(done)
 
 	return nil
+}
+
+// stdout is where the results are printed. It is a variable so tests can capture it.
+var stdout io.Writer = os.Stdout
+
+// withTimeout returns a context that expires after d, or one that never expires when d is 0.
+func withTimeout(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+	if d <= 0 {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, d)
+}
+
+// searchOne runs the search of one profile and region and returns its result set.
+//
+// When the search has not returned by the deadline of ctx, it returns a new, empty result set
+// holding only a timed-out error instead: the rows of a search cut short may be incomplete.
+// A search that ignores ctx is left running; its result set is never read again.
+func searchOne(
+	ctx context.Context, eng engine, profile, region string, filters map[string][]string, opts *Options,
+) common.Results {
+	r := eng.new(profile, region, filters, opts)
+
+	inTime := make(chan bool, 1)
+	go func() {
+		r.Search(ctx)
+		inTime <- ctx.Err() == nil
+	}()
+
+	select {
+	case ok := <-inTime:
+		if ok {
+			return r
+		}
+	case <-ctx.Done():
+		// The search may have returned in time just as the deadline hit.
+		select {
+		case ok := <-inTime:
+			if ok {
+				return r
+			}
+		default:
+		}
+	}
+
+	timedOut := eng.new(profile, region, filters, opts)
+	timedOut.AddError(fmt.Sprintf(
+		"search timed out after %s; raise --timeout, or set it to 0 to disable it", opts.Timeout))
+	return timedOut
 }
 
 // whoAmIFn wraps common.WhoAmI so tests can replace the STS call.
@@ -196,8 +252,8 @@ var warnings io.Writer = os.Stderr
 //
 // A failure is only a warning: the searches still run, and each failing profile and region
 // reports its own error in its result set. One bad profile must not stop the whole run.
-func preAuthenticate(profile, region string) {
-	if _, err := whoAmIFn(profile, region); err != nil {
+func preAuthenticate(ctx context.Context, profile, region string) {
+	if _, err := whoAmIFn(ctx, profile, region); err != nil {
 		fmt.Fprintf(warnings, "warning: pre-authentication with profile %q in region %s failed, continuing: %v\n",
 			profile, region, err)
 	}

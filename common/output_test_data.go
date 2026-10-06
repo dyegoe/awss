@@ -43,6 +43,7 @@ func (tr *testResults) Len() int                 { return len(tr.Data) }
 func (tr *testResults) GetProfile() string       { return tr.Profile }
 func (tr *testResults) GetRegion() string        { return tr.Region }
 func (tr *testResults) GetErrors() []string      { return tr.Errors }
+func (tr *testResults) AddError(msg string)      { tr.Errors = append(tr.Errors, msg) }
 func (tr *testResults) GetSortField() string     { return "field" }
 func (tr *testResults) GetHeaders() []interface{} {
 	headers := []interface{}{}

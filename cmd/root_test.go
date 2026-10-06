@@ -21,6 +21,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -69,6 +70,36 @@ func Test_initConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := initConfig(tt.args.cfg); (err != nil) != tt.wantErr {
 				t.Errorf("initConfig() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// Test_parseTimeout tests parseTimeout with flag and config file values.
+func Test_parseTimeout(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   interface{}
+		want    time.Duration
+		wantErr bool
+	}{
+		{name: "flag default", value: "5m0s", want: 5 * time.Minute},
+		{name: "seconds", value: "90s", want: 90 * time.Second},
+		{name: "duration value", value: 2 * time.Minute, want: 2 * time.Minute},
+		{name: "zero disables", value: "0", want: 0},
+		{name: "zero from yaml int", value: 0, want: 0},
+		{name: "bare number from yaml", value: 300, wantErr: true},
+		{name: "negative", value: "-1s", wantErr: true},
+		{name: "garbage", value: "soon", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseTimeout(tt.value)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("parseTimeout(%v) error = %v, wantErr %v", tt.value, err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("parseTimeout(%v) = %v, want %v", tt.value, got, tt.want)
 			}
 		})
 	}

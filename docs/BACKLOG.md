@@ -14,13 +14,12 @@ Legend: [ ] to do · [~] in progress
 
 ## Reliability
 
-- [ ] [**Cancellation and timeout.**](https://github.com/dyegoe/awss/issues/142) `search.Execute` uses `context.Background()`. If one region
-  hangs, the whole run hangs. Wire `context.WithTimeout` (flag or config, e.g. `--timeout 60s`)
-  at the top of `Execute` and pass it down; `Search(ctx)` already accepts it.
 - [ ] [**Pre-authenticate every profile.**](https://github.com/dyegoe/awss/issues/143) The `WhoAmI` workaround only pre-authenticates the
   first profile x region. With several SSO/Okta profiles the remaining ones still authenticate
   in parallel inside the fan-out. Pre-auth each unique profile sequentially before starting
   the goroutines.
+  Since `--timeout` (#142) the pre-auth runs inside the deadline: a stalled first profile uses
+  the whole budget, and every profile and region is then reported as timed out.
 
 ## Testing
 
@@ -36,8 +35,8 @@ Coverage per package as of 2026-10-06 (`go test -cover ./...`):
 | `common`        |    91.3% | —                                                            |
 | `search/s3obj`  |    85.5% | —                                                            |
 | `search/s3`     |    80.8% | `Search()` (AWS config + client construction)                |
-| `cmd`           |    39.8% | `Execute`, `persistentPreRun`, `runSearch` happy path        |
-| `search`        |   100.0% | —                                                            |
+| `cmd`           |    39.5% | `Execute`, `persistentPreRun`, `runSearch` happy path        |
+| `search`        |    99.2% | deadline and search ending at the same instant (not forced)  |
 
 - [ ] [**`cmd`: test root command execution.**](https://github.com/dyegoe/awss/issues/149)
   Drive `rootCmd` with `ExecuteC()` in tests and capture stdout.
