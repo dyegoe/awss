@@ -31,18 +31,14 @@ Coverage per package as of 2026-10-06 (`go test -cover ./...`):
 | `search/eni`    |    98.8% | —                                                            |
 | `search/vpc`    |    98.3% | —                                                            |
 | `search/ebs`    |    97.8% | —                                                            |
+| `search/subnet` |    97.8% | —                                                            |
 | `search/ec2`    |    97.5% | —                                                            |
 | `common`        |    91.3% | —                                                            |
 | `search/s3obj`  |    85.5% | —                                                            |
 | `search/s3`     |    80.8% | `Search()` (AWS config + client construction)                |
-| `search/subnet` |    73.8% | `Search()` paginator loop                                    |
-| `cmd`           |    39.5% | `Execute`, `persistentPreRun`, `runSearch` happy path        |
+| `cmd`           |    39.8% | `Execute`, `persistentPreRun`, `runSearch` happy path        |
 | `search`        |   100.0% | —                                                            |
 
-- [ ] [**Inject the EC2 client in `search/subnet`.**](https://github.com/dyegoe/awss/issues/148)
-  Use the SDK's `DescribeSubnetsAPIClient` and a page size the way `search/vpc`, `search/ec2`,
-  `search/eni` and `search/ebs` do, so its `Search()` body can be tested with a fake and the
-  package reaches the 80% target. It is the last EC2 search package without a fake client.
 - [ ] [**`cmd`: test root command execution.**](https://github.com/dyegoe/awss/issues/149)
   Drive `rootCmd` with `ExecuteC()` in tests and capture stdout.
 

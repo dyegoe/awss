@@ -130,9 +130,10 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
 - Use table-driven tests with named cases (`name string` as first field).
 - Mock AWS calls one of two ways, never with real credentials:
   - a package-level function variable that tests replace (`getAwsProfilesFn` in `common/aws.go`,
-    `searchFn` in `search/subnet`, `subnetsInCIDRs` in `search/ec2`);
-  - the SDK's `*APIClient` interfaces, so a fake client drives the paginator (`search/eni`, `search/s3`,
-    `search/s3obj`). Prefer this for new packages: it lets the whole `Search()` body be tested.
+    `subnetsInCIDRs` in `search/ec2`);
+  - the SDK's `*APIClient` interfaces, so a fake client drives the paginator (every EC2 search
+    package, `search/s3`, `search/s3obj`). Prefer this for new packages: it lets the whole
+    `Search()` body be tested.
 - EC2 `Describe*` calls that do not name IDs send `MaxResults`: AWS recommends paginated calls
   only, and the SDK paginator does not set a page size by itself (see `pageSize` in `search/eni`).
   This is a precaution: an unpaginated call returned 5250 ENIs from one account without failing.
