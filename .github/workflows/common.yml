@@ -29,8 +29,10 @@ jobs:
         with:
           version: v2.13.1
 
-      - name: Run test
-        run: go test -timeout 30s -short $(go list ./...)
+      # -race replaces a plain run: same tests, plus a check of the parallel profile x region
+      # fan-out. The detector slows tests down, hence the longer timeout.
+      - name: Run test (race detector)
+        run: go test -race -timeout 2m -short $(go list ./...)
 
       - name: Smoke test version injection
         run: |

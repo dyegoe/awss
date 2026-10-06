@@ -46,7 +46,7 @@ Output rendering (table, JSON, JSON-pretty) is driven entirely by struct tags (`
 Agents are expected to work **fully autonomously** in this repo:
 
 - Read, write, and refactor code without asking for confirmation on individual edits.
-- Run `go build ./...` and `go test ./...` after every change to verify correctness.
+- Run `go build ./...` and `go test -race ./...` after every change to verify correctness.
 - Run `golangci-lint run` before considering any task done.
 - Fix any lint errors introduced by your changes before committing.
 - Never break existing tests. If a refactor changes a public API, update all call sites and tests.
@@ -56,7 +56,7 @@ Agents are expected to work **fully autonomously** in this repo:
 
 ```bash
 go build ./...
-go test ./...
+go test -race ./...
 golangci-lint run
 ```
 

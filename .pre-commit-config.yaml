@@ -18,7 +18,7 @@ repos:
       - id: go-unit-tests
         name: go test
         description: golangci-lint only lints, it does not run tests, so this stays local.
-        entry: go test ./...
+        entry: go test -race ./...
         language: system
         types: [go]
         pass_filenames: false
