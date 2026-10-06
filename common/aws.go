@@ -30,7 +30,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"gopkg.in/ini.v1"
 )
 
@@ -53,25 +52,6 @@ func AwsConfig(profile, region string) (aws.Config, error) {
 		return cfg, err
 	}
 	return cfg, nil
-}
-
-// WhoAmI returns the AWS account ID and error.
-//
-// The profile and region are used to create the AWS config.
-// The AWS account ID is returned by the STS GetCallerIdentity API.
-// This function is used as workaround to pre-authenticate the AWS config.
-// ctx bounds the STS call, so a stalled endpoint cannot block the caller forever.
-func WhoAmI(ctx context.Context, profile, region string) (string, error) {
-	cfg, err := AwsConfig(profile, region)
-	if err != nil {
-		return "", err
-	}
-	client := sts.NewFromConfig(cfg)
-	resp, err := client.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
-	if err != nil {
-		return "", err
-	}
-	return StringValue(resp.Account), nil
 }
 
 // defaultSharedConfigFilename is the default location of the AWS config file.
