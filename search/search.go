@@ -122,7 +122,7 @@ var engines = map[string]engine{
 	},
 	"s3": {
 		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchS3.New(profile, region, filters, opts.SortField, opts.Regex)
+			return searchS3.New(profile, region, filters, opts.SortField, opts.Regex, opts.ShowTags)
 		},
 		sortFields:     searchS3.GetSortFields,
 		sortFieldNames: searchS3.SortFieldNames,

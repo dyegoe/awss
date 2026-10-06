@@ -10,8 +10,6 @@ Legend: [ ] to do · [~] in progress
 
 ## Feature follow-ups (tracked as issues)
 
-- [ ] [#127](https://github.com/dyegoe/awss/issues/127) Show bucket tags in `awss s3`
-  (one `GetBucketTagging` call per bucket; fetch only when `--show-tags` is set).
 - [ ] [#128](https://github.com/dyegoe/awss/issues/128) `awss ec2 --cidrs` also matching
   secondary network interfaces (`network-interface.subnet-id` / `network-interface.vpc-id`).
 
@@ -31,9 +29,9 @@ Coverage per package as of 2026-10-06 (`go test -cover ./...`):
 
 | Package         | Coverage | Gap                                                          |
 | --------------- | -------: | ------------------------------------------------------------ |
-| `common`        |    90.9% | —                                                            |
+| `common`        |    91.1% | —                                                            |
 | `search/s3obj`  |    85.5% | —                                                            |
-| `search/s3`     |    75.6% | `Search()` (AWS config + client construction)                |
+| `search/s3`     |    80.8% | `Search()` (AWS config + client construction)                |
 | `search/subnet` |    68.2% | `Search()` paginator loop                                    |
 | `search/vpc`    |    67.2% | `Search()` paginator loop                                    |
 | `search/ec2`    |    65.6% | `Search()` DescribeInstances call                            |

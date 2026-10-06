@@ -26,6 +26,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // // TestAwsConfig tests the AwsConfig function.
@@ -367,6 +368,37 @@ func TestTagsToMap(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := TagsToMap(tt.args.tags); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("TagsToMap()\n%#v\nwant\n%#v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestS3TagsToMap tests the S3TagsToMap function.
+func TestS3TagsToMap(t *testing.T) {
+	tests := []struct {
+		name string
+		tags []s3types.Tag
+		want map[string]string
+	}{
+		{name: "empty", tags: []s3types.Tag{}, want: map[string]string{}},
+		{
+			name: "two tags",
+			tags: []s3types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("value")},
+				{Key: aws.String("Environment"), Value: aws.String("value2")},
+			},
+			want: map[string]string{"Name": "value", "Environment": "value2"},
+		},
+		{
+			name: "nil key skipped, nil value empty",
+			tags: []s3types.Tag{{Value: aws.String("orphan")}, {Key: aws.String("Empty")}},
+			want: map[string]string{"Empty": ""},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := S3TagsToMap(tt.tags); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("S3TagsToMap()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}

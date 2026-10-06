@@ -22,19 +22,35 @@ package s3
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/dyegoe/awss/common"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 // FilterKeyName is the filters key carrying the bucket name patterns.
 //
 // S3 has no server-side name filter, so names are matched client-side with common.Matcher.
 const FilterKeyName = "name"
+
+// tagWorkers caps the GetBucketTagging calls running at the same time in one region.
+const tagWorkers = 10
+
+// errCodeNoSuchTagSet is the S3 error code returned by GetBucketTagging for a bucket without tags.
+const errCodeNoSuchTagSet = "NoSuchTagSet"
+
+// getBucketTaggingAPIClient is the part of the S3 client used to read bucket tags.
+type getBucketTaggingAPIClient interface {
+	GetBucketTagging(
+		ctx context.Context, params *s3.GetBucketTaggingInput, optFns ...func(*s3.Options),
+	) (*s3.GetBucketTaggingOutput, error)
+}
 
 // Results describes results of the S3 buckets search.
 type Results struct {
@@ -48,6 +64,9 @@ type Results struct {
 
 	// Regex makes the name patterns regular expressions instead of globs.
 	Regex bool `json:"-"`
+
+	// ShowTags fetches the tags of each bucket found (one API call per bucket).
+	ShowTags bool `json:"-"`
 }
 
 // dataRow represents a row of the S3 buckets search results.
@@ -63,10 +82,13 @@ type dataRow struct {
 
 	// ARN is the Amazon Resource Name of the bucket.
 	ARN string `json:"arn,omitempty" header:"ARN" sort:"arn"`
+
+	// Tags are the tags of the bucket, filled only when ShowTags is set.
+	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
 }
 
 // New initiates and returns a new instance of S3 bucket results.
-func New(profile, region string, filters map[string][]string, sortField string, regex bool) *Results {
+func New(profile, region string, filters map[string][]string, sortField string, regex, showTags bool) *Results {
 	return &Results{
 		BaseResults: common.BaseResults{
 			Profile:   profile,
@@ -74,9 +96,10 @@ func New(profile, region string, filters map[string][]string, sortField string, 
 			Errors:    []string{},
 			SortField: sortField,
 		},
-		Data:    []dataRow{},
-		Filters: filters,
-		Regex:   regex,
+		Data:     []dataRow{},
+		Filters:  filters,
+		Regex:    regex,
+		ShowTags: showTags,
 	}
 }
 
@@ -96,9 +119,14 @@ func (r *Results) Search(ctx context.Context) {
 		return
 	}
 
-	if err := r.collectBuckets(ctx, s3.NewFromConfig(cfg), matcher); err != nil {
+	client := s3.NewFromConfig(cfg)
+	if err := r.collectBuckets(ctx, client, matcher); err != nil {
 		r.Errors = append(r.Errors, err.Error())
 		return
+	}
+
+	if r.ShowTags {
+		r.collectTags(ctx, client)
 	}
 
 	if r.SortField == "" {
@@ -136,6 +164,50 @@ func (r *Results) collectBuckets(ctx context.Context, client s3.ListBucketsAPICl
 		}
 	}
 	return nil
+}
+
+// collectTags fills the Tags of every row, running at most tagWorkers GetBucketTagging calls at once.
+//
+// A bucket without tags is not an error. Any other failure is reported per bucket and leaves
+// that row without tags.
+func (r *Results) collectTags(ctx context.Context, client getBucketTaggingAPIClient) {
+	errs := make([]error, len(r.Data))
+	sem := make(chan struct{}, tagWorkers)
+	var wg sync.WaitGroup
+
+	for i := range r.Data {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			r.Data[i].Tags, errs[i] = bucketTags(ctx, client, r.Data[i].Name)
+		}(i)
+	}
+	wg.Wait()
+
+	// Append in row order, so the errors are deterministic.
+	for _, err := range errs {
+		if err != nil {
+			r.Errors = append(r.Errors, err.Error())
+		}
+	}
+}
+
+// bucketTags returns the tags of one bucket. A bucket without tags returns an empty map.
+func bucketTags(ctx context.Context, client getBucketTaggingAPIClient, bucket string) (map[string]string, error) {
+	out, err := client.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: common.String(bucket)})
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) && apiErr.ErrorCode() == errCodeNoSuchTagSet {
+		return map[string]string{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error getting tags of bucket %s: %w", bucket, err)
+	}
+	if out == nil {
+		return map[string]string{}, nil
+	}
+	return common.S3TagsToMap(out.TagSet), nil
 }
 
 // parseBucket converts a single Bucket into a dataRow.

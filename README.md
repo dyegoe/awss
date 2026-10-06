@@ -151,7 +151,10 @@ Additional flags:
 
 Name matching happens client-side (S3 has no server-side name filter). Globs are anchored:
 `prod-*` matches `prod-logs` but not `my-prod-logs`; use `--regex` with `prod-` for a substring match.
-Bucket tags are not shown.
+
+Bucket tags cost one extra API call per bucket, so they are fetched only when `--show-tags` or
+`--show-tags-keys` is set, also for JSON output (`awss s3 -a --show-tags --output json`). A bucket you
+cannot read the tags of still shows up, with the error listed above its table.
 
 #### S3 objects (`awss s3obj`)
 

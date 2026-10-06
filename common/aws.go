@@ -29,6 +29,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"gopkg.in/ini.v1"
 )
@@ -116,6 +117,20 @@ func TagsToMap(tags []types.Tag) map[string]string {
 	data := map[string]string{}
 	for _, t := range tags {
 		data[*t.Key] = *t.Value
+	}
+	return data
+}
+
+// S3TagsToMap takes a slice of S3 tags and returns a map of tags and values.
+//
+// S3 uses its own Tag type, so it cannot share TagsToMap. Tags with a nil key are skipped.
+func S3TagsToMap(tags []s3types.Tag) map[string]string {
+	data := map[string]string{}
+	for _, t := range tags {
+		if t.Key == nil {
+			continue
+		}
+		data[*t.Key] = StringValue(t.Value)
 	}
 	return data
 }
