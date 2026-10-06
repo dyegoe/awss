@@ -17,11 +17,18 @@ limitations under the License.
 package vpc
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dyegoe/awss/common"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
@@ -285,5 +292,156 @@ func TestGetSortFields(t *testing.T) {
 	wantNames := []string{"cidr", "cidrs", "default", "dhcp", "id", "name", "owner", "state"}
 	if names := SortFieldNames(); !reflect.DeepEqual(names, wantNames) {
 		t.Errorf("SortFieldNames() = %v, want %v", names, wantNames)
+	}
+}
+
+// fakeDescribeVpcs is a DescribeVpcsAPIClient that serves one page of VPCs per entry of pages and
+// records the inputs it receives.
+type fakeDescribeVpcs struct {
+	pages  [][]types.Vpc
+	err    error
+	inputs []*ec2.DescribeVpcsInput
+}
+
+func (f *fakeDescribeVpcs) DescribeVpcs(
+	_ context.Context, in *ec2.DescribeVpcsInput, _ ...func(*ec2.Options),
+) (*ec2.DescribeVpcsOutput, error) {
+	f.inputs = append(f.inputs, in)
+	if f.err != nil {
+		return nil, f.err
+	}
+	out := &ec2.DescribeVpcsOutput{}
+	page := len(f.inputs) - 1
+	if page < len(f.pages) {
+		out.Vpcs = f.pages[page]
+	}
+	if page < len(f.pages)-1 {
+		out.NextToken = common.String(fmt.Sprint(page + 1))
+	}
+	return out, nil
+}
+
+// vpc returns a VPC with the given ID.
+func vpc(id string) types.Vpc { return types.Vpc{VpcId: common.String(id)} }
+
+// collectCase is one table entry of TestResults_collect.
+type collectCase struct {
+	name        string
+	sortField   string
+	input       *ec2.DescribeVpcsInput
+	client      *fakeDescribeVpcs
+	wantIDs     []string
+	wantErrors  []string
+	wantCalls   int
+	wantMaxSize *int32
+}
+
+func collectCases() []collectCase {
+	twoPages := [][]types.Vpc{{vpc("vpc-c"), vpc("vpc-a")}, {vpc("vpc-b")}}
+	return []collectCase{
+		{
+			name: "follows every page and asks for pages", client: &fakeDescribeVpcs{pages: twoPages},
+			wantIDs: []string{"vpc-c", "vpc-a", "vpc-b"}, wantCalls: 2, wantMaxSize: aws.Int32(pageSize),
+		},
+		{
+			name: "rows are sorted by the sort field", sortField: "id", client: &fakeDescribeVpcs{pages: twoPages},
+			wantIDs: []string{"vpc-a", "vpc-b", "vpc-c"}, wantCalls: 2, wantMaxSize: aws.Int32(pageSize),
+		},
+		{
+			name:   "named VPC IDs send no page size",
+			input:  &ec2.DescribeVpcsInput{VpcIds: []string{"vpc-a"}},
+			client: &fakeDescribeVpcs{pages: [][]types.Vpc{{vpc("vpc-a")}}}, wantIDs: []string{"vpc-a"}, wantCalls: 1,
+		},
+		{
+			name: "empty result", client: &fakeDescribeVpcs{},
+			wantIDs: []string{}, wantCalls: 1, wantMaxSize: aws.Int32(pageSize),
+		},
+		{
+			name: "describe error is reported with no rows", client: &fakeDescribeVpcs{err: errors.New("boom")},
+			wantIDs: []string{}, wantErrors: []string{"error describing vpcs: boom"},
+			wantCalls: 1, wantMaxSize: aws.Int32(pageSize),
+		},
+		{
+			name: "unknown sort field is reported and the rows kept", sortField: "nope",
+			client:  &fakeDescribeVpcs{pages: [][]types.Vpc{{vpc("vpc-a")}}},
+			wantIDs: []string{"vpc-a"},
+			wantErrors: []string{
+				"invalid sort field: nope. The options are: " + strings.Join(common.SortFieldNames(dataRow{}), ", "),
+			},
+			wantCalls: 1, wantMaxSize: aws.Int32(pageSize),
+		},
+	}
+}
+
+// TestResults_collect tests the paginated describe, the page size and the sorting through a
+// fake EC2 client.
+func TestResults_collect(t *testing.T) {
+	for _, tt := range collectCases() {
+		t.Run(tt.name, func(t *testing.T) {
+			input := tt.input
+			if input == nil {
+				input = &ec2.DescribeVpcsInput{Filters: common.FilterDefault("state", []string{"available"})}
+			}
+			r := New("default", "us-east-1", nil, tt.sortField)
+
+			r.collect(context.Background(), tt.client, input)
+
+			got := []string{}
+			for i := range r.Data {
+				got = append(got, r.Data[i].VpcID)
+			}
+			if !reflect.DeepEqual(got, tt.wantIDs) {
+				t.Errorf("rows = %v, want %v", got, tt.wantIDs)
+			}
+			if !reflect.DeepEqual(r.Errors, append([]string{}, tt.wantErrors...)) {
+				t.Errorf("Errors = %q, want %q", r.Errors, tt.wantErrors)
+			}
+			if len(tt.client.inputs) != tt.wantCalls {
+				t.Fatalf("DescribeVpcs calls = %d, want %d", len(tt.client.inputs), tt.wantCalls)
+			}
+			for _, in := range tt.client.inputs {
+				if !reflect.DeepEqual(in.MaxResults, tt.wantMaxSize) || !reflect.DeepEqual(in.Filters, input.Filters) {
+					t.Errorf("input MaxResults = %v, Filters = %#v; want %v, %#v",
+						in.MaxResults, in.Filters, tt.wantMaxSize, input.Filters)
+				}
+			}
+			if input.MaxResults != nil {
+				t.Errorf("collect changed the caller's input")
+			}
+		})
+	}
+}
+
+// TestResults_Search_earlyErrors tests the errors Search reports before any EC2 call.
+func TestResults_Search_earlyErrors(t *testing.T) {
+	// An empty AWS config file: the profile does not exist and nothing is read from the user's files.
+	empty := filepath.Join(t.TempDir(), "config")
+	t.Setenv("AWS_CONFIG_FILE", empty)
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", empty)
+
+	tests := []struct {
+		name       string
+		filters    map[string][]string
+		wantPrefix string
+	}{
+		{
+			name:       "invalid tag filter",
+			filters:    map[string][]string{"tag": {"no-equals-sign"}},
+			wantPrefix: "error building filters:",
+		},
+		{
+			name:       "unknown profile",
+			filters:    map[string][]string{},
+			wantPrefix: "error getting aws config:",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := New("awss-test-missing-profile", "us-east-1", tt.filters, "")
+			r.Search(context.Background())
+			if len(r.Errors) != 1 || !strings.HasPrefix(r.Errors[0], tt.wantPrefix) {
+				t.Errorf("Errors = %q, want one error starting with %q", r.Errors, tt.wantPrefix)
+			}
+		})
 	}
 }

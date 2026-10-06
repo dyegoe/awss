@@ -26,6 +26,7 @@ import (
 
 	"github.com/dyegoe/awss/common"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
@@ -110,7 +111,26 @@ func (r *Results) Search(ctx context.Context) {
 		return
 	}
 
-	paginator := ec2.NewDescribeVpcsPaginator(ec2.NewFromConfig(cfg), input)
+	r.collect(ctx, ec2.NewFromConfig(cfg), input)
+}
+
+// pageSize is the number of VPCs asked per DescribeVpcs call.
+//
+// AWS recommends paginated calls only, so every search that does not name the VPCs asks for
+// pages. 1000 is the largest page AWS allows.
+const pageSize int32 = 1000
+
+// collect describes the VPCs, following every page, and sorts the rows.
+//
+// Search builds the real client; tests pass a fake.
+func (r *Results) collect(ctx context.Context, client ec2.DescribeVpcsAPIClient, input *ec2.DescribeVpcsInput) {
+	paged := *input
+	// AWS rejects MaxResults together with VpcIds.
+	if len(paged.VpcIds) == 0 && paged.MaxResults == nil {
+		paged.MaxResults = aws.Int32(pageSize)
+	}
+
+	paginator := ec2.NewDescribeVpcsPaginator(client, &paged)
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
