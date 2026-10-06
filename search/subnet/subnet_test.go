@@ -18,12 +18,18 @@ package subnet
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dyegoe/awss/common"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
@@ -281,19 +287,172 @@ func TestGetSortFields(t *testing.T) {
 	}
 }
 
-// mockSearch replaces the AWS call of InCIDRs for the duration of the test.
-//
-// It returns a getter for the filters the last search was called with.
-func mockSearch(t *testing.T, fill func(r *Results)) func() map[string][]string {
-	t.Helper()
-	old := searchFn
-	t.Cleanup(func() { searchFn = old })
-	var used map[string][]string
-	searchFn = func(_ context.Context, r *Results) {
-		used = r.Filters
-		fill(r)
+// fakeDescribeSubnets is a DescribeSubnetsAPIClient that serves one page of subnets per entry of
+// pages and records the inputs it receives.
+type fakeDescribeSubnets struct {
+	pages  [][]types.Subnet
+	err    error
+	inputs []*ec2.DescribeSubnetsInput
+}
+
+func (f *fakeDescribeSubnets) DescribeSubnets(
+	_ context.Context, in *ec2.DescribeSubnetsInput, _ ...func(*ec2.Options),
+) (*ec2.DescribeSubnetsOutput, error) {
+	f.inputs = append(f.inputs, in)
+	if f.err != nil {
+		return nil, f.err
 	}
-	return func() map[string][]string { return used }
+	out := &ec2.DescribeSubnetsOutput{}
+	page := len(f.inputs) - 1
+	if page < len(f.pages) {
+		out.Subnets = f.pages[page]
+	}
+	if page < len(f.pages)-1 {
+		out.NextToken = common.String(fmt.Sprint(page + 1))
+	}
+	return out, nil
+}
+
+// subnet returns a subnet with the given ID, VPC ID and CIDR block. Empty values stay nil.
+func subnet(id, vpcID, cidr string) types.Subnet {
+	s := types.Subnet{SubnetId: common.String(id)}
+	if vpcID != "" {
+		s.VpcId = common.String(vpcID)
+	}
+	if cidr != "" {
+		s.CidrBlock = common.String(cidr)
+	}
+	return s
+}
+
+// collectCase is one table entry of TestResults_collect.
+type collectCase struct {
+	name        string
+	sortField   string
+	input       *ec2.DescribeSubnetsInput
+	client      *fakeDescribeSubnets
+	wantIDs     []string
+	wantErrors  []string
+	wantCalls   int
+	wantMaxSize *int32
+}
+
+func collectCases() []collectCase {
+	twoPages := [][]types.Subnet{{subnet("subnet-c", "", ""), subnet("subnet-a", "", "")}, {subnet("subnet-b", "", "")}}
+	return []collectCase{
+		{
+			name: "follows every page and asks for pages", client: &fakeDescribeSubnets{pages: twoPages},
+			wantIDs: []string{"subnet-c", "subnet-a", "subnet-b"}, wantCalls: 2, wantMaxSize: aws.Int32(pageSize),
+		},
+		{
+			name: "rows are sorted by the sort field", sortField: "id", client: &fakeDescribeSubnets{pages: twoPages},
+			wantIDs: []string{"subnet-a", "subnet-b", "subnet-c"}, wantCalls: 2, wantMaxSize: aws.Int32(pageSize),
+		},
+		{
+			name:      "named subnet IDs send no page size",
+			input:     &ec2.DescribeSubnetsInput{SubnetIds: []string{"subnet-a"}},
+			client:    &fakeDescribeSubnets{pages: [][]types.Subnet{{subnet("subnet-a", "", "")}}},
+			wantIDs:   []string{"subnet-a"},
+			wantCalls: 1,
+		},
+		{
+			name: "empty result", client: &fakeDescribeSubnets{},
+			wantIDs: []string{}, wantCalls: 1, wantMaxSize: aws.Int32(pageSize),
+		},
+		{
+			name: "describe error is reported with no rows", client: &fakeDescribeSubnets{err: errors.New("boom")},
+			wantIDs: []string{}, wantErrors: []string{"error describing subnets: boom"},
+			wantCalls: 1, wantMaxSize: aws.Int32(pageSize),
+		},
+		{
+			name: "unknown sort field is reported and the rows kept", sortField: "nope",
+			client:  &fakeDescribeSubnets{pages: [][]types.Subnet{{subnet("subnet-a", "", "")}}},
+			wantIDs: []string{"subnet-a"},
+			wantErrors: []string{
+				"invalid sort field: nope. The options are: " + strings.Join(common.SortFieldNames(dataRow{}), ", "),
+			},
+			wantCalls: 1, wantMaxSize: aws.Int32(pageSize),
+		},
+	}
+}
+
+// TestResults_collect tests the paginated describe, the page size and the sorting through a
+// fake EC2 client.
+func TestResults_collect(t *testing.T) {
+	for _, tt := range collectCases() {
+		t.Run(tt.name, func(t *testing.T) {
+			input := tt.input
+			if input == nil {
+				input = &ec2.DescribeSubnetsInput{Filters: common.FilterDefault("vpc-id", []string{"vpc-1"})}
+			}
+			r := New("default", "us-east-1", nil, tt.sortField)
+
+			r.collect(context.Background(), tt.client, input)
+
+			got := []string{}
+			for i := range r.Data {
+				got = append(got, r.Data[i].SubnetID)
+			}
+			if !reflect.DeepEqual(got, tt.wantIDs) {
+				t.Errorf("rows = %v, want %v", got, tt.wantIDs)
+			}
+			if !reflect.DeepEqual(r.Errors, append([]string{}, tt.wantErrors...)) {
+				t.Errorf("Errors = %q, want %q", r.Errors, tt.wantErrors)
+			}
+			if len(tt.client.inputs) != tt.wantCalls {
+				t.Fatalf("DescribeSubnets calls = %d, want %d", len(tt.client.inputs), tt.wantCalls)
+			}
+			for _, in := range tt.client.inputs {
+				if !reflect.DeepEqual(in.MaxResults, tt.wantMaxSize) || !reflect.DeepEqual(in.Filters, input.Filters) {
+					t.Errorf("input MaxResults = %v, Filters = %#v; want %v, %#v",
+						in.MaxResults, in.Filters, tt.wantMaxSize, input.Filters)
+				}
+			}
+			if input.MaxResults != nil {
+				t.Errorf("collect changed the caller's input")
+			}
+		})
+	}
+}
+
+// emptyAwsConfig points the AWS config and credentials files at an empty file, so no profile
+// exists and nothing is read from the user's files.
+func emptyAwsConfig(t *testing.T) {
+	t.Helper()
+	empty := filepath.Join(t.TempDir(), "config")
+	t.Setenv("AWS_CONFIG_FILE", empty)
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", empty)
+}
+
+// TestResults_Search_earlyErrors tests the errors Search reports before any EC2 call.
+func TestResults_Search_earlyErrors(t *testing.T) {
+	emptyAwsConfig(t)
+
+	tests := []struct {
+		name       string
+		filters    map[string][]string
+		wantPrefix string
+	}{
+		{
+			name:       "invalid tag filter",
+			filters:    map[string][]string{"tag": {"no-equals-sign"}},
+			wantPrefix: "error building filters:",
+		},
+		{
+			name:       "unknown profile",
+			filters:    map[string][]string{},
+			wantPrefix: "error getting aws config:",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := New("awss-test-missing-profile", "us-east-1", tt.filters, "")
+			r.Search(context.Background())
+			if len(r.Errors) != 1 || !strings.HasPrefix(r.Errors[0], tt.wantPrefix) {
+				t.Errorf("Errors = %q, want one error starting with %q", r.Errors, tt.wantPrefix)
+			}
+		})
+	}
 }
 
 // mustNets parses CIDRs for tests.
@@ -307,18 +466,23 @@ func mustNets(t *testing.T, cidrs ...string) []*net.IPNet {
 }
 
 // regionSubnets is a VPC with a primary (10.121.224.0/20) and a secondary (100.64.0.0/16)
-// CIDR block, plus a subnet of another VPC and one without a CIDR block.
-func regionSubnets(r *Results) {
-	r.Data = append(r.Data,
-		dataRow{SubnetID: "subnet-p1", VpcID: "vpc-1", CidrBlock: "10.121.224.0/24"},
-		dataRow{SubnetID: "subnet-p2", VpcID: "vpc-1", CidrBlock: "10.121.225.0/24"},
-		dataRow{SubnetID: "subnet-s1", VpcID: "vpc-1", CidrBlock: "100.64.0.0/18"},
-		dataRow{SubnetID: "subnet-o1", VpcID: "vpc-2", CidrBlock: "100.64.64.0/18"},
-		dataRow{SubnetID: "subnet-x", VpcID: "vpc-3"},
-	)
+// CIDR block, plus a subnet of another VPC and one without a CIDR block, over two pages.
+func regionSubnets() [][]types.Subnet {
+	return [][]types.Subnet{
+		{
+			subnet("subnet-p1", "vpc-1", "10.121.224.0/24"),
+			subnet("subnet-p2", "vpc-1", "10.121.225.0/24"),
+			subnet("subnet-s1", "vpc-1", "100.64.0.0/18"),
+		},
+		{
+			subnet("subnet-o1", "vpc-2", "100.64.64.0/18"),
+			subnet("subnet-x", "vpc-3", ""),
+		},
+	}
 }
 
-// TestInCIDRs checks which subnets and VPCs a range resolves into.
+// TestInCIDRs checks which subnets and VPCs a range resolves into, and that every subnet of the
+// region is listed in pages, with no filter.
 func TestInCIDRs(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -331,43 +495,59 @@ func TestInCIDRs(t *testing.T) {
 		{name: "vpc secondary block", cidrs: []string{"100.64.0.0/18"},
 			wantSubnets: []string{"subnet-s1"}, wantVPCs: []string{"vpc-1"}},
 		{name: "range across vpcs", cidrs: []string{"100.64.0.0/16"},
-			wantSubnets: []string{"subnet-s1", "subnet-o1"}, wantVPCs: []string{"vpc-1", "vpc-2"}},
+			wantSubnets: []string{"subnet-o1", "subnet-s1"}, wantVPCs: []string{"vpc-1", "vpc-2"}},
 		{name: "range smaller than a subnet", cidrs: []string{"10.121.225.16/28"},
 			wantSubnets: []string{"subnet-p2"}, wantVPCs: []string{"vpc-1"}},
 		{name: "no overlap", cidrs: []string{"192.168.0.0/16"}, wantSubnets: []string{}, wantVPCs: []string{}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			used := mockSearch(t, regionSubnets)
-			subnets, vpcs, err := InCIDRs(context.Background(), "default", "us-east-1", mustNets(t, tt.cidrs...))
+			client := &fakeDescribeSubnets{pages: regionSubnets()}
+			subnets, vpcs, err := inCIDRs(context.Background(), client, "default", "us-east-1", mustNets(t, tt.cidrs...))
 			if err != nil {
-				t.Fatalf("InCIDRs() unexpected error: %v", err)
+				t.Fatalf("inCIDRs() unexpected error: %v", err)
 			}
 			if !reflect.DeepEqual(subnets, tt.wantSubnets) || !reflect.DeepEqual(vpcs, tt.wantVPCs) {
-				t.Errorf("InCIDRs() = %v, %v; want %v, %v", subnets, vpcs, tt.wantSubnets, tt.wantVPCs)
+				t.Errorf("inCIDRs() = %v, %v; want %v, %v", subnets, vpcs, tt.wantSubnets, tt.wantVPCs)
 			}
-			if len(used()) != 0 {
-				t.Errorf("InCIDRs() searched with filters %v, want none", used())
+			if len(client.inputs) != 2 {
+				t.Fatalf("DescribeSubnets calls = %d, want 2", len(client.inputs))
+			}
+			for _, in := range client.inputs {
+				if len(in.Filters) != 0 || len(in.SubnetIds) != 0 || !reflect.DeepEqual(in.MaxResults, aws.Int32(pageSize)) {
+					t.Errorf("input Filters = %v, SubnetIds = %v, MaxResults = %v; want none, none, %d",
+						in.Filters, in.SubnetIds, in.MaxResults, pageSize)
+				}
 			}
 		})
 	}
 }
 
-// TestInCIDRs_error checks that search errors are wrapped and returned.
+// TestInCIDRs_error checks that describe errors are wrapped and returned.
 func TestInCIDRs_error(t *testing.T) {
-	mockSearch(t, func(r *Results) { r.Errors = append(r.Errors, "boom") })
-	_, _, err := InCIDRs(context.Background(), "default", "us-east-1", mustNets(t, "10.0.1.0/24"))
-	if err == nil || err.Error() != "searching subnets by CIDR: boom" {
-		t.Errorf("InCIDRs() error = %v, want %q", err, "searching subnets by CIDR: boom")
+	client := &fakeDescribeSubnets{err: errors.New("boom")}
+	_, _, err := inCIDRs(context.Background(), client, "default", "us-east-1", mustNets(t, "10.0.1.0/24"))
+	want := "searching subnets by CIDR: error describing subnets: boom"
+	if err == nil || err.Error() != want {
+		t.Errorf("inCIDRs() error = %v, want %q", err, want)
 	}
 }
 
-// TestInCIDRs_empty checks that no search runs when no CIDR is given.
+// TestInCIDRs_awsConfigError checks that a config error is wrapped and returned.
+func TestInCIDRs_awsConfigError(t *testing.T) {
+	emptyAwsConfig(t)
+	_, _, err := InCIDRs(context.Background(), "awss-test-missing-profile", "us-east-1", mustNets(t, "10.0.1.0/24"))
+	if err == nil || !strings.HasPrefix(err.Error(), "searching subnets by CIDR: error getting aws config:") {
+		t.Errorf("InCIDRs() error = %v, want a wrapped aws config error", err)
+	}
+}
+
+// TestInCIDRs_empty checks that no AWS config is loaded when no CIDR is given.
 func TestInCIDRs_empty(t *testing.T) {
-	called := false
-	mockSearch(t, func(_ *Results) { called = true })
-	subnets, vpcs, err := InCIDRs(context.Background(), "default", "us-east-1", nil)
-	if err != nil || len(subnets) != 0 || len(vpcs) != 0 || called {
-		t.Errorf("InCIDRs(nil) = %v, %v, %v, called=%v; want empty, empty, nil, false", subnets, vpcs, err, called)
+	emptyAwsConfig(t)
+	// A missing profile would fail if InCIDRs loaded the AWS config.
+	subnets, vpcs, err := InCIDRs(context.Background(), "awss-test-missing-profile", "us-east-1", nil)
+	if err != nil || !reflect.DeepEqual(subnets, []string{}) || !reflect.DeepEqual(vpcs, []string{}) {
+		t.Errorf("InCIDRs(nil) = %v, %v, %v; want empty, empty, nil", subnets, vpcs, err)
 	}
 }
