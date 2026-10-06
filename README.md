@@ -194,11 +194,11 @@ to S3 so only that part of the bucket is listed.
 - `--all` cannot be combined with any filter flag
 - Wildcard `*` matches all values in a filter
 - Tags format: `Key=Value1:Value2,AnotherKey=Value`
-- `--timeout` (default `5m`) bounds the whole run, pre-authentication included. A profile and
-  region still searching at the deadline is printed with the error
-  `search timed out after <duration>` and no rows, since its rows could be incomplete; the profiles
-  and regions that finished are printed as usual, and the command still exits 0. Use a duration
-  with a unit (`90s`, `5m`); `0` disables the timeout. Set it in the config file with `timeout:`.
+- `--timeout` (default `5m`) bounds the whole run. A profile and region still searching at the
+  deadline is printed with the error `search timed out after <duration>` and no rows, since its
+  rows could be incomplete; the profiles and regions that finished are printed as usual, and the
+  command still exits 0. Use a duration with a unit (`90s`, `5m`); `0` disables the timeout. Set
+  it in the config file with `timeout:`.
 
 ## Installation
 
@@ -224,7 +224,9 @@ cp awss /usr/local/bin
 
 - AWS credentials. awss uses the AWS SDK's standard resolution: named profiles from
   `~/.aws/config` (`--profiles`), `AWS_PROFILE`, or `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`.
-  SSO profiles work after `aws sso login`.
+- A valid session for every profile you search. awss never logs in: run `aws sso login`, or your
+  credential helper (for example Granted), before searching. A profile without a valid session
+  reports its own error in its result set; the other profiles are searched as usual.
 - Read-only IAM permissions. awss never modifies anything. The minimum policy is:
 
 ```json
@@ -234,7 +236,6 @@ cp awss /usr/local/bin
     {
       "Effect": "Allow",
       "Action": [
-        "sts:GetCallerIdentity",
         "ec2:DescribeInstances",
         "ec2:DescribeNetworkInterfaces",
         "ec2:DescribeVolumes",
