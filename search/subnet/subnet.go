@@ -28,6 +28,7 @@ import (
 
 	"github.com/dyegoe/awss/common"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
@@ -118,7 +119,26 @@ func (r *Results) Search(ctx context.Context) {
 		return
 	}
 
-	paginator := ec2.NewDescribeSubnetsPaginator(ec2.NewFromConfig(cfg), input)
+	r.collect(ctx, ec2.NewFromConfig(cfg), input)
+}
+
+// pageSize is the number of subnets asked per DescribeSubnets call.
+//
+// AWS recommends paginated calls only, so every search that does not name the subnets asks for
+// pages. 1000 is the largest page AWS allows.
+const pageSize int32 = 1000
+
+// collect describes the subnets, following every page, and sorts the rows.
+//
+// Search and InCIDRs build the real client; tests pass a fake.
+func (r *Results) collect(ctx context.Context, client ec2.DescribeSubnetsAPIClient, input *ec2.DescribeSubnetsInput) {
+	paged := *input
+	// AWS rejects MaxResults together with SubnetIds.
+	if len(paged.SubnetIds) == 0 && paged.MaxResults == nil {
+		paged.MaxResults = aws.Int32(pageSize)
+	}
+
+	paginator := ec2.NewDescribeSubnetsPaginator(client, &paged)
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -223,9 +243,6 @@ func SortFieldNames() []string {
 	return common.SortFieldNames(dataRow{})
 }
 
-// searchFn runs the search of r. It is a variable so tests can replace the AWS call.
-var searchFn = func(ctx context.Context, r *Results) { r.Search(ctx) }
-
 // InCIDRs returns the IDs of the subnets whose IPv4 CIDR block overlaps any of the given
 // networks, and the IDs of the VPCs those subnets belong to (sorted, without duplicates).
 //
@@ -234,17 +251,27 @@ var searchFn = func(ctx context.Context, r *Results) { r.Search(ctx) }
 // AWS has no overlap filter, so all subnets of the region are listed and matched here.
 // It returns empty slices when nothing overlaps and an error when the search failed.
 func InCIDRs(ctx context.Context, profile, region string, nets []*net.IPNet) (subnetIDs, vpcIDs []string, err error) {
-	subnetIDs, vpcIDs = []string{}, []string{}
 	if len(nets) == 0 {
-		return subnetIDs, vpcIDs, nil
+		return []string{}, []string{}, nil
 	}
+	cfg, err := common.AwsConfig(profile, region)
+	if err != nil {
+		return nil, nil, fmt.Errorf("searching subnets by CIDR: error getting aws config: %w", err)
+	}
+	return inCIDRs(ctx, ec2.NewFromConfig(cfg), profile, region, nets)
+}
 
+// inCIDRs is InCIDRs once the EC2 client is built. Tests pass a fake client.
+func inCIDRs(
+	ctx context.Context, client ec2.DescribeSubnetsAPIClient, profile, region string, nets []*net.IPNet,
+) (subnetIDs, vpcIDs []string, err error) {
 	r := New(profile, region, map[string][]string{}, "id")
-	searchFn(ctx, r)
+	r.collect(ctx, client, &ec2.DescribeSubnetsInput{})
 	if len(r.Errors) > 0 {
 		return nil, nil, fmt.Errorf("searching subnets by CIDR: %s", common.StringSliceToString(r.Errors, "; "))
 	}
 
+	subnetIDs, vpcIDs = []string{}, []string{}
 	seenVPC := map[string]bool{}
 	for i := range r.Data {
 		if !overlapsAny(r.Data[i].CidrBlock, nets) {
