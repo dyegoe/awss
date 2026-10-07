@@ -79,38 +79,44 @@ func TestNew(t *testing.T) {
 	}
 }
 
-var mockResultsEmpty = &Results{
-	BaseResults: common.BaseResults{
-		Profile: "",
-		Region:  "",
-		Errors:  []string{},
-	},
-	Data:    []dataRow{},
-	Filters: map[string][]string{},
+// mockResultsEmpty returns a new empty result set. Each test gets its own: some sort it in place.
+func mockResultsEmpty() *Results {
+	return &Results{
+		BaseResults: common.BaseResults{
+			Profile: "",
+			Region:  "",
+			Errors:  []string{},
+		},
+		Data:    []dataRow{},
+		Filters: map[string][]string{},
+	}
 }
 
-var mockResults = &Results{
-	BaseResults: common.BaseResults{
-		Profile: "default",
-		Region:  "us-east-1",
-		Errors: []string{
-			"error1",
-			"error2",
+// mockResults returns a new result set with two rows. Each test gets its own: some sort it in place.
+func mockResults() *Results {
+	return &Results{
+		BaseResults: common.BaseResults{
+			Profile: "default",
+			Region:  "us-east-1",
+			Errors: []string{
+				"error1",
+				"error2",
+			},
+			SortField: "id",
 		},
-		SortField: "id",
-	},
-	Data: []dataRow{
-		*mockDataRow1,
-		*mockDataRow2,
-	},
-	Filters: map[string][]string{
-		"instance-id":                    {"i-1234567890abcdef0", "i-0987654321fedcba9"},
-		"tag:Name":                       {"instance-name-1", "instance-name-2"},
-		"tag":                            {"key=value:value3", "key2=value2"},
-		"availability-zone":              {"a", "b"},
-		"instance-state-name":            {"running", "stopped"},
-		"block-device-mapping.volume-id": {"vol-1234567890abcdef0"},
-	},
+		Data: []dataRow{
+			*mockDataRow1,
+			*mockDataRow2,
+		},
+		Filters: map[string][]string{
+			"instance-id":                    {"i-1234567890abcdef0", "i-0987654321fedcba9"},
+			"tag:Name":                       {"instance-name-1", "instance-name-2"},
+			"tag":                            {"key=value:value3", "key2=value2"},
+			"availability-zone":              {"a", "b"},
+			"instance-state-name":            {"running", "stopped"},
+			"block-device-mapping.volume-id": {"vol-1234567890abcdef0"},
+		},
+	}
 }
 
 var mockDataRow1 = &dataRow{
@@ -168,12 +174,12 @@ func TestResults_Len(t *testing.T) {
 	}{
 		{
 			name:    "TestResults_Len",
-			results: mockResults,
+			results: mockResults(),
 			want:    2,
 		},
 		{
 			name:    "TestResults_Len_Empty",
-			results: mockResultsEmpty,
+			results: mockResultsEmpty(),
 			want:    0,
 		},
 	}
@@ -195,12 +201,12 @@ func TestResults_GetProfile(t *testing.T) {
 	}{
 		{
 			name:    "TestResults_GetProfile",
-			results: mockResults,
+			results: mockResults(),
 			want:    "default",
 		},
 		{
 			name:    "TestResults_GetProfile_Empty",
-			results: mockResultsEmpty,
+			results: mockResultsEmpty(),
 			want:    "",
 		},
 	}
@@ -222,12 +228,12 @@ func TestResults_GetRegion(t *testing.T) {
 	}{
 		{
 			name:    "TestResults_GetRegion",
-			results: mockResults,
+			results: mockResults(),
 			want:    "us-east-1",
 		},
 		{
 			name:    "TestResults_GetRegion_Empty",
-			results: mockResultsEmpty,
+			results: mockResultsEmpty(),
 			want:    "",
 		},
 	}
@@ -249,12 +255,12 @@ func TestResults_GetErrors(t *testing.T) {
 	}{
 		{
 			name:    "TestResults_GetErrors",
-			results: mockResults,
+			results: mockResults(),
 			want:    []string{"error1", "error2"},
 		},
 		{
 			name:    "TestResults_GetErrors_Empty",
-			results: mockResultsEmpty,
+			results: mockResultsEmpty(),
 			want:    []string{},
 		},
 	}
@@ -276,12 +282,12 @@ func TestResults_GetSortField(t *testing.T) {
 	}{
 		{
 			name:    "TestResults_GetSortField",
-			results: mockResults,
+			results: mockResults(),
 			want:    "id",
 		},
 		{
 			name:    "TestResults_GetSortField_Empty",
-			results: mockResultsEmpty,
+			results: mockResultsEmpty(),
 			want:    "",
 		},
 	}
@@ -303,7 +309,7 @@ func TestResults_GetHeaders(t *testing.T) {
 	}{
 		{
 			name:    "TestResults_GetHeaders",
-			results: mockResults,
+			results: mockResults(),
 			want:    []interface{}{"ID", "Name", "Type", "AZ", "State", "Private IP", "Public IP", "ENIs", "Volumes", "Tags"},
 		},
 	}
@@ -325,7 +331,7 @@ func TestResults_GetRows(t *testing.T) {
 	}{
 		{
 			name:    "TestResults_GetRows",
-			results: mockResults,
+			results: mockResults(),
 			want: []interface{}{
 				*mockDataRow1,
 				*mockDataRow2,
@@ -351,7 +357,7 @@ func TestResults_getFilters(t *testing.T) {
 	}{
 		{
 			name:    "multiple filters",
-			results: mockResults,
+			results: mockResults(),
 			want: &ec2.DescribeInstancesInput{
 				InstanceIds: []string{"i-1234567890abcdef0", "i-0987654321fedcba9"},
 				Filters: []types.Filter{
@@ -399,7 +405,7 @@ func TestResults_sortResults(t *testing.T) {
 	}{
 		{
 			name:    "type",
-			results: mockResults,
+			results: mockResults(),
 			args: args{
 				field: "type",
 			},
@@ -407,7 +413,7 @@ func TestResults_sortResults(t *testing.T) {
 		},
 		{
 			name:    "invalid",
-			results: mockResults,
+			results: mockResults(),
 			args: args{
 				field: "invalid",
 			},
