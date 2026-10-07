@@ -25,8 +25,8 @@ import (
 	"github.com/dyegoe/awss/search"
 )
 
-// Test_ec2Filters_volumeIDs checks that --volume-ids maps to the AWS block-device-mapping.volume-id filter.
-func Test_ec2Filters_volumeIDs(t *testing.T) {
+// TestEc2Filters_volumeIDs checks that --volume-ids maps to the AWS block-device-mapping.volume-id filter.
+func TestEc2Filters_volumeIDs(t *testing.T) {
 	f := ec2Filters{VolumeIDs: []string{"vol-1", "vol-2"}}
 	got, err := common.StructToFilters(f)
 	if err != nil {
@@ -38,16 +38,16 @@ func Test_ec2Filters_volumeIDs(t *testing.T) {
 	}
 }
 
-// Test_ec2FilterFlags_coversStruct checks every ec2Filters field has a registered flag in the --all list.
-func Test_ec2FilterFlags_coversStruct(t *testing.T) {
+// TestEc2FilterFlags_coversStruct checks every ec2Filters field has a registered flag in the --all list.
+func TestEc2FilterFlags_coversStruct(t *testing.T) {
 	if ec2Cmd.Flags().Lookup("all") == nil {
 		ec2InitFlags()
 	}
 	checkFilterFlags(t, "ec2", ec2Cmd, reflect.TypeOf(ec2Filters{}).NumField(), ec2FilterFlags)
 }
 
-// Test_ec2Filters_cidrs checks --cidrs maps to the cidr pseudo-filter key.
-func Test_ec2Filters_cidrs(t *testing.T) {
+// TestEc2Filters_cidrs checks --cidrs maps to the cidr pseudo-filter key.
+func TestEc2Filters_cidrs(t *testing.T) {
 	got, err := common.StructToFilters(ec2Filters{CIDRs: []string{"10.0.1.0/24"}})
 	if err != nil {
 		t.Fatalf("StructToFilters() error = %v", err)
@@ -57,8 +57,8 @@ func Test_ec2Filters_cidrs(t *testing.T) {
 	}
 }
 
-// Test_ec2RunE_invalidCIDR checks that a --cidrs value that is not an IPv4 range is rejected before searching.
-func Test_ec2RunE_invalidCIDR(t *testing.T) {
+// TestEc2RunE_invalidCIDR checks that a --cidrs value that is not an IPv4 range is rejected before searching.
+func TestEc2RunE_invalidCIDR(t *testing.T) {
 	old := ec2F
 	t.Cleanup(func() { ec2F = old })
 	for _, cidr := range []string{"10.0.1.0", "10.0.*", "2001:db8::/32"} {
@@ -69,8 +69,8 @@ func Test_ec2RunE_invalidCIDR(t *testing.T) {
 	}
 }
 
-// Test_sortHelp_listsEveryField checks the --sort help text of each command names every valid sort field.
-func Test_sortHelp_listsEveryField(t *testing.T) {
+// TestSortHelp_listsEveryField checks the --sort help text of each command names every valid sort field.
+func TestSortHelp_listsEveryField(t *testing.T) {
 	for _, cmd := range []string{"ec2", "eni", "ebs", "vpc", "subnet", "s3", "s3obj"} {
 		help := sortHelp(cmd, "things", "id")
 		for _, name := range search.SortFieldNames(cmd) {

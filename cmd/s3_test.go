@@ -23,16 +23,16 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Test_s3FilterFlags_coversStruct checks every s3Filters field has a registered flag in the --all list.
-func Test_s3FilterFlags_coversStruct(t *testing.T) {
+// TestS3FilterFlags_coversStruct checks every s3Filters field has a registered flag in the --all list.
+func TestS3FilterFlags_coversStruct(t *testing.T) {
 	if s3Cmd.Flags().Lookup("all") == nil {
 		s3InitFlags()
 	}
 	checkFilterFlags(t, "s3", s3Cmd, reflect.TypeOf(s3Filters{}).NumField(), s3FilterFlags)
 }
 
-// Test_s3RunE_invalidPattern checks that a bad glob or regex is rejected before searching.
-func Test_s3RunE_invalidPattern(t *testing.T) {
+// TestS3RunE_invalidPattern checks that a bad glob or regex is rejected before searching.
+func TestS3RunE_invalidPattern(t *testing.T) {
 	old := s3F
 	t.Cleanup(func() { s3F = old; viper.Set(labelS3Regex, false) })
 
@@ -49,8 +49,8 @@ func Test_s3RunE_invalidPattern(t *testing.T) {
 	}
 }
 
-// Test_boolLabel checks the empty label shortcut and the viper lookup.
-func Test_boolLabel(t *testing.T) {
+// TestBoolLabel checks the empty label shortcut and the viper lookup.
+func TestBoolLabel(t *testing.T) {
 	if boolLabel("") {
 		t.Error("boolLabel(\"\") = true, want false")
 	}
@@ -61,8 +61,8 @@ func Test_boolLabel(t *testing.T) {
 	}
 }
 
-// Test_subcommands_rejectPositionalArgs checks a stray argument (e.g. a pattern given to --regex) fails loudly.
-func Test_subcommands_rejectPositionalArgs(t *testing.T) {
+// TestSubcommands_rejectPositionalArgs checks a stray argument (e.g. a pattern given to --regex) fails loudly.
+func TestSubcommands_rejectPositionalArgs(t *testing.T) {
 	for _, c := range rootCmd.Commands() {
 		if c.Name() == "completion" || c.Name() == "help" {
 			continue

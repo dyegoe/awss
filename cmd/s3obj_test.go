@@ -24,16 +24,16 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Test_s3objFilterFlags_coversStruct checks every s3objFilters field has a registered flag.
-func Test_s3objFilterFlags_coversStruct(t *testing.T) {
+// TestS3objFilterFlags_coversStruct checks every s3objFilters field has a registered flag.
+func TestS3objFilterFlags_coversStruct(t *testing.T) {
 	if s3objCmd.Flags().Lookup(flagBuckets) == nil {
 		s3objInitFlags()
 	}
 	checkFilterFlags(t, "s3obj", s3objCmd, reflect.TypeOf(s3objFilters{}).NumField(), s3objFilterFlags)
 }
 
-// Test_s3objRunE_validation checks --buckets is required and bad patterns are rejected before searching.
-func Test_s3objRunE_validation(t *testing.T) {
+// TestS3objRunE_validation checks --buckets is required and bad patterns are rejected before searching.
+func TestS3objRunE_validation(t *testing.T) {
 	old := s3objF
 	t.Cleanup(func() { s3objF = old; viper.Set(labelS3objRegex, false) })
 
@@ -55,8 +55,8 @@ func Test_s3objRunE_validation(t *testing.T) {
 	}
 }
 
-// Test_intLabel checks the empty label shortcut and the viper lookup.
-func Test_intLabel(t *testing.T) {
+// TestIntLabel checks the empty label shortcut and the viper lookup.
+func TestIntLabel(t *testing.T) {
 	if got := intLabel(""); got != 0 {
 		t.Errorf("intLabel(\"\") = %d, want 0", got)
 	}

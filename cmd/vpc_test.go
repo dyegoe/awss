@@ -23,8 +23,8 @@ import (
 	"github.com/dyegoe/awss/common"
 )
 
-// Test_vpcFilters_cidrs checks that --cidrs maps to the association CIDR filter.
-func Test_vpcFilters_cidrs(t *testing.T) {
+// TestVpcFilters_cidrs checks that --cidrs maps to the association CIDR filter.
+func TestVpcFilters_cidrs(t *testing.T) {
 	f := vpcFilters{CIDRs: []string{"10.0.0.0/16"}, IsDefault: []string{"false"}}
 	got, err := common.StructToFilters(f)
 	if err != nil {
@@ -46,14 +46,14 @@ func ensureVpcFlags() {
 	}
 }
 
-// Test_vpcFilterFlags_coversStruct checks every vpcFilters field has a flag listed for --all exclusivity.
-func Test_vpcFilterFlags_coversStruct(t *testing.T) {
+// TestVpcFilterFlags_coversStruct checks every vpcFilters field has a flag listed for --all exclusivity.
+func TestVpcFilterFlags_coversStruct(t *testing.T) {
 	ensureVpcFlags()
 	checkFilterFlags(t, "vpc", vpcCmd, reflect.TypeOf(vpcFilters{}).NumField(), vpcFilterFlags)
 }
 
-// Test_vpcRunE_invalidCIDR checks that a malformed --cidrs value is rejected before searching.
-func Test_vpcRunE_invalidCIDR(t *testing.T) {
+// TestVpcRunE_invalidCIDR checks that a malformed --cidrs value is rejected before searching.
+func TestVpcRunE_invalidCIDR(t *testing.T) {
 	ensureVpcFlags()
 	old := vpcF
 	t.Cleanup(func() { vpcF = old })
