@@ -33,32 +33,38 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
-var mockDataRow1 = dataRow{
-	SubnetID:         "subnet-0000000000000000a",
-	Name:             "public-a",
-	VpcID:            "vpc-1",
-	CidrBlock:        "10.0.1.0/24",
-	AvailabilityZone: "us-east-1a",
-	AvailableIPs:     251,
-	State:            "available",
-	MapPublicIP:      "true",
-	DefaultForAz:     "false",
-	OwnerID:          "123456789012",
-	Tags:             map[string]string{"Name": "public-a", "Tier": "public"},
+// mockDataRow1 returns a new public subnet row.
+func mockDataRow1() dataRow {
+	return dataRow{
+		SubnetID:         "subnet-0000000000000000a",
+		Name:             "public-a",
+		VpcID:            "vpc-1",
+		CidrBlock:        "10.0.1.0/24",
+		AvailabilityZone: "us-east-1a",
+		AvailableIPs:     251,
+		State:            "available",
+		MapPublicIP:      "true",
+		DefaultForAz:     "false",
+		OwnerID:          "123456789012",
+		Tags:             map[string]string{"Name": "public-a", "Tier": "public"},
+	}
 }
 
-var mockDataRow2 = dataRow{
-	SubnetID:         "subnet-0000000000000000b",
-	Name:             "private-b",
-	VpcID:            "vpc-1",
-	CidrBlock:        "10.0.2.0/24",
-	AvailabilityZone: "us-east-1b",
-	AvailableIPs:     30,
-	State:            "available",
-	MapPublicIP:      "false",
-	DefaultForAz:     "false",
-	OwnerID:          "123456789012",
-	Tags:             map[string]string{"Name": "private-b"},
+// mockDataRow2 returns a new private subnet row.
+func mockDataRow2() dataRow {
+	return dataRow{
+		SubnetID:         "subnet-0000000000000000b",
+		Name:             "private-b",
+		VpcID:            "vpc-1",
+		CidrBlock:        "10.0.2.0/24",
+		AvailabilityZone: "us-east-1b",
+		AvailableIPs:     30,
+		State:            "available",
+		MapPublicIP:      "false",
+		DefaultForAz:     "false",
+		OwnerID:          "123456789012",
+		Tags:             map[string]string{"Name": "private-b"},
+	}
 }
 
 func mockResults() *Results {
@@ -69,7 +75,7 @@ func mockResults() *Results {
 			Errors:    []string{},
 			SortField: "id",
 		},
-		Data: []dataRow{mockDataRow1, mockDataRow2},
+		Data: []dataRow{mockDataRow1(), mockDataRow2()},
 		Filters: map[string][]string{
 			"subnet-id": {"subnet-0000000000000000a"},
 			"vpc-id":    {"vpc-1"},
@@ -114,7 +120,7 @@ func TestResults_accessors(t *testing.T) {
 	if got := r.GetHeaders(); !reflect.DeepEqual(got, wantHeaders) {
 		t.Errorf("GetHeaders()\n%#v\nwant\n%#v", got, wantHeaders)
 	}
-	wantRows := []interface{}{mockDataRow1, mockDataRow2}
+	wantRows := []interface{}{mockDataRow1(), mockDataRow2()}
 	if got := r.GetRows(); !reflect.DeepEqual(got, wantRows) {
 		t.Errorf("GetRows()\n%#v\nwant\n%#v", got, wantRows)
 	}
@@ -248,7 +254,7 @@ func TestResults_sortResults(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := mockResults()
-			r.Data = []dataRow{big, mockDataRow2, mockDataRow1}
+			r.Data = []dataRow{big, mockDataRow2(), mockDataRow1()}
 			err := r.sortResults(tt.field)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("sortResults(%q) error = %v, wantErr %v", tt.field, err, tt.wantErr)
