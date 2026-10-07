@@ -68,35 +68,18 @@ Ready to contribute? Here's how to set up `awss` for local development.
     git checkout -b 123-short-description
     ```
 
-5. Make your changes. Before committing, verify everything passes:
+5. Make your changes, following the rules in `AGENTS.md` (Standards and guardrails). Before
+   committing, verify everything passes:
 
     ```bash
     make build
-    make test
+    make test   # the same test command CI runs
     make lint
     ```
 
-    Or equivalently:
-
-    ```bash
-    go build ./...
-    go test ./...
-    golangci-lint run
-    ```
-
-6. Commit your changes following the [Conventional Commits](https://www.conventionalcommits.org/) format:
-
-    ```text
-    <type>(<scope>): <short description>
-
-    Types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test
-    Scope: cmd, common, search, search/<resource> (ec2, eni, ebs, vpc, subnet, s3, s3obj)
-    ```
-
-    `feat` produces a minor release and `fix` a patch release, so pick the type by what a user
-    would notice, not by how big the diff is.
-
-    Example:
+6. Commit your changes in the [Conventional Commits](https://www.conventionalcommits.org/)
+   format; the types, scopes and how the type drives the release are in `AGENTS.md` (Commit
+   message format). Example:
 
     ```bash
     git add search/ec2/ec2.go search/ec2/ec2_test.go
@@ -112,14 +95,11 @@ Ready to contribute? Here's how to set up `awss` for local development.
 
 ## Pull Request Guidelines
 
-Before you submit a pull request, check that it meets these guidelines:
-
-1. All three verify commands must pass: `make build`, `make test`, `make lint`.
-2. If the pull request adds functionality, update the docs and add tests. A new flag, command,
-   sort field or config key must appear in `README.md`; a new resource type must follow the
-   "Adding new resource types" checklist in `AGENTS.md`.
-3. New exported symbols must have doc comments (see `docs/CODESTYLE.md`).
-4. Follow the coding conventions described in `docs/CODESTYLE.md`.
+A pull request meets the MUST rules of `AGENTS.md` (Standards and guardrails). Most of them are
+checked by `make test`, `make lint` and CI; the ones marked *review* are on you and the reviewer,
+so read that table before opening the pull request. A new resource type follows the "Adding new
+resource types" checklist in `AGENTS.md`; `docs/CODESTYLE.md` explains the code rules with
+examples.
 
 ## Releasing (maintainers)
 

@@ -17,7 +17,7 @@ across multiple profiles and regions. It wraps AWS SDK Go v2 and uses Cobra + Vi
 **Go version:** the project follows the latest Go release. The `go` directive in `go.mod` is the
 single source: CI and the release builds read it. When Go is upgraded locally, bump the directive
 in the same PR (`go mod edit -go=<version>`). Do not hardcode the version in docs.
-**Key dependencies:** cobra, viper, aws-sdk-go-v2 (ec2, s3, sts), go-pretty, ini.v1
+**Key dependencies:** cobra, viper, aws-sdk-go-v2 (config, ec2, s3), go-pretty, ini.v1
 
 ### Package layout
 
@@ -33,6 +33,8 @@ search/subnet/       — Subnet search logic, result type, and InCIDRs (overlapp
 search/s3/           — S3 bucket search (per region, client-side name matching)
 search/s3obj/        — S3 object (key) search inside given buckets, capped by --max-keys
 internal/testconv/   — checks the test conventions of every package (run by its own test in CI)
+internal/nesting/    — checks the nesting depth of every function (run by its own test in CI)
+scripts/             — coverage.awk: the per-package coverage and test-file check of make test
 common/              — shared: Results interface, BaseResults, AWS helpers, filter builders,
                        output formatting, reflection row helpers (rows.go), Matcher (match.go), utilities
 ```
@@ -47,9 +49,8 @@ Output rendering (table, JSON, JSON-pretty) is driven entirely by struct tags (`
 Agents are expected to work **fully autonomously** in this repo:
 
 - Read, write, and refactor code without asking for confirmation on individual edits.
-- Run `go build ./...` and `go test -race -count=2 -shuffle=on ./...` after every change to verify
-  correctness.
-- Run `golangci-lint run` before considering any task done.
+- Run `make build` and `make test` after every change, and `make lint` before considering any task
+  done.
 - Fix any lint errors introduced by your changes before committing.
 - Never break existing tests. If a refactor changes a public API, update all call sites and tests.
 - Prefer small, focused commits over large sweeping changes — one logical fix per commit.
@@ -57,29 +58,80 @@ Agents are expected to work **fully autonomously** in this repo:
 ### Verify commands
 
 ```bash
-go build ./...
-go test -race -count=2 -shuffle=on ./...
-golangci-lint run
+make build
+make test   # race detector, random order, every test twice, coverage and test-file check
+make lint   # golangci-lint run
 ```
 
-All three must pass cleanly before any task is considered complete. The test command is the one
-CI runs: random order (`-shuffle=on`, the seed is printed on failure) and every test twice.
+All three must pass cleanly before any task is considered complete. CI and the pre-commit hook
+run the same `make test`, so a green local run means a green CI test step. A shuffle failure
+prints its seed: rerun with `go test -shuffle=<seed> ./<package>`.
 
 ---
 
-## Code style
+## Standards and guardrails
 
-See `docs/CODESTYLE.md` for the full style guide.
+This section is the single list of rules for this codebase. **MUST** rules block a pull request;
+each names what enforces it. A rule marked *review* has no tool that can check it, so the
+reviewer and the author own it. **SHOULD** rules may be broken with a reason in the pull request.
+`docs/CODESTYLE.md` explains the code rules with examples; it does not add rules.
 
-Summary of non-negotiable rules:
+### MUST: code
 
-- No naked `if err != nil { return }` that silently swallows errors — always wrap with context.
-- No `context.TODO()` — use `context.Background()` at call sites or accept and pass `ctx context.Context`.
-- No hardcoded version strings — version must be injected via `-ldflags`.
-- Nil-check all pointer dereferences from AWS SDK responses before use.
-- Max nesting depth: 3 levels. Extract early-return guards or helper functions to reduce nesting.
-- All exported symbols must have a doc comment.
-- Never mutate `Results.Filters` inside `Search()`: the map is shared by every goroutine of a run. Copy it.
+| Rule | Enforced by |
+|---|---|
+| Wrap every error from another module with context (`fmt.Errorf("doing x: %w", err)`); never drop or ignore an error. | `wrapcheck`, `errcheck`, `nilerr` |
+| A failing profile or region records its error in its own result set and the run continues; `Search()` never panics or stops the run. | tests (`search` package: logged-out profile, timeout) |
+| Nil-check every pointer from an AWS SDK response before use (`common.StringValue` for `*string`). | review |
+| No `context.TODO()`; pass the caller's `ctx`. `context.Background()` only at the top of `search.Execute` and in helpers with no caller context. | `forbidigo`, `noctx` |
+| Control statements nest at most 3 levels deep in a function. | `internal/nesting` (`TestCheck_repository`) |
+| Functions stay small: at most 60 lines and 50 statements, cyclomatic complexity at most 15. | `funlen`, `gocyclo` |
+| Every exported symbol has a doc comment; an exported function returns exported types. | `revive` |
+| Never mutate `Results.Filters` inside `Search()`: one map is shared by every goroutine of a run. Copy it to rewrite it. | test (`TestEngines_searchKeepsFilters`), race detector |
+| No hardcoded version string; the version comes from `-ldflags`. | CI version-injection smoke test |
+| `//nolint` names the linter and says why, and only where there is no clean fix. | `nolintlint`; review for "no clean fix" |
+| Imports stay inside the allowed modules. | `depguard` |
+| No AWS call inside a loop over the results of another AWS call: collect IDs, then batch. | review |
+| Use the shared helpers of `common` instead of copying reflection, sorting or matching code. | review, `dupl` |
+| EC2 `Describe*` calls that do not name IDs send `MaxResults` (see Testing conventions). | tests (fake client page size, per package) |
+| `go.mod` and `go.sum` are tidy; code is `gofmt`/`goimports` formatted. | CI tidy diff, golangci-lint formatters |
+
+### MUST: tests
+
+| Rule | Enforced by |
+|---|---|
+| Every package has tests and covers at least 80% of its statements. | `make test` (`scripts/coverage.awk`) |
+| Tests pass with the race detector, in any order, and when run twice. | `make test` (`-race -count=2 -shuffle=on`) |
+| Tests follow the naming and structure convention of Testing conventions. | `internal/testconv`, `thelper` |
+| No package-level `var` in a test file. | `internal/testconv` |
+| Tests never call AWS: fake clients or replaced function variables only. | review |
+
+### MUST: process
+
+| Rule | Enforced by |
+|---|---|
+| Work on an issue happens on an issue-numbered branch and lands through a pull request; never commit to `main`. | branch protection on `main`, review |
+| Commit messages follow Conventional Commits (see Commit message format). | `cz check` (CI `check-commits`, `commit-msg` hook) |
+| Pull requests are squash-merged; agents open them and never merge. | repository settings, review |
+| A change to authentication, profiles or shared VPCs carries the exact `awss` commands for the real AWS check in its pull request (see Changes that need a real AWS check). | review |
+| A new flag, command, sort field or config key appears in `README.md`. | review |
+| A finished backlog item is removed from `docs/BACKLOG.md`, not ticked. | review |
+| The `go` directive of `go.mod` is the only Go version; CI and releases read it. | CI (`go-version-file`) |
+
+### SHOULD
+
+- Small, focused commits: one logical change per commit, and every commit builds and passes.
+- New packages mock AWS through the SDK's `*APIClient` interfaces (see Testing conventions).
+- Extract a helper when a loop body grows beyond about 10 lines.
+- Unexported helpers get a doc comment when their purpose is not obvious.
+- New test failure messages read `Func(input) = got, want want`.
+- CLI sort and filter values are kebab-case (`private-ip`, not `private_ip`).
+
+### Adding a guardrail
+
+A new MUST rule names its enforcement in the same pull request. Before relying on a linter or a
+check, prove it fires: add one deliberate violation, see it fail, and remove it. A check that
+silently passes is worse than none, because the rule looks enforced.
 
 ---
 
@@ -161,24 +213,22 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
 - Tests must pass in any order and when run again (`go test -count=2 -shuffle=on ./...`). No
   package-level `var` in a test file: return a fresh fixture from a function (`mockResults()` in
   `search/vpc`), since some tests sort or change it in place.
-- Test files for output live in `common/output_test.go` — use `output_test_data.go` for fixtures.
+- Output tests live in `common/output_test.go`, with their fixtures in `common/output_data_test.go`.
 - Do not make real AWS API calls in tests.
-- Target ≥ 80% coverage per package.
 
 ---
 
 ## Linter
 
-Config is in `.golangci.yml` using **golangci-lint v2** format (`version: "2"`).
-Enabled linters include: `errcheck`, `govet`, `gosec`, `misspell`,
-`funlen` (60 lines / 50 statements), `gocyclo` (max 15), `dupl`, `lll`, `noctx`.
-Formatters (`gofmt`, `goimports`) are configured in the `formatters` section (v2 convention).
+Config is in `.golangci.yml` (golangci-lint v2 format, `version: "2"`; CI pins the version in
+`.github/workflows/common.yml` and the pre-commit hook in `.pre-commit-config.yaml`). The table
+in Standards and guardrails says which linter enforces which rule. Formatters (`gofmt`,
+`goimports`) are configured in the `formatters` section.
 
-`//nolint:<linter>` comments are allowed only when there is no clean fix and the suppression has a
-comment explaining why. Example:
+A justified suppression names the linter and the reason:
 
 ```go
-for _, inst := range i.Instances { //nolint:gocritic // rangeValCopy: AWS SDK struct is not pointer-based
+//nolint:lll // the expected compact JSON is one line by definition
 ```
 
 ---

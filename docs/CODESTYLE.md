@@ -1,13 +1,18 @@
 # Code Style Guide — awss
 
-This document defines the coding conventions for the awss project.
-Claude Code enforces these rules on all new and modified code.
+This guide explains, with examples, the code rules of `AGENTS.md` (Standards and guardrails):
+why each rule exists and how to follow it. It adds no rules of its own; when the two disagree,
+`AGENTS.md` wins and this guide is the one to fix.
 
 ---
 
 ## 1. Error handling
 
-### Always wrap errors with context
+The rule and its enforcement are in `AGENTS.md`, Standards and guardrails.
+
+### Wrap errors with context
+
+An error from another module says what failed, not what awss was doing. The wrap adds that:
 
 ```go
 // Bad
@@ -23,7 +28,7 @@ if err != nil {
 }
 ```
 
-### Never silently discard errors
+### Do not discard errors
 
 ```go
 // Bad — parse error is thrown away, caller gets wrong behaviour silently
@@ -39,10 +44,10 @@ if err != nil {
 }
 ```
 
-### Collect errors into the result, don't stop early in Search()
+### Collect errors into the result in Search()
 
-This is intentional in this project — one failing region should not crash the whole run.
-Append to `r.Errors` and return early from the current Search() call only:
+One failing profile or region must not stop the others. `Search()` appends to `r.Errors` and
+returns from its own call only:
 
 ```go
 if err != nil {
@@ -55,7 +60,10 @@ if err != nil {
 
 ## 2. Nil pointer safety
 
-All pointer fields from AWS SDK responses must be nil-checked before dereferencing.
+The rule and its enforcement are in `AGENTS.md`, Standards and guardrails.
+
+AWS SDK responses use pointers for most fields, and any of them can be nil (a detached ENI has
+no `SubnetId`):
 
 ```go
 // Bad — panics on detached ENI
@@ -78,8 +86,11 @@ if eni.Attachment != nil && eni.Attachment.InstanceId != nil {
 
 ## 3. Context
 
-Never use `context.TODO()` in production code. `Search(ctx context.Context)` receives the
-context from `search.Execute`; pass it to every AWS call and every helper that makes one.
+The rule and its enforcement are in `AGENTS.md`, Standards and guardrails.
+
+`Search(ctx context.Context)` receives the context of `search.Execute`, which carries the
+`--timeout` deadline. Every AWS call and every helper that makes one gets that `ctx`, so the
+deadline reaches it:
 
 ```go
 // Bad
@@ -91,14 +102,14 @@ func (r *Results) Search(ctx context.Context) {
 }
 ```
 
-`context.Background()` is acceptable only at the top of `search.Execute` and in one-off helpers
-that have no caller context (for example `common.AwsConfig`).
 
 ---
 
 ## 4. Nesting depth
 
-Maximum nesting depth is **3 levels**. Reduce nesting using:
+The rule and its enforcement are in `AGENTS.md`, Standards and guardrails. `internal/nesting`
+counts `if`, `for`, `range`, `switch` and `select`; an `else if` stays at the level of its `if`,
+and a function literal starts again at 0. To reduce nesting:
 
 **Early return / guard clauses:**
 
@@ -138,7 +149,7 @@ func (r *Results) parseENI(eni types.NetworkInterface) (dataRow, error) { ... }
 
 ## 5. Version injection
 
-Never hardcode a version string in source code.
+The rule and its enforcement are in `AGENTS.md`, Standards and guardrails.
 
 ```go
 // Bad
@@ -159,14 +170,16 @@ Build with:
 go build -ldflags="-X github.com/dyegoe/awss/cmd.version=$(git describe --tags --always)" .
 ```
 
-The Makefile and the release workflow (`.github/workflows/build-binaries.yml`) must inject the
-version. The source file must never contain a release version number.
+The Makefile and the release build (`.github/workflows/build-binaries.yml`, called by
+`release.yml`) inject the version; the
+CI smoke test builds with `-X …version=ci-test` and checks `awss --version` prints it.
 
 ---
 
 ## 6. Reuse the shared helpers
 
-Do not copy reflection or matching code into a resource package. `common` already provides:
+The rule and its enforcement are in `AGENTS.md`, Standards and guardrails. `common` already
+provides:
 
 | Need                                   | Helper                                              |
 | -------------------------------------- | --------------------------------------------------- |
@@ -182,13 +195,13 @@ Do not copy reflection or matching code into a resource package. `common` alread
 A resource package's `GetHeaders`, `GetRows`, `GetSortFields`, `SortFieldNames` and
 `sortResults` should each be one line calling these.
 
-Never mutate `Results.Filters` inside `Search()`: the same map is handed to every
-profile x region goroutine. Build a copy when a filter must be rewritten (see
-`resolveCIDRFilter` in `search/ec2`).
+`Results.Filters` is the same map in every profile x region goroutine of a run, so a search that
+must rewrite a filter builds a copy: see `resolveCIDRFilter` in `search/ec2`.
 
-## 7. Struct consistency: exported vs unexported
+## 7. Exported functions return exported types
 
-If a type is returned by an exported function, it must be exported.
+The rule and its enforcement are in `AGENTS.md`, Standards and guardrails. A caller of an exported
+function cannot name an unexported return type:
 
 ```go
 // Bad — exported function returns unexported type
@@ -206,38 +219,18 @@ func terminalSize() terminalSize { ... }
 
 ---
 
-## 8. Eliminating struct duplication with embedding
+## 8. Shared result fields: BaseResults
 
-`ec2.Results` and `eni.Results` share identical fields and getter methods.
-When refactoring, extract a `common.BaseResults` and embed it:
-
-```go
-// In common/results.go
-type BaseResults struct {
-    Profile   string   `json:"profile"`
-    Region    string   `json:"region"`
-    Errors    []string `json:"errors,omitempty"`
-    SortField string   `json:"-"`
-}
-
-func (b *BaseResults) GetProfile() string  { return b.Profile }
-func (b *BaseResults) GetRegion() string   { return b.Region }
-func (b *BaseResults) GetErrors() []string { return b.Errors }
-func (b *BaseResults) GetSortField() string { return b.SortField }
-
-// In search/ec2/ec2.go
-type Results struct {
-    common.BaseResults
-    Filters map[string][]string `json:"-"`
-    Data    []dataRow           `json:"data"`
-}
-```
+Every resource `Results` embeds `common.BaseResults`, which holds the profile, region, errors and
+sort field and implements their getters. A new resource type embeds it too instead of
+redeclaring those fields (`AGENTS.md`, Adding new resource types).
 
 ---
 
 ## 9. N+1 API call pattern
 
-Never call AWS APIs inside a loop over results from another AWS call.
+The rule and its enforcement are in `AGENTS.md`, Standards and guardrails. One call per item
+multiplies the run time and the API throttling by the number of items:
 
 ```go
 // Bad — one DescribeInstances call per ENI
@@ -257,6 +250,9 @@ for _, eni := range response.NetworkInterfaces {
 
 ## 10. Naming conventions
 
+Go casing is checked by the compiler and `revive`; the CLI values follow the SHOULD rule of
+`AGENTS.md`. Test names follow `AGENTS.md`, Testing conventions.
+
 | Thing                       | Convention             | Example                         |
 | --------------------------- | ---------------------- | ------------------------------- |
 | Packages                    | lowercase, single word | `ec2`, `eni`, `common`          |
@@ -265,7 +261,7 @@ for _, eni := range response.NetworkInterfaces {
 | Exported functions          | PascalCase verb/noun   | `GetHeaders`, `FilterTags`      |
 | Unexported functions        | camelCase              | `getFilters`, `sortResults`     |
 | CLI flag labels (constants) | camelCase with prefix  | `labelProfiles`, `labelEc2Sort` |
-| Test cases                  | descriptive string     | `"empty filter returns error"`  |
+| Test case names             | short lower-case phrase | `"empty filter returns error"` |
 
 CLI sort/filter flag values use **kebab-case**: `private-ip`, `public-ip`, not `private_ip`.
 
@@ -273,8 +269,8 @@ CLI sort/filter flag values use **kebab-case**: `private-ip`, `public-ip`, not `
 
 ## 11. Doc comments
 
-Every exported symbol (type, function, variable, constant) must have a doc comment.
-Comments start with the symbol name and are written as full sentences.
+The rule and its enforcement are in `AGENTS.md`, Standards and guardrails. Comments start with the
+symbol name and are full sentences:
 
 ```go
 // FilterTags returns a list of EC2 filter objects built from tag key=value pairs.
