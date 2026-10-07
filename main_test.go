@@ -25,14 +25,14 @@ import (
 	"testing"
 )
 
-// mainArgsEnv carries the CLI arguments to the child process of Test_main, one per line.
+// mainArgsEnv carries the CLI arguments to the child process of TestMain_cli, one per line.
 // When it is set, the test binary runs main() with them instead of the test.
 const mainArgsEnv = "AWSS_TEST_MAIN_ARGS"
 
-// Test_main runs the real binary entry point in a child process and checks its output and exit
+// TestMain_cli runs the real binary entry point in a child process and checks its output and exit
 // code. A child process gives every run fresh Cobra and Viper globals, and lets the os.Exit
 // calls of cmd.Execute happen without ending the test.
-func Test_main(t *testing.T) {
+func TestMain_cli(t *testing.T) {
 	if args, ok := os.LookupEnv(mainArgsEnv); ok {
 		os.Args = append([]string{"awss"}, strings.Split(args, "\n")...)
 		main()
@@ -57,7 +57,7 @@ func Test_main(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// The child is this same test binary, run again.
 			self := os.Args[0]
-			child := exec.CommandContext(t.Context(), self, "-test.run=^Test_main$") //nolint:gosec // G204: self re-run
+			child := exec.CommandContext(t.Context(), self, "-test.run=^TestMain_cli$") //nolint:gosec // G204: self re-run
 			// No config file, profile or region from the machine running the tests.
 			child.Env = append(os.Environ(),
 				mainArgsEnv+"="+strings.Join(tt.args, "\n"),
