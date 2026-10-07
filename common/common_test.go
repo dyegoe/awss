@@ -84,7 +84,7 @@ func getStructToFiltersCases() []testStructToFiltersCase {
 
 // TestParseTags tests the ParseTags function.
 //
-//nolint:funlen
+//nolint:funlen // one table of tag cases, kept together so the formats read side by side
 func TestParseTags(t *testing.T) {
 	tests := []struct {
 		name    string

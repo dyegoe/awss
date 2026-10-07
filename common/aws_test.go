@@ -384,7 +384,7 @@ func TestFilterNames(t *testing.T) {
 
 // TestFilterTags tests the FilterTags function.
 //
-//nolint:funlen
+//nolint:funlen // one table of tag cases, kept together so the formats read side by side
 func TestFilterTags(t *testing.T) {
 	tests := []struct {
 		name    string
