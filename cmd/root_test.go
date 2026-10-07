@@ -40,43 +40,40 @@ func checkFilterFlags(t *testing.T, name string, cmd *cobra.Command, numFields i
 	}
 }
 
-// Test_initConfig tests the initConfig function.
-func Test_initConfig(t *testing.T) {
-	type args struct {
-		cfg string
-	}
+// TestInitConfig tests the initConfig function.
+func TestInitConfig(t *testing.T) {
 	tests := []struct {
 		name    string
-		args    args
+		cfg     string
 		wantErr bool
 	}{
 		{
 			name:    "empty",
-			args:    args{cfg: ""},
+			cfg:     "",
 			wantErr: false,
 		},
 		{
 			name:    "non-existent",
-			args:    args{cfg: "non-existent"},
+			cfg:     "non-existent",
 			wantErr: true,
 		},
 		{
 			name:    "existent",
-			args:    args{cfg: "testdata/config.yaml"},
+			cfg:     "testdata/config.yaml",
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := initConfig(tt.args.cfg); (err != nil) != tt.wantErr {
+			if err := initConfig(tt.cfg); (err != nil) != tt.wantErr {
 				t.Errorf("initConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-// Test_parseTimeout tests parseTimeout with flag and config file values.
-func Test_parseTimeout(t *testing.T) {
+// TestParseTimeout tests parseTimeout with flag and config file values.
+func TestParseTimeout(t *testing.T) {
 	tests := []struct {
 		name    string
 		value   interface{}

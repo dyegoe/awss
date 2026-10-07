@@ -23,8 +23,8 @@ import (
 	"github.com/dyegoe/awss/common"
 )
 
-// Test_subnetFilters_mapping checks the struct tags map flags to the AWS filter names.
-func Test_subnetFilters_mapping(t *testing.T) {
+// TestSubnetFilters_mapping checks the struct tags map flags to the AWS filter names.
+func TestSubnetFilters_mapping(t *testing.T) {
 	f := subnetFilters{
 		CIDRs:       []string{"10.0.1.0/24"},
 		VpcIDs:      []string{"vpc-1"},
@@ -44,16 +44,16 @@ func Test_subnetFilters_mapping(t *testing.T) {
 	}
 }
 
-// Test_subnetFilterFlags_coversStruct checks every subnetFilters field has a registered flag in the --all list.
-func Test_subnetFilterFlags_coversStruct(t *testing.T) {
+// TestSubnetFilterFlags_coversStruct checks every subnetFilters field has a registered flag in the --all list.
+func TestSubnetFilterFlags_coversStruct(t *testing.T) {
 	if subnetCmd.Flags().Lookup("all") == nil {
 		subnetInitFlags()
 	}
 	checkFilterFlags(t, "subnet", subnetCmd, reflect.TypeOf(subnetFilters{}).NumField(), subnetFilterFlags)
 }
 
-// Test_subnetRunE_invalidCIDR checks that a malformed --cidrs value is rejected before searching.
-func Test_subnetRunE_invalidCIDR(t *testing.T) {
+// TestSubnetRunE_invalidCIDR checks that a malformed --cidrs value is rejected before searching.
+func TestSubnetRunE_invalidCIDR(t *testing.T) {
 	old := subnetF
 	t.Cleanup(func() { subnetF = old })
 	subnetF = subnetFilters{CIDRs: []string{"10.0.1.0/33"}}
