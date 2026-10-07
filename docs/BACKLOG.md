@@ -29,16 +29,11 @@ Coverage per package as of 2026-10-07 (`go test -cover ./...`):
 | `search/s3`     |    80.8% | `Search()` (AWS config + client construction)                |
 | `search`        |    99.1% | deadline and search ending at the same instant (not forced)  |
 
-- [ ] [**Standardise test names and structure.**](https://github.com/dyegoe/awss/issues/173) Three
-  naming styles (`TestType_Method`, `TestName`, `Test_name`), gotests `args` wrappers, shared
-  mutable fixtures left in `search/eni` and `search/ebs`, and commented-out tests. Pick one
-  convention, apply it, and enforce it with an automated check.
-
 ## Standards
 
 - [ ] [**Make the standards and guardrails explicit, mandatory and enforced.**](https://github.com/dyegoe/awss/issues/174)
   One list of MUST rules in `AGENTS.md`, each with the linter, CI step or test that enforces it;
-  `docs/CODESTYLE.md` and `CONTRIBUTING.md` explain and link instead of restating. Depends on #173.
+  `docs/CODESTYLE.md` and `CONTRIBUTING.md` explain and link instead of restating.
 
 ## Architecture
 
