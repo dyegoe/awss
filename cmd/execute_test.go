@@ -56,6 +56,7 @@ func resetCLI(t *testing.T, searchErr error) *[]searchCall {
 	t.Setenv("AWS_REGION", "")
 	t.Setenv("AWS_DEFAULT_REGION", "")
 	t.Setenv("AWS_PROFILE", "")
+	t.Setenv("AWS_CONFIG_FILE", "")
 
 	rootCmd.ResetCommands()
 	rootCmd.ResetFlags()
@@ -129,11 +130,14 @@ type executeCase struct {
 	config string
 	// regionEnv, when set, is the AWS_REGION of the run.
 	regionEnv string
+	// awsConfig, when set, is written to a file AWS_CONFIG_FILE points to.
+	awsConfig string
 	want      searchCall
 }
 
 func executeCases() []executeCase {
-	return append(subcommandCases(), globalCases()...)
+	cases := append(subcommandCases(), globalCases()...)
+	return append(cases, profileCases()...)
 }
 
 // subcommandCases runs each search subcommand with its own flags.
@@ -190,6 +194,47 @@ func subcommandCases() []executeCase {
 	}
 }
 
+// testAwsConfig is an AWS config file with three profiles, for the --profiles cases.
+const testAwsConfig = "[default]\nregion = us-east-1\n" +
+	"[profile dev]\nregion = us-east-1\n" +
+	"[profile prod]\nregion = us-east-1\n"
+
+// profileCases checks that --profiles and all-profiles are validated against the file
+// AWS_CONFIG_FILE points to, the one the AWS SDK reads (#168).
+func profileCases() []executeCase {
+	profilesCall := func(profiles ...string) searchCall {
+		return searchCall{
+			cmd: "ec2", profiles: profiles, regions: []string{"us-east-1"},
+			filters: map[string][]string{}, opts: defaultOpts("name"),
+		}
+	}
+	return []executeCase{
+		{
+			name: "--profiles from AWS_CONFIG_FILE", args: []string{"ec2", "--all", "--profiles", "dev,prod"},
+			awsConfig: testAwsConfig, want: profilesCall("dev", "prod"),
+		},
+		{
+			name: "--profiles all lists AWS_CONFIG_FILE", args: []string{"ec2", "--all", "--profiles", "all"},
+			awsConfig: testAwsConfig, want: profilesCall("default", "dev", "prod"),
+		},
+		{
+			name: "all-profiles of the awss config, checked against AWS_CONFIG_FILE",
+			args: []string{"ec2", "--all", "--profiles", "all"}, config: "all-profiles: [prod]\n",
+			awsConfig: testAwsConfig, want: profilesCall("prod"),
+		},
+	}
+}
+
+// useAwsConfig writes an AWS config file and points AWS_CONFIG_FILE to it for the test.
+func useAwsConfig(t *testing.T, content string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "aws-config")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AWS_CONFIG_FILE", path)
+}
+
 // globalCases covers the global flags, the environment and the config file.
 func globalCases() []executeCase {
 	return []executeCase{
@@ -243,6 +288,9 @@ func TestExecute_search(t *testing.T) {
 			if tt.regionEnv != "" {
 				t.Setenv("AWS_REGION", tt.regionEnv)
 			}
+			if tt.awsConfig != "" {
+				useAwsConfig(t, tt.awsConfig)
+			}
 			args := tt.args
 			if tt.config != "" {
 				args = append([]string{"--config", writeConfig(t, tt.config)}, args...)
@@ -263,15 +311,19 @@ func TestExecute_search(t *testing.T) {
 	}
 }
 
-// TestExecute_errors checks the argument and validation failures: each one fails the command
-// with a message naming the problem, and no search runs.
-func TestExecute_errors(t *testing.T) {
-	tests := []struct {
-		name    string
-		args    []string
-		config  string
-		wantErr string
-	}{
+// errorCase is one table entry of TestExecute_errors.
+type errorCase struct {
+	name string
+	args []string
+	// config and awsConfig are as in executeCase.
+	config    string
+	awsConfig string
+	wantErr   string
+}
+
+// errorCases lists argument and validation failures.
+func errorCases() []errorCase {
+	return []errorCase{
 		{name: "unknown subcommand", args: []string{"rds"}, wantErr: `unknown command "rds"`},
 		{name: "positional argument", args: []string{"ec2", "--all", "extra"}, wantErr: `unknown command "extra"`},
 		{name: "unknown flag", args: []string{"ec2", "--nope"}, wantErr: "unknown flag: --nope"},
@@ -295,10 +347,31 @@ func TestExecute_errors(t *testing.T) {
 			wantErr: "config file not found: /nonexistent/awss.yaml"},
 		{name: "config path is a directory", args: []string{"--config", os.TempDir(), "ec2", "--all"},
 			wantErr: "config file is a directory"},
+		{
+			name: "profile not in AWS_CONFIG_FILE", args: []string{"ec2", "--all", "--profiles", "dev,staging"},
+			awsConfig: testAwsConfig, wantErr: "profile staging not found",
+		},
+		{
+			name: "all-profiles entry not in AWS_CONFIG_FILE", args: []string{"ec2", "--all", "--profiles", "all"},
+			config: "all-profiles: [prod, staging]\n", awsConfig: testAwsConfig,
+			wantErr: "checking all-profiles: profile staging not found",
+		},
+		{
+			name: "no AWS config file at all", args: []string{"ec2", "--all", "--profiles", "dev"},
+			wantErr: "no such file or directory",
+		},
 	}
-	for _, tt := range tests {
+}
+
+// TestExecute_errors checks the argument and validation failures: each one fails the command
+// with a message naming the problem, and no search runs.
+func TestExecute_errors(t *testing.T) {
+	for _, tt := range errorCases() {
 		t.Run(tt.name, func(t *testing.T) {
 			calls := resetCLI(t, nil)
+			if tt.awsConfig != "" {
+				useAwsConfig(t, tt.awsConfig)
+			}
 			args := tt.args
 			if tt.config != "" {
 				args = append([]string{"--config", writeConfig(t, tt.config)}, args...)
