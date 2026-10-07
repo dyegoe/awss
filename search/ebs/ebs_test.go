@@ -37,26 +37,21 @@ import (
 
 // TestNew tests the New function.
 func TestNew(t *testing.T) {
-	type args struct {
+	tests := []struct {
+		name           string
 		profile        string
 		region         string
 		filters        map[string][]string
 		sortField      string
 		noInstanceName bool
-	}
-	tests := []struct {
-		name string
-		args args
-		want *Results
+		want           *Results
 	}{
 		{
-			name: "TestNew",
-			args: args{
-				profile:   "default",
-				region:    "us-east-1",
-				filters:   map[string][]string{"volume-id": {"vol-1234567890abcdef0"}},
-				sortField: "id",
-			},
+			name:      "TestNew",
+			profile:   "default",
+			region:    "us-east-1",
+			filters:   map[string][]string{"volume-id": {"vol-1234567890abcdef0"}},
+			sortField: "id",
 			want: &Results{
 				BaseResults: common.BaseResults{
 					Profile:   "default",
@@ -71,7 +66,7 @@ func TestNew(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := New(tt.args.profile, tt.args.region, tt.args.filters, tt.args.sortField, tt.args.noInstanceName)
+			got := New(tt.profile, tt.region, tt.filters, tt.sortField, tt.noInstanceName)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("New()\n%#v\nwant\n%#v", got, tt.want)
 			}
@@ -79,200 +74,127 @@ func TestNew(t *testing.T) {
 	}
 }
 
-var mockResultsEmpty = &Results{
-	BaseResults: common.BaseResults{
-		Profile: "",
-		Region:  "",
-		Errors:  []string{},
-	},
-	Data:    []dataRow{},
-	Filters: map[string][]string{},
-}
-
-var mockResults = &Results{
-	BaseResults: common.BaseResults{
-		Profile: "default",
-		Region:  "us-east-1",
-		Errors: []string{
-			"error1",
-			"error2",
+// mockResultsEmpty returns a new empty result set. Each test gets its own: some sort it in place.
+func mockResultsEmpty() *Results {
+	return &Results{
+		BaseResults: common.BaseResults{
+			Profile: "",
+			Region:  "",
+			Errors:  []string{},
 		},
-		SortField: "id",
-	},
-	Data: []dataRow{
-		*mockDataRow1,
-		*mockDataRow2,
-	},
-	Filters: map[string][]string{
-		"volume-id":         {"vol-1234567890abcdef0"},
-		"tag":               {"key=value:value3", "key2=value2"},
-		"availability-zone": {"a", "b"},
-		"status":            {"available"},
-	},
+		Data:    []dataRow{},
+		Filters: map[string][]string{},
+	}
 }
 
-var mockDataRow1 = &dataRow{
-	VolumeID:         "vol-1234567890abcdef0",
-	Size:             100,
-	VolumeType:       "gp3",
-	State:            "in-use",
-	AvailabilityZone: "us-east-1a",
-	Encrypted:        "true",
-	InstanceID:       "i-1234567890abcdef0",
-	InstanceName:     "instance-name-1",
-	Device:           "/dev/sda1",
-	Tags: map[string]string{
-		"Name":        "volume-1",
-		"Environment": "test",
-	},
+// mockResults returns a new result set with two rows. Each test gets its own: some sort it in place.
+func mockResults() *Results {
+	return &Results{
+		BaseResults: common.BaseResults{
+			Profile: "default",
+			Region:  "us-east-1",
+			Errors: []string{
+				"error1",
+				"error2",
+			},
+			SortField: "id",
+		},
+		Data: []dataRow{
+			mockDataRow1(),
+			mockDataRow2(),
+		},
+		Filters: map[string][]string{
+			"volume-id":         {"vol-1234567890abcdef0"},
+			"tag":               {"key=value:value3", "key2=value2"},
+			"availability-zone": {"a", "b"},
+			"status":            {"available"},
+		},
+	}
 }
 
-var mockDataRow2 = &dataRow{
-	VolumeID:         "vol-1234567890abcdef1",
-	Size:             200,
-	VolumeType:       "io2",
-	State:            "available",
-	AvailabilityZone: "us-east-1b",
-	Encrypted:        "false",
-	InstanceID:       "",
-	InstanceName:     "",
-	Device:           "",
-	Tags: map[string]string{
-		"Name":        "volume-2",
-		"Environment": "prod",
-	},
+// mockDataRow1 returns a new volume row.
+func mockDataRow1() dataRow {
+	return dataRow{
+		VolumeID:         "vol-1234567890abcdef0",
+		Size:             100,
+		VolumeType:       "gp3",
+		State:            "in-use",
+		AvailabilityZone: "us-east-1a",
+		Encrypted:        "true",
+		InstanceID:       "i-1234567890abcdef0",
+		InstanceName:     "instance-name-1",
+		Device:           "/dev/sda1",
+		Tags: map[string]string{
+			"Name":        "volume-1",
+			"Environment": "test",
+		},
+	}
 }
 
-// TestResults_Len tests the Len function.
-func TestResults_Len(t *testing.T) {
+// mockDataRow2 returns a new volume row.
+func mockDataRow2() dataRow {
+	return dataRow{
+		VolumeID:         "vol-1234567890abcdef1",
+		Size:             200,
+		VolumeType:       "io2",
+		State:            "available",
+		AvailabilityZone: "us-east-1b",
+		Encrypted:        "false",
+		InstanceID:       "",
+		InstanceName:     "",
+		Device:           "",
+		Tags: map[string]string{
+			"Name":        "volume-2",
+			"Environment": "prod",
+		},
+	}
+}
+
+// TestResults_accessors tests Len and the BaseResults getters on a full and an empty result set.
+func TestResults_accessors(t *testing.T) {
 	tests := []struct {
-		name    string
-		results *Results
-		want    int
+		name          string
+		results       *Results
+		wantLen       int
+		wantProfile   string
+		wantRegion    string
+		wantSortField string
+		wantErrors    []string
 	}{
 		{
-			name:    "TestResults_Len",
-			results: mockResults,
-			want:    2,
+			name: "two rows with errors", results: mockResults(),
+			wantLen:       2,
+			wantProfile:   "default",
+			wantRegion:    "us-east-1",
+			wantSortField: "id",
+			wantErrors:    []string{"error1", "error2"},
 		},
 		{
-			name:    "TestResults_Len_Empty",
-			results: mockResultsEmpty,
-			want:    0,
+			name: "empty", results: mockResultsEmpty(),
+			wantLen:       0,
+			wantProfile:   "",
+			wantRegion:    "",
+			wantSortField: "",
+			wantErrors:    []string{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.results.Len(); got != tt.want {
-				t.Errorf("Results.Len()\n%#v\nwant\n%#v", got, tt.want)
+			r := tt.results
+			if got := r.Len(); got != tt.wantLen {
+				t.Errorf("Len() = %d, want %d", got, tt.wantLen)
 			}
-		})
-	}
-}
-
-// TestResults_GetProfile tests the GetProfile function.
-func TestResults_GetProfile(t *testing.T) {
-	tests := []struct {
-		name    string
-		results *Results
-		want    string
-	}{
-		{
-			name:    "TestResults_GetProfile",
-			results: mockResults,
-			want:    "default",
-		},
-		{
-			name:    "TestResults_GetProfile_Empty",
-			results: mockResultsEmpty,
-			want:    "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.results.GetProfile(); got != tt.want {
-				t.Errorf("Results.GetProfile()\n%#v\nwant\n%#v", got, tt.want)
+			if got := r.GetProfile(); got != tt.wantProfile {
+				t.Errorf("GetProfile() = %q, want %q", got, tt.wantProfile)
 			}
-		})
-	}
-}
-
-// TestResults_GetRegion tests the GetRegion function.
-func TestResults_GetRegion(t *testing.T) {
-	tests := []struct {
-		name    string
-		results *Results
-		want    string
-	}{
-		{
-			name:    "TestResults_GetRegion",
-			results: mockResults,
-			want:    "us-east-1",
-		},
-		{
-			name:    "TestResults_GetRegion_Empty",
-			results: mockResultsEmpty,
-			want:    "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.results.GetRegion(); got != tt.want {
-				t.Errorf("Results.GetRegion()\n%#v\nwant\n%#v", got, tt.want)
+			if got := r.GetRegion(); got != tt.wantRegion {
+				t.Errorf("GetRegion() = %q, want %q", got, tt.wantRegion)
 			}
-		})
-	}
-}
-
-// TestResults_GetErrors tests the GetErrors function.
-func TestResults_GetErrors(t *testing.T) {
-	tests := []struct {
-		name    string
-		results *Results
-		want    []string
-	}{
-		{
-			name:    "TestResults_GetErrors",
-			results: mockResults,
-			want:    []string{"error1", "error2"},
-		},
-		{
-			name:    "TestResults_GetErrors_Empty",
-			results: mockResultsEmpty,
-			want:    []string{},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.results.GetErrors(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Results.GetErrors()\n%#v\nwant\n%#v", got, tt.want)
+			if got := r.GetSortField(); got != tt.wantSortField {
+				t.Errorf("GetSortField() = %q, want %q", got, tt.wantSortField)
 			}
-		})
-	}
-}
-
-// TestResults_GetSortField tests the GetSortField function.
-func TestResults_GetSortField(t *testing.T) {
-	tests := []struct {
-		name    string
-		results *Results
-		want    string
-	}{
-		{
-			name:    "TestResults_GetSortField",
-			results: mockResults,
-			want:    "id",
-		},
-		{
-			name:    "TestResults_GetSortField_Empty",
-			results: mockResultsEmpty,
-			want:    "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.results.GetSortField(); got != tt.want {
-				t.Errorf("Results.GetSortField()\n%#v\nwant\n%#v", got, tt.want)
+			if got := r.GetErrors(); !reflect.DeepEqual(got, tt.wantErrors) {
+				t.Errorf("GetErrors() = %q, want %q", got, tt.wantErrors)
 			}
 		})
 	}
@@ -287,7 +209,7 @@ func TestResults_GetHeaders(t *testing.T) {
 	}{
 		{
 			name:    "TestResults_GetHeaders",
-			results: mockResults,
+			results: mockResults(),
 			want: []interface{}{
 				"ID", "Size (GiB)", "Type", "State", "AZ",
 				"Encrypted", "Instance ID", "Instance Name", "Device", "Tags",
@@ -312,10 +234,10 @@ func TestResults_GetRows(t *testing.T) {
 	}{
 		{
 			name:    "TestResults_GetRows",
-			results: mockResults,
+			results: mockResults(),
 			want: []interface{}{
-				*mockDataRow1,
-				*mockDataRow2,
+				mockDataRow1(),
+				mockDataRow2(),
 			},
 		},
 	}
@@ -337,7 +259,7 @@ func TestResults_getFilters(t *testing.T) {
 	}{
 		{
 			name:    "multiple filters",
-			results: mockResults,
+			results: mockResults(),
 			want: &ec2.DescribeVolumesInput{
 				VolumeIds: []string{"vol-1234567890abcdef0"},
 				Filters: []types.Filter{
