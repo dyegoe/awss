@@ -32,27 +32,33 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
-var mockDataRow1 = dataRow{
-	VpcID:         "vpc-0000000000000000a",
-	Name:          "prod",
-	CidrBlock:     "10.0.0.0/16",
-	CidrBlocks:    []string{"10.0.0.0/16", "10.1.0.0/16"},
-	State:         "available",
-	IsDefault:     "false",
-	OwnerID:       "123456789012",
-	DhcpOptionsID: "dopt-1",
-	Tags:          map[string]string{"Name": "prod", "Environment": "prod"},
+// mockDataRow1 returns a new VPC row with two CIDR blocks.
+func mockDataRow1() dataRow {
+	return dataRow{
+		VpcID:         "vpc-0000000000000000a",
+		Name:          "prod",
+		CidrBlock:     "10.0.0.0/16",
+		CidrBlocks:    []string{"10.0.0.0/16", "10.1.0.0/16"},
+		State:         "available",
+		IsDefault:     "false",
+		OwnerID:       "123456789012",
+		DhcpOptionsID: "dopt-1",
+		Tags:          map[string]string{"Name": "prod", "Environment": "prod"},
+	}
 }
 
-var mockDataRow2 = dataRow{
-	VpcID:      "vpc-0000000000000000b",
-	Name:       "dev",
-	CidrBlock:  "172.16.0.0/16",
-	CidrBlocks: []string{"172.16.0.0/16"},
-	State:      "available",
-	IsDefault:  "true",
-	OwnerID:    "123456789012",
-	Tags:       map[string]string{"Name": "dev"},
+// mockDataRow2 returns a new default VPC row.
+func mockDataRow2() dataRow {
+	return dataRow{
+		VpcID:      "vpc-0000000000000000b",
+		Name:       "dev",
+		CidrBlock:  "172.16.0.0/16",
+		CidrBlocks: []string{"172.16.0.0/16"},
+		State:      "available",
+		IsDefault:  "true",
+		OwnerID:    "123456789012",
+		Tags:       map[string]string{"Name": "dev"},
+	}
 }
 
 func mockResults() *Results {
@@ -63,7 +69,7 @@ func mockResults() *Results {
 			Errors:    []string{},
 			SortField: "id",
 		},
-		Data: []dataRow{mockDataRow1, mockDataRow2},
+		Data: []dataRow{mockDataRow1(), mockDataRow2()},
 		Filters: map[string][]string{
 			"vpc-id":   {"vpc-0000000000000000a"},
 			"tag:Name": {"prod", "dev"},
@@ -121,7 +127,7 @@ func TestResults_GetHeaders(t *testing.T) {
 
 // TestResults_GetRows tests the GetRows function.
 func TestResults_GetRows(t *testing.T) {
-	want := []interface{}{mockDataRow1, mockDataRow2}
+	want := []interface{}{mockDataRow1(), mockDataRow2()}
 	if got := mockResults().GetRows(); !reflect.DeepEqual(got, want) {
 		t.Errorf("GetRows()\n%#v\nwant\n%#v", got, want)
 	}
@@ -257,7 +263,7 @@ func TestResults_sortResults(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := mockResults()
-			r.Data = []dataRow{mockDataRow2, mockDataRow1}
+			r.Data = []dataRow{mockDataRow2(), mockDataRow1()}
 			err := r.sortResults(tt.field)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("sortResults(%q) error = %v, wantErr %v", tt.field, err, tt.wantErr)
