@@ -85,51 +85,7 @@ https://github.com/dyegoe/awss`,
 //
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	initFlags()
-	ec2InitFlags()
-	eniInitFlags()
-	ebsInitFlags()
-	vpcInitFlags()
-	subnetInitFlags()
-	s3InitFlags()
-	s3objInitFlags()
-
-	if err := initViper(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	if err := ec2InitViper(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	if err := eniInitViper(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	if err := ebsInitViper(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	if err := vpcInitViper(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	if err := subnetInitViper(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	if err := s3InitViper(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	if err := s3objInitViper(); err != nil {
+	if err := setup(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -137,6 +93,42 @@ func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+// subcommand ties a search subcommand to the functions that register its flags and bind them to viper.
+type subcommand struct {
+	cmd       *cobra.Command
+	initFlags func()
+	initViper func() error
+}
+
+// subcommands lists the search subcommands, in the order they are registered.
+var subcommands = []subcommand{
+	{ec2Cmd, ec2InitFlags, ec2InitViper},
+	{eniCmd, eniInitFlags, eniInitViper},
+	{ebsCmd, ebsInitFlags, ebsInitViper},
+	{vpcCmd, vpcInitFlags, vpcInitViper},
+	{subnetCmd, subnetInitFlags, subnetInitViper},
+	{s3Cmd, s3InitFlags, s3InitViper},
+	{s3objCmd, s3objInitFlags, s3objInitViper},
+}
+
+// setup registers the global flags and every subcommand with its flags, then binds them to viper.
+func setup() error {
+	initFlags()
+	for _, sub := range subcommands {
+		sub.initFlags()
+	}
+
+	if err := initViper(); err != nil {
+		return err
+	}
+	for _, sub := range subcommands {
+		if err := sub.initViper(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // persistentPreRun is executed before any command.
@@ -385,6 +377,9 @@ func intLabel(label string) int {
 	return viper.GetInt(label)
 }
 
+// executeSearch runs the search. It is a variable so tests can replace the AWS calls.
+var executeSearch = search.Execute
+
 // runSearch is the common RunE body of every search subcommand.
 //
 // It validates the sort field, builds filters, and executes the search.
@@ -403,7 +398,7 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 
 	tagsKeys := viper.GetStringSlice(labelTagsKeys)
 
-	return search.Execute(
+	return executeSearch(
 		cmd.Name(),
 		viper.GetStringSlice(labelProfiles),
 		viper.GetStringSlice(labelRegions),
