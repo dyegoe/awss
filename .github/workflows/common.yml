@@ -31,8 +31,10 @@ jobs:
 
       # -race replaces a plain run: same tests, plus a check of the parallel profile x region
       # fan-out. The detector slows tests down, hence the longer timeout.
-      - name: Run test (race detector)
-        run: go test -race -timeout 2m -short $(go list ./...)
+      # -shuffle=on catches tests that depend on the order they run in, -count=2 tests that break
+      # their own process state (AGENTS.md). A failure prints the seed: rerun with -shuffle=<seed>.
+      - name: Run test (race detector, random order, twice)
+        run: go test -race -count=2 -shuffle=on -timeout 2m -short $(go list ./...)
 
       - name: Smoke test version injection
         run: |
