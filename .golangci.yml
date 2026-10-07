@@ -9,6 +9,7 @@ linters:
     - dupl
     - errcheck
     - errorlint
+    - forbidigo
     - funlen
     - gochecknoinits
     - goconst
@@ -33,6 +34,7 @@ linters:
     - unparam
     - unused
     - whitespace
+    - wrapcheck
   settings:
     depguard:
       rules:
@@ -50,6 +52,19 @@ linters:
             - gopkg.in/ini.v1
     dupl:
       threshold: 100
+    forbidigo:
+      forbid:
+        - pattern: ^context\.TODO$
+          msg: pass the caller's ctx, or context.Background() at the top of search.Execute (AGENTS.md)
+      analyze-types: true
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    wrapcheck:
+      # The module's own packages return errors that already carry their context, and many are
+      # the exact user-facing message (invalid sort field: ...). Only foreign errors need wrapping.
+      ignore-package-globs:
+        - github.com/dyegoe/awss/*
     funlen:
       lines: 60
       statements: 50
@@ -84,7 +99,6 @@ linters:
   exclusions:
     generated: lax
     presets:
-      - comments
       - common-false-positives
       - legacy
       - std-error-handling
