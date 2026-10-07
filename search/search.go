@@ -65,8 +65,8 @@ type Options struct {
 	// MaxKeys caps the keys scanned per bucket in the s3obj search. Zero means the search's default.
 	MaxKeys int
 
-	// Timeout is how long the run may take, pre-authentication included. A profile and region
-	// still searching at the deadline is reported as timed out. Zero disables it.
+	// Timeout is how long the run may take. A profile and region still searching at the deadline
+	// is reported as timed out. Zero disables it.
 	Timeout time.Duration
 }
 
@@ -164,13 +164,8 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 
 	go common.PrintResults(stdout, resultsChan, done, opts.Output, opts.ShowEmpty, opts.ShowTags, opts.TagsKeys)
 
-	// The deadline covers the pre-authentication too: a stalled STS endpoint must not block the run.
 	ctx, cancel := withTimeout(context.Background(), opts.Timeout)
 	defer cancel()
-
-	if len(profiles) > 0 && len(regions) > 0 {
-		preAuthenticate(ctx, profiles[0], regions[0])
-	}
 
 	for _, profile := range profiles {
 		for _, region := range regions {
@@ -239,24 +234,6 @@ func searchOne(
 	timedOut.AddError(fmt.Sprintf(
 		"search timed out after %s; raise --timeout, or set it to 0 to disable it", opts.Timeout))
 	return timedOut
-}
-
-// whoAmIFn wraps common.WhoAmI so tests can replace the STS call.
-var whoAmIFn = common.WhoAmI
-
-// warnings is where non-fatal problems are reported. It is a variable so tests can capture it.
-var warnings io.Writer = os.Stderr
-
-// preAuthenticate calls STS once with the first profile and region before the parallel fan-out,
-// so a login flow (e.g. Okta) is triggered once instead of by every goroutine at the same time.
-//
-// A failure is only a warning: the searches still run, and each failing profile and region
-// reports its own error in its result set. One bad profile must not stop the whole run.
-func preAuthenticate(ctx context.Context, profile, region string) {
-	if _, err := whoAmIFn(ctx, profile, region); err != nil {
-		fmt.Fprintf(warnings, "warning: pre-authentication with profile %q in region %s failed, continuing: %v\n",
-			profile, region, err)
-	}
 }
 
 // CheckSortField checks if the given sort field is valid for the given command.

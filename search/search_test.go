@@ -28,7 +28,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -172,58 +171,21 @@ func mockCountingEngine(t *testing.T) *int {
 	return &calls
 }
 
-// mockPreAuth replaces the STS call with one returning err and captures the warnings.
-// It returns the number of STS calls made and the warnings buffer.
-func mockPreAuth(t *testing.T, err error) (*int, *bytes.Buffer) {
-	t.Helper()
-	oldWhoAmI, oldWarnings := whoAmIFn, warnings
-	t.Cleanup(func() { whoAmIFn, warnings = oldWhoAmI, oldWarnings })
-	calls := 0
-	whoAmIFn = func(_ context.Context, _, _ string) (string, error) {
-		calls++
-		return "", err
-	}
-	buf := &bytes.Buffer{}
-	warnings = buf
-	return &calls, buf
-}
-
-// TestExecute_preAuth checks that a failing pre-authentication is a warning naming the
-// profile and region, and that every profile x region is still searched.
-func TestExecute_preAuth(t *testing.T) {
+// TestExecute_fanOut checks that every profile x region is searched once, and none without profiles.
+func TestExecute_fanOut(t *testing.T) {
 	tests := []struct {
-		name        string
-		whoAmIErr   error
-		profiles    []string
-		regions     []string
-		wantWarning []string
-		wantCalls   int
+		name      string
+		profiles  []string
+		regions   []string
+		wantCalls int
 	}{
-		{
-			name:        "first profile fails, the run continues",
-			whoAmIErr:   errors.New("api error InvalidClientTokenId"),
-			profiles:    []string{"default", "good-1", "good-2"},
-			regions:     []string{"us-east-1", "eu-west-1"},
-			wantWarning: []string{`"default"`, "us-east-1", "InvalidClientTokenId"},
-			wantCalls:   6,
-		},
-		{
-			name:      "pre-auth succeeds, no warning",
-			profiles:  []string{"p1"},
-			regions:   []string{"us-east-1"},
-			wantCalls: 1,
-		},
-		{
-			name:      "no profiles, no pre-auth and no searches",
-			profiles:  []string{},
-			regions:   []string{"us-east-1"},
-			wantCalls: 0,
-		},
+		{name: "every profile x region", profiles: []string{"p1", "p2", "p3"}, regions: []string{"r1", "r2"}, wantCalls: 6},
+		{name: "one profile and region", profiles: []string{"p1"}, regions: []string{"r1"}, wantCalls: 1},
+		{name: "no profiles, no searches", profiles: []string{}, regions: []string{"r1"}, wantCalls: 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			calls := mockCountingEngine(t)
-			preAuthCalls, buf := mockPreAuth(t, tt.whoAmIErr)
 
 			opts := &Options{Output: common.JSON}
 			if err := Execute("test", tt.profiles, tt.regions, map[string][]string{}, opts); err != nil {
@@ -231,17 +193,6 @@ func TestExecute_preAuth(t *testing.T) {
 			}
 			if *calls != tt.wantCalls {
 				t.Errorf("searches built = %d, want %d", *calls, tt.wantCalls)
-			}
-			if wantPreAuth := min(tt.wantCalls, 1); *preAuthCalls != wantPreAuth {
-				t.Errorf("pre-auth calls = %d, want %d", *preAuthCalls, wantPreAuth)
-			}
-			if len(tt.wantWarning) == 0 && buf.Len() > 0 {
-				t.Errorf("unexpected warning: %q", buf.String())
-			}
-			for _, want := range tt.wantWarning {
-				if !strings.Contains(buf.String(), want) {
-					t.Errorf("warning = %q, want it to contain %q", buf.String(), want)
-				}
 			}
 		})
 	}
@@ -327,7 +278,6 @@ func TestExecute_timeoutReachesSearch(t *testing.T) {
 				mu.Unlock()
 			}
 			mockTimedEngine(t, map[string]func(context.Context, *timedResults){"p1": record, "p2": record})
-			mockPreAuth(t, nil)
 			captureStdout(t)
 
 			opts := &Options{Output: common.JSON, Timeout: tt.timeout}
@@ -372,7 +322,6 @@ func TestExecute_timeout(t *testing.T) {
 			r.Data = append(r.Data, "too-late")
 		},
 	})
-	mockPreAuth(t, nil)
 	out := captureStdout(t)
 
 	opts := &Options{Output: common.JSON, Timeout: 100 * time.Millisecond}
@@ -399,34 +348,28 @@ func TestExecute_timeout(t *testing.T) {
 	}
 }
 
-// TestExecute_preAuthTimeout checks that a pre-authentication stuck on a stalled STS endpoint is
-// cut by the deadline: the run returns, warns, and reports every search as timed out.
-func TestExecute_preAuthTimeout(t *testing.T) {
-	oldWhoAmI, oldWarnings := whoAmIFn, warnings
-	t.Cleanup(func() { whoAmIFn, warnings = oldWhoAmI, oldWarnings })
-	whoAmIFn = func(ctx context.Context, _, _ string) (string, error) {
-		<-ctx.Done()
-		return "", ctx.Err()
-	}
-	warn := &bytes.Buffer{}
-	warnings = warn
+// TestExecute_loggedOutProfile checks that a profile without a valid session reports its own error
+// in its result set, and that the other profiles are unaffected.
+func TestExecute_loggedOutProfile(t *testing.T) {
+	const expired = "error describing instances: failed to refresh cached credentials, the SSO session has expired"
 	mockTimedEngine(t, map[string]func(context.Context, *timedResults){
-		"p1": func(ctx context.Context, _ *timedResults) { <-ctx.Done() },
+		"logged-in-1": func(_ context.Context, r *timedResults) { r.Data = append(r.Data, "row-1") },
+		"expired":     func(_ context.Context, r *timedResults) { r.Errors = append(r.Errors, expired) },
+		"logged-in-2": func(_ context.Context, r *timedResults) { r.Data = append(r.Data, "row-2") },
 	})
 	out := captureStdout(t)
 
-	opts := &Options{Output: common.JSON, Timeout: 50 * time.Millisecond}
-	if err := Execute("test", []string{"p1"}, []string{"us-east-1"}, map[string][]string{}, opts); err != nil {
+	opts := &Options{Output: common.JSON}
+	profiles := []string{"logged-in-1", "expired", "logged-in-2"}
+	if err := Execute("test", profiles, []string{"us-east-1"}, map[string][]string{}, opts); err != nil {
 		t.Fatalf("Execute() error = %v, want nil", err)
 	}
 
-	if !strings.Contains(warn.String(), context.DeadlineExceeded.Error()) {
-		t.Errorf("warning = %q, want the pre-authentication deadline error", warn.String())
+	want := map[string]printedSet{
+		"logged-in-1": {Profile: "logged-in-1", Region: "us-east-1", Data: []string{"row-1"}},
+		"expired":     {Profile: "expired", Region: "us-east-1", Data: []string{}, Errors: []string{expired}},
+		"logged-in-2": {Profile: "logged-in-2", Region: "us-east-1", Data: []string{"row-2"}},
 	}
-	want := map[string]printedSet{"p1": {
-		Profile: "p1", Region: "us-east-1", Data: []string{},
-		Errors: []string{"search timed out after 50ms; raise --timeout, or set it to 0 to disable it"},
-	}}
 	if got := decodePrinted(t, out); !reflect.DeepEqual(got, want) {
 		t.Errorf("printed result sets\n%+v\nwant\n%+v", got, want)
 	}

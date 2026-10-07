@@ -17,7 +17,7 @@ Please include the awss version, the command you ran, and what an attacker could
 
 ## Scope
 
-awss is a read-only client: it only calls `Describe*`, `List*` and `sts:GetCallerIdentity`.
+awss is a read-only client: it only calls `Describe*` and `List*`.
 Credentials are resolved by the AWS SDK's standard chain and are never written to disk or
 printed. Reports about the AWS SDK itself should go to
 [AWS](https://aws.amazon.com/security/vulnerability-reporting/).

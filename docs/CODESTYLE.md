@@ -92,7 +92,7 @@ func (r *Results) Search(ctx context.Context) {
 ```
 
 `context.Background()` is acceptable only at the top of `search.Execute` and in one-off helpers
-that have no caller context (for example `common.WhoAmI`).
+that have no caller context (for example `common.AwsConfig`).
 
 ---
 

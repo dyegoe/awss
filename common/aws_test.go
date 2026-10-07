@@ -57,34 +57,6 @@ import (
 // 	}
 // }
 
-// // TestWhoAmI tests the WhoAmI function.
-// func TestWhoAmI(t *testing.T) {
-// 	type args struct {
-// 		profile string
-// 		region  string
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		want    string
-// 		wantErr bool
-// 	}{
-// 		// TODO: Add test cases.
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			got, err := WhoAmI(tt.args.profile, tt.args.region)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("WhoAmI() error = %v, wantErr %v", err, tt.wantErr)
-// 				return
-// 			}
-// 			if got != tt.want {
-// 				t.Errorf("WhoAmI()\n%#v\nwant\n%#v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
-
 // TestGetAwsProfiles tests the GetAwsProfiles function.
 func TestGetAwsProfiles(t *testing.T) {
 	// save the original variable, defer the restore and mock the variable
