@@ -21,20 +21,20 @@ jobs:
       - name: Run vet
         run: go vet ./...
 
-      - name: Run mod tidy
-        run: go mod tidy -v
+      # go mod tidy rewrites go.mod and go.sum; the diff makes an untidy module fail the job.
+      - name: Check go.mod and go.sum are tidy
+        run: go mod tidy -v && git diff --exit-code -- go.mod go.sum
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
           version: v2.13.1
 
-      # -race replaces a plain run: same tests, plus a check of the parallel profile x region
-      # fan-out. The detector slows tests down, hence the longer timeout.
-      # -shuffle=on catches tests that depend on the order they run in, -count=2 tests that break
-      # their own process state (AGENTS.md). A failure prints the seed: rerun with -shuffle=<seed>.
-      - name: Run test (race detector, random order, twice)
-        run: go test -race -count=2 -shuffle=on -timeout 2m -short $(go list ./...)
+      # make test is the one test command (Makefile): race detector, random order and every test
+      # twice (a failure prints the seed: rerun with -shuffle=<seed>), then a check that every
+      # package has tests and covers at least 80% of its statements (AGENTS.md).
+      - name: Run test (race, random order, twice, coverage)
+        run: make test
 
       - name: Smoke test version injection
         run: |
