@@ -30,13 +30,15 @@ import (
 )
 
 const (
-	labelS3objSort    = "s3obj.sort"
-	labelS3objRegex   = "s3obj.regex"
-	labelS3objMaxKeys = "s3obj.max-keys"
+	labelS3objSort       = "s3obj.sort"
+	labelS3objRegex      = "s3obj.regex"
+	labelS3objMaxKeys    = "s3obj.max-keys"
+	labelS3objMaxBuckets = "s3obj.max-buckets"
 
-	flagBuckets = "buckets"
-	flagKeys    = "keys"
-	flagMaxKeys = "max-keys"
+	flagBuckets    = "buckets"
+	flagKeys       = "keys"
+	flagMaxKeys    = "max-keys"
+	flagMaxBuckets = "max-buckets"
 )
 
 // s3objFilters represents the filters for the s3obj command.
@@ -56,8 +58,11 @@ var s3objCmd = &cobra.Command{
 	Short: "Search for S3 objects (keys) inside buckets.",
 	Long: `
 Search for S3 objects (keys) inside the given buckets.
---buckets is required and takes exact bucket names. Each region only scans the buckets that
-live in it, so use --regions all when you do not know the bucket's region.
+--buckets is required and takes bucket names or glob patterns ('prod-logs-*'). Each region only
+scans the matching buckets that live in it, so use --regions all when you do not know the
+bucket's region. When the patterns match more than --max-buckets buckets (default 20) in a
+region, that region scans nothing and reports it: narrow the patterns or raise the limit. There
+is no --all: scanning every bucket is an inventory job (S3 Inventory with Athena).
 
 Search keys by glob pattern ('*' matches anything, including '/', '?' one character):
 	awss s3obj -b my-bucket -K 'logs/2024/*.gz'
@@ -80,15 +85,20 @@ func s3objRunE(cmd *cobra.Command, _ []string) error {
 	if len(s3objF.Buckets) == 0 {
 		return fmt.Errorf("--%s is required", flagBuckets)
 	}
+	// Bucket patterns are always globs; validate them before any AWS call.
+	if _, err := common.NewMatcher(s3objF.Buckets, false); err != nil {
+		return fmt.Errorf("invalid --%s pattern: %w", flagBuckets, err)
+	}
 	// Validate the patterns early, before any AWS call.
 	if _, err := common.NewMatcher(s3objF.Keys, viper.GetBool(labelS3objRegex)); err != nil {
 		return err
 	}
 	return runSearch(cmd, &cmdSpec{
-		sortLabel:    labelS3objSort,
-		regexLabel:   labelS3objRegex,
-		maxKeysLabel: labelS3objMaxKeys,
-		filterFlags:  s3objFilterFlags,
+		sortLabel:       labelS3objSort,
+		regexLabel:      labelS3objRegex,
+		maxKeysLabel:    labelS3objMaxKeys,
+		maxBucketsLabel: labelS3objMaxBuckets,
+		filterFlags:     s3objFilterFlags,
 	}, nil, nil, s3objF)
 }
 
@@ -96,20 +106,23 @@ func s3objInitFlags() {
 	rootCmd.AddCommand(s3objCmd)
 
 	s3objCmd.Flags().StringSliceVarP(&s3objF.Buckets, flagBuckets, "b", []string{},
-		"Buckets to scan, exact names. Required. `my-bucket,other-bucket`")
+		"Buckets to scan: names or glob patterns, never regular expressions. Required. `'prod-logs-*,my-bucket'`")
 	s3objCmd.Flags().StringSliceVarP(&s3objF.Keys, flagKeys, "K", []string{},
 		"Filter objects by key patterns. Globs by default, see --regex. `'logs/2024/*.gz'`")
 	s3objCmd.Flags().Bool(flagRegex, false,
 		"Treat --keys patterns as Go regular expressions instead of globs.")
 	s3objCmd.Flags().Int(flagMaxKeys, s3obj.DefaultMaxKeys,
 		"Maximum number of keys scanned per bucket before stopping.")
+	s3objCmd.Flags().Int(flagMaxBuckets, s3obj.DefaultMaxBuckets,
+		"Maximum number of buckets the patterns may match in one region; above it the region scans nothing.")
 	s3objCmd.Flags().String(flagSort, "key", sortHelp("s3obj", "objects", "key"))
 }
 
 func s3objInitViper() error {
 	return bindFlags(s3objCmd, map[string]string{
-		labelS3objSort:    flagSort,
-		labelS3objRegex:   flagRegex,
-		labelS3objMaxKeys: flagMaxKeys,
+		labelS3objSort:       flagSort,
+		labelS3objRegex:      flagRegex,
+		labelS3objMaxKeys:    flagMaxKeys,
+		labelS3objMaxBuckets: flagMaxBuckets,
 	})
 }

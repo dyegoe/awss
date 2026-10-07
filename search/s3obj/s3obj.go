@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	// FilterKeyBucket is the filters key carrying the exact bucket names to scan.
+	// FilterKeyBucket is the filters key carrying the bucket names or glob patterns to scan.
 	FilterKeyBucket = "bucket"
 
 	// FilterKeyKey is the filters key carrying the key patterns, matched client-side.
@@ -41,6 +41,9 @@ const (
 
 	// DefaultMaxKeys is the default cap of keys scanned per bucket.
 	DefaultMaxKeys = 10000
+
+	// DefaultMaxBuckets is the default cap of buckets one profile and region may scan.
+	DefaultMaxBuckets = 20
 )
 
 // api is the subset of the S3 client used by the search. *s3.Client satisfies it.
@@ -64,6 +67,10 @@ type Results struct {
 
 	// MaxKeys caps the number of keys scanned per bucket. Zero or less means DefaultMaxKeys.
 	MaxKeys int `json:"-"`
+
+	// MaxBuckets caps the buckets the bucket patterns may match in the region. Above it, the
+	// region scans nothing. Zero or less means DefaultMaxBuckets.
+	MaxBuckets int `json:"-"`
 }
 
 // dataRow represents a row of the S3 objects search results.
@@ -85,9 +92,14 @@ type dataRow struct {
 }
 
 // New initiates and returns a new instance of S3 object results.
-func New(profile, region string, filters map[string][]string, sortField string, regex bool, maxKeys int) *Results {
+func New(
+	profile, region string, filters map[string][]string, sortField string, regex bool, maxKeys, maxBuckets int,
+) *Results {
 	if maxKeys <= 0 {
 		maxKeys = DefaultMaxKeys
+	}
+	if maxBuckets <= 0 {
+		maxBuckets = DefaultMaxBuckets
 	}
 	return &Results{
 		BaseResults: common.BaseResults{
@@ -96,10 +108,11 @@ func New(profile, region string, filters map[string][]string, sortField string, 
 			Errors:    []string{},
 			SortField: sortField,
 		},
-		Data:    []dataRow{},
-		Filters: filters,
-		Regex:   regex,
-		MaxKeys: maxKeys,
+		Data:       []dataRow{},
+		Filters:    filters,
+		Regex:      regex,
+		MaxKeys:    maxKeys,
+		MaxBuckets: maxBuckets,
 	}
 }
 
@@ -146,14 +159,21 @@ func (r *Results) collect(ctx context.Context, client api, matcher *common.Match
 	}
 }
 
-// bucketsInRegion returns the requested buckets that live in r.Region, sorted by name.
+// bucketsInRegion returns the buckets of r.Region whose names match the bucket patterns (globs;
+// an exact name matches itself), sorted by name. It fails, scanning nothing, when they match more
+// than r.MaxBuckets buckets.
 func (r *Results) bucketsInRegion(ctx context.Context, client s3.ListBucketsAPIClient) ([]string, error) {
 	requested := r.Filters[FilterKeyBucket]
 	if len(requested) == 0 {
 		return nil, fmt.Errorf("no bucket given: use the %q filter", FilterKeyBucket)
 	}
+	// Bucket patterns are always globs: --regex applies to the key patterns only.
+	matcher, err := common.NewMatcher(requested, false)
+	if err != nil {
+		return nil, fmt.Errorf("invalid bucket pattern: %w", err)
+	}
 
-	inRegion := map[string]struct{}{}
+	var buckets []string
 	paginator := s3.NewListBucketsPaginator(client, &s3.ListBucketsInput{BucketRegion: common.String(r.Region)})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
@@ -161,15 +181,16 @@ func (r *Results) bucketsInRegion(ctx context.Context, client s3.ListBucketsAPIC
 			return nil, fmt.Errorf("error listing buckets: %w", err)
 		}
 		for i := range page.Buckets {
-			inRegion[common.StringValue(page.Buckets[i].Name)] = struct{}{}
+			if name := common.StringValue(page.Buckets[i].Name); matcher.Match(name) {
+				buckets = append(buckets, name)
+			}
 		}
 	}
 
-	buckets := make([]string, 0, len(requested))
-	for _, name := range requested {
-		if _, ok := inRegion[name]; ok {
-			buckets = append(buckets, name)
-		}
+	// A partial scan would make "not found" meaningless, so above the cap nothing is scanned.
+	if len(buckets) > r.MaxBuckets {
+		return nil, fmt.Errorf("the bucket patterns match %d buckets in %s, more than --max-buckets %d: "+
+			"narrow the patterns or raise --max-buckets", len(buckets), r.Region, r.MaxBuckets)
 	}
 	sort.Strings(buckets)
 	return buckets, nil

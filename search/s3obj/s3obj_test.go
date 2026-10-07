@@ -92,24 +92,30 @@ func keys(rows []dataRow) []string {
 	return out
 }
 
-// TestNew tests New, including the MaxKeys default.
+// TestNew tests New, including the MaxKeys and MaxBuckets defaults.
 func TestNew(t *testing.T) {
 	filters := map[string][]string{FilterKeyBucket: {"b"}, FilterKeyKey: {"*.gz"}}
-	got := New("default", "us-east-1", filters, "key", true, 0)
+	got := New("default", "us-east-1", filters, "key", true, 0, 0)
 	if got.MaxKeys != DefaultMaxKeys {
 		t.Errorf("New(maxKeys=0).MaxKeys = %d, want %d", got.MaxKeys, DefaultMaxKeys)
 	}
 	if !got.Regex || got.GetSortField() != "key" || got.GetProfile() != "default" || got.GetRegion() != "us-east-1" {
 		t.Errorf("New() did not keep its arguments: %#v", got)
 	}
-	if got := New("p", "r", filters, "", false, 5).MaxKeys; got != 5 {
+	if got := New("p", "r", filters, "", false, 5, 0).MaxKeys; got != 5 {
 		t.Errorf("New(maxKeys=5).MaxKeys = %d, want 5", got)
+	}
+	if got.MaxBuckets != DefaultMaxBuckets {
+		t.Errorf("New(maxBuckets=0).MaxBuckets = %d, want %d", got.MaxBuckets, DefaultMaxBuckets)
+	}
+	if got := New("p", "r", filters, "", false, 0, 7).MaxBuckets; got != 7 {
+		t.Errorf("New(maxBuckets=7).MaxBuckets = %d, want 7", got)
 	}
 }
 
 // TestResults_accessors tests Len, GetHeaders, GetRows.
 func TestResults_accessors(t *testing.T) {
-	r := New("default", "us-east-1", map[string][]string{}, "key", false, 0)
+	r := New("default", "us-east-1", map[string][]string{}, "key", false, 0, 0)
 	r.Data = []dataRow{{Key: "a"}, {Key: "b"}}
 	if got := r.Len(); got != 2 {
 		t.Errorf("Len() = %d, want 2", got)
@@ -140,29 +146,123 @@ func TestParseObject(t *testing.T) {
 	}
 }
 
-// TestResults_bucketsInRegion tests the intersection of requested buckets with the region's buckets.
+// patternBuckets is a fake with four buckets in us-east-1 and one in eu-west-1.
+func patternBuckets() *fakeS3 {
+	return &fakeS3{bucketsInRegion: map[string][]string{
+		"us-east-1": {"prod-logs-b", "prod-data", "dev-logs", "prod-logs-a"},
+		"eu-west-1": {"prod-logs-eu"},
+	}}
+}
+
+// TestResults_bucketsInRegion checks which buckets of the region the bucket patterns select:
+// bucketsCase is one table entry of TestResults_bucketsInRegion.
+type bucketsCase struct {
+	name       string
+	buckets    []string
+	regex      bool
+	maxBuckets int
+	want       []string
+	wantErr    string
+}
+
+// bucketsCases lists the bucket selections of TestResults_bucketsInRegion.
+func bucketsCases() []bucketsCase {
+	return []bucketsCase{
+		{
+			name:    "exact names: missing and other-region names are skipped",
+			buckets: []string{"prod-data", "prod-logs-eu", "missing"},
+			want:    []string{"prod-data"},
+		},
+		{name: "glob star", buckets: []string{"prod-logs-*"}, want: []string{"prod-logs-a", "prod-logs-b"}},
+		{name: "glob question mark", buckets: []string{"prod-logs-?"}, want: []string{"prod-logs-a", "prod-logs-b"}},
+		{
+			name:    "several patterns, a bucket matched twice is listed once",
+			buckets: []string{"prod-*", "*-logs-a"},
+			want:    []string{"prod-data", "prod-logs-a", "prod-logs-b"},
+		},
+		{
+			name:    "bucket patterns stay globs when --regex is set for the keys",
+			buckets: []string{"prod-logs-.*"},
+			regex:   true,
+		},
+		{name: "no match", buckets: []string{"staging-*"}},
+		{
+			name: "exactly at the cap", buckets: []string{"prod-logs-*"}, maxBuckets: 2,
+			want: []string{"prod-logs-a", "prod-logs-b"},
+		},
+		{
+			name: "above the cap", buckets: []string{"*"}, maxBuckets: 3,
+			wantErr: "the bucket patterns match 4 buckets in us-east-1, more than --max-buckets 3: " +
+				"narrow the patterns or raise --max-buckets",
+		},
+		{name: "invalid pattern", buckets: []string{"[unclosed"}, wantErr: "invalid bucket pattern"},
+		{name: "no bucket filter", wantErr: `no bucket given: use the "bucket" filter`},
+	}
+}
+
+// exact names, globs (never regexes), the --max-buckets cap, and the errors.
 func TestResults_bucketsInRegion(t *testing.T) {
-	client := &fakeS3{bucketsInRegion: map[string][]string{"us-east-1": {"b1", "b3"}, "eu-west-1": {"b2"}}}
-	r := New("default", "us-east-1", map[string][]string{FilterKeyBucket: {"b3", "b2", "b1", "missing"}}, "", false, 0)
+	for _, tt := range bucketsCases() {
+		t.Run(tt.name, func(t *testing.T) {
+			client := patternBuckets()
+			filters := map[string][]string{}
+			if tt.buckets != nil {
+				filters[FilterKeyBucket] = tt.buckets
+			}
+			r := New("default", "us-east-1", filters, "", tt.regex, 0, tt.maxBuckets)
 
-	got, err := r.bucketsInRegion(context.Background(), client)
-	if err != nil {
-		t.Fatalf("bucketsInRegion() error = %v", err)
-	}
-	if want := []string{"b1", "b3"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("bucketsInRegion() = %v, want %v", got, want)
-	}
-	if got := common.StringValue(client.listBucketsInputs[0].BucketRegion); got != "us-east-1" {
-		t.Errorf("ListBuckets BucketRegion = %q, want us-east-1", got)
-	}
+			got, err := r.bucketsInRegion(context.Background(), client)
 
-	noBuckets := New("d", "r", map[string][]string{}, "", false, 0)
-	if _, err := noBuckets.bucketsInRegion(context.Background(), client); err == nil {
-		t.Error("bucketsInRegion() with no bucket filter: error = nil, want error")
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("bucketsInRegion(%v) error = %v, want %q", tt.buckets, err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("bucketsInRegion(%v) error = %v", tt.buckets, err)
+			}
+			if len(got) != 0 || len(tt.want) != 0 {
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("bucketsInRegion(%v) = %v, want %v", tt.buckets, got, tt.want)
+				}
+			}
+			if region := common.StringValue(client.listBucketsInputs[0].BucketRegion); region != "us-east-1" {
+				t.Errorf("ListBuckets BucketRegion = %q, want us-east-1", region)
+			}
+		})
 	}
+}
+
+// TestResults_bucketsInRegion_listError checks that a ListBuckets error is wrapped and returned.
+func TestResults_bucketsInRegion_listError(t *testing.T) {
+	client := patternBuckets()
 	client.bucketsErr = errors.New("denied")
+	r := New("default", "us-east-1", map[string][]string{FilterKeyBucket: {"prod-*"}}, "", false, 0, 0)
+
 	if _, err := r.bucketsInRegion(context.Background(), client); err == nil || !strings.Contains(err.Error(), "denied") {
-		t.Errorf("bucketsInRegion() with API error = %v, want wrapped denied", err)
+		t.Errorf("bucketsInRegion() error = %v, want the wrapped ListBuckets error", err)
+	}
+}
+
+// TestResults_collect_tooManyBuckets checks that a region whose bucket patterns match more than
+// --max-buckets buckets reports it and lists no object at all, rather than a partial set.
+func TestResults_collect_tooManyBuckets(t *testing.T) {
+	client := patternBuckets()
+	r := New("default", "us-east-1", map[string][]string{FilterKeyBucket: {"*"}}, "", false, 0, 3)
+
+	matcher, err := common.NewMatcher(nil, false)
+	if err != nil {
+		t.Fatalf("NewMatcher() error = %v", err)
+	}
+
+	r.collect(context.Background(), client, matcher)
+
+	if len(client.listObjectsInputs) != 0 {
+		t.Errorf("ListObjectsV2 calls = %d, want 0", len(client.listObjectsInputs))
+	}
+	if len(r.Errors) != 1 || !strings.Contains(r.Errors[0], "match 4 buckets in us-east-1") {
+		t.Errorf("collect() errors = %q, want the --max-buckets error", r.Errors)
 	}
 }
 
@@ -254,7 +354,7 @@ func TestResults_collect(t *testing.T) {
 	for _, tt := range collectCases() {
 		t.Run(tt.name, func(t *testing.T) {
 			filters := map[string][]string{FilterKeyBucket: tt.buckets, FilterKeyKey: tt.patterns}
-			r := New("default", "us-east-1", filters, "", tt.regex, tt.maxKeys)
+			r := New("default", "us-east-1", filters, "", tt.regex, tt.maxKeys, 0)
 			matcher, err := common.NewMatcher(tt.patterns, tt.regex)
 			if err != nil {
 				t.Fatalf("NewMatcher() error = %v", err)
@@ -282,7 +382,7 @@ func TestResults_collect(t *testing.T) {
 
 // TestResults_Search_invalidPattern checks an invalid pattern is reported without calling AWS.
 func TestResults_Search_invalidPattern(t *testing.T) {
-	r := New("default", "us-east-1", map[string][]string{FilterKeyBucket: {"b"}, FilterKeyKey: {"[x"}}, "key", false, 0)
+	r := New("default", "us-east-1", map[string][]string{FilterKeyBucket: {"b"}, FilterKeyKey: {"[x"}}, "key", false, 0, 0)
 	r.Search(context.Background())
 	if len(r.Errors) != 1 || !strings.Contains(r.Errors[0], "invalid pattern") {
 		t.Errorf("Search() Errors = %v, want one invalid pattern error", r.Errors)
@@ -309,7 +409,7 @@ func TestResults_sortResults(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := New("default", "us-east-1", map[string][]string{}, "", false, 0)
+			r := New("default", "us-east-1", map[string][]string{}, "", false, 0, 0)
 			r.Data = append([]dataRow(nil), rows...)
 			err := r.sortResults(tt.field)
 			if (err != nil) != tt.wantErr {

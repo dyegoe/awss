@@ -364,6 +364,9 @@ type cmdSpec struct {
 	// maxKeysLabel is the viper key of --max-keys, or "" when the command has none.
 	maxKeysLabel string
 
+	// maxBucketsLabel is the viper key of --max-buckets, or "" when the command has none.
+	maxBucketsLabel string
+
 	// filterFlags lists the filter flag names that cannot be combined with --all.
 	filterFlags []string
 }
@@ -416,6 +419,7 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 			NoInstanceName: boolLabel(spec.noInstanceNameLabel),
 			Regex:          boolLabel(spec.regexLabel),
 			MaxKeys:        intLabel(spec.maxKeysLabel),
+			MaxBuckets:     intLabel(spec.maxBucketsLabel),
 			Timeout:        viper.GetDuration(labelTimeout),
 		},
 	)
