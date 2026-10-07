@@ -59,34 +59,34 @@ func mockEngines(t *testing.T, newFn constructor) {
 func TestCheckSortField(t *testing.T) {
 	mockEngines(t, nil)
 
-	type args struct {
-		cmd string
-		f   string
-	}
 	tests := []struct {
 		name    string
-		args    args
+		cmd     string
+		f       string
 		wantErr bool
 	}{
 		{
 			name:    "Command found and field found",
-			args:    args{cmd: "test", f: "field1"},
+			cmd:     "test",
+			f:       "field1",
 			wantErr: false,
 		},
 		{
 			name:    "Command not found",
-			args:    args{cmd: "test2", f: "field1"},
+			cmd:     "test2",
+			f:       "field1",
 			wantErr: true,
 		},
 		{
 			name:    "Command found but field not found",
-			args:    args{cmd: "test", f: "field2"},
+			cmd:     "test",
+			f:       "field2",
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := CheckSortField(tt.args.cmd, tt.args.f); (err != nil) != tt.wantErr {
+			if err := CheckSortField(tt.cmd, tt.f); (err != nil) != tt.wantErr {
 				t.Errorf("CheckSortField() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
