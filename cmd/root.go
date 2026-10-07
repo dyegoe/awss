@@ -135,7 +135,7 @@ func setup() error {
 func persistentPreRun(cmd *cobra.Command, _ []string) error {
 	cfg, err := cmd.Flags().GetString(labelConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("reading the --%s flag: %w", labelConfig, err)
 	}
 
 	if err := initConfig(cfg); err != nil {
@@ -272,7 +272,7 @@ func initConfig(cfg string) error {
 	if cfg == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return err
+			return fmt.Errorf("finding the home directory for the config file: %w", err)
 		}
 		f = filepath.Join(home, ".awss", "config.yaml")
 	}
@@ -298,7 +298,7 @@ func initConfig(cfg string) error {
 	viper.SetConfigFile(f)
 
 	if err := viper.ReadInConfig(); err != nil {
-		return err
+		return fmt.Errorf("reading config file %s: %w", f, err)
 	}
 	return nil
 }
