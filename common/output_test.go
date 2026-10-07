@@ -84,25 +84,25 @@ func TestPrintResults(t *testing.T) {
 	}{
 		{
 			name:    "JSON output",
-			results: &tr,
+			results: mockResults(),
 			output:  JSON,
 			want:    "json\n",
 		},
 		{
 			name:    "JSONPretty output",
-			results: &tr,
+			results: mockResults(),
 			output:  JSONPretty,
 			want:    "json-pretty\n",
 		},
 		{
 			name:    "Table output",
-			results: &tr,
+			results: mockResults(),
 			output:  Table,
 			want:    "table\n",
 		},
 		{
 			name:    "Invalid output",
-			results: &tr,
+			results: mockResults(),
 			output:  "invalid",
 			want:    "Invalid output format: invalid\n",
 		},
@@ -155,7 +155,7 @@ func TestToBold(t *testing.T) {
 
 // TestToJSON is a test function for toJSON.
 //
-//nolint:dupl
+//nolint:dupl // same table shape as TestToJSONPretty, for the other JSON printer
 func TestToJSON(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -166,21 +166,21 @@ func TestToJSON(t *testing.T) {
 	}{
 		{
 			name:      "empty json showEmpty false",
-			r:         &trEmpty,
+			r:         mockResultsEmpty(),
 			showEmpty: false,
 			showTags:  false,
 			want:      "",
 		},
 		{
 			name:      "empty json",
-			r:         &trEmpty,
+			r:         mockResultsEmpty(),
 			showEmpty: true,
 			showTags:  false,
 			want:      jsonEmptyNoPretty,
 		},
 		{
 			name:      "json",
-			r:         &tr,
+			r:         mockResults(),
 			showEmpty: false,
 			showTags:  false,
 			want:      jsonNoPretty,
@@ -198,7 +198,7 @@ func TestToJSON(t *testing.T) {
 
 // TestToJSONPretty is a test function for toJSONPretty.
 //
-//nolint:dupl
+//nolint:dupl // same table shape as TestToJSON, for the other JSON printer
 func TestToJSONPretty(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -209,21 +209,21 @@ func TestToJSONPretty(t *testing.T) {
 	}{
 		{
 			name:      "empty json showEmpty false",
-			r:         &trEmpty,
+			r:         mockResultsEmpty(),
 			showEmpty: false,
 			showTags:  false,
 			want:      "",
 		},
 		{
 			name:      "empty json",
-			r:         &trEmpty,
+			r:         mockResultsEmpty(),
 			showEmpty: true,
 			showTags:  false,
 			want:      jsonEmptyPretty,
 		},
 		{
 			name:      "json",
-			r:         &tr,
+			r:         mockResults(),
 			showEmpty: false,
 			showTags:  false,
 			want:      jsonPretty,
@@ -256,38 +256,38 @@ func TestToTable(t *testing.T) {
 	}{
 		{
 			name: "table with no tags",
-			r:    &tr,
+			r:    mockResults(),
 			want: tableNoTags,
 		},
 		{
 			name:     "table with tags",
-			r:        &tr,
+			r:        mockResults(),
 			showTags: true,
 			want:     tableTags,
 		},
 		{
 			name:     "table with tags filtered by key",
-			r:        &tr,
+			r:        mockResults(),
 			showTags: true,
 			tagsKeys: []string{"key1", "key3"},
 			want:     tableTagsFiltered,
 		},
 		{
 			name:      "empty table with no tags",
-			r:         &trEmpty,
+			r:         mockResultsEmpty(),
 			showEmpty: true,
 			want:      tableEmptyNoTags,
 		},
 		{
 			name:      "empty table with tags",
-			r:         &trEmpty,
+			r:         mockResultsEmpty(),
 			showEmpty: true,
 			showTags:  true,
 			want:      tableEmptyTags,
 		},
 		{
 			name: "empty table showEmpty false",
-			r:    &trEmpty,
+			r:    mockResultsEmpty(),
 			want: "",
 		},
 	}
@@ -316,7 +316,7 @@ func TestRowFromStruct(t *testing.T) {
 		},
 		{
 			name: "test struct",
-			i:    tdr1,
+			i:    mockDataRow1(),
 			want: table.Row{
 				fmt.Sprintf("%s: %s\n%s: %s",
 					text.Bold.Sprint("Info String1"),
@@ -334,7 +334,7 @@ func TestRowFromStruct(t *testing.T) {
 		},
 		{
 			name:     "test struct with tagsKeys filter",
-			i:        tdr1,
+			i:        mockDataRow1(),
 			tagsKeys: []string{"key1"},
 			want: table.Row{
 				fmt.Sprintf("%s: %s\n%s: %s",
@@ -371,7 +371,7 @@ func TestHeaderStructFieldsToString(t *testing.T) {
 		},
 		{
 			name: "testInfo struct 1",
-			i:    ti1,
+			i:    mockInfo1(),
 			want: fmt.Sprintf("%s: %s\n%s: %s",
 				text.Bold.Sprint("Info String1"),
 				"testInfo1String1",
@@ -380,7 +380,7 @@ func TestHeaderStructFieldsToString(t *testing.T) {
 		},
 		{
 			name: "testInfo struct 2",
-			i:    ti2,
+			i:    mockInfo2(),
 			want: fmt.Sprintf("%s: %s\n%s: %s",
 				text.Bold.Sprint("Info String1"),
 				"testInfo2String1",

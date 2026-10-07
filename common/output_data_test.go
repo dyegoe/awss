@@ -87,106 +87,88 @@ type testInfo struct {
 	InfoString2 string `json:"info_string2" header:"Info String2"`
 }
 
-// tr is a testResults used for testing.
-//
-//	json:"profile" = testProfile
-//	json:"region"  = testRegion
-//	json:"errors"  = []string{"testError1", "testError2"}
-//	json:"data"    = []testDataRow{tdr1, tdr2}
-var tr = testResults{
-	Profile: "testProfile",
-	Region:  "testRegion",
-	Errors:  []string{"testError1", "testError2"},
-	Data: []testDataRow{
-		tdr1,
-		tdr2,
-	},
+// mockResults returns a new result set with two rows and two errors.
+func mockResults() *testResults {
+	return &testResults{
+		Profile: "testProfile",
+		Region:  "testRegion",
+		Errors:  []string{"testError1", "testError2"},
+		Data: []testDataRow{
+			mockDataRow1(),
+			mockDataRow2(),
+		},
+	}
 }
 
-// trEmpty is a testResults used for testing.
-//
-//	json:"profile" = testProfileEmpty
-//	json:"region"  = testRegionEmpty
-//	json:"errors"  = []string{}
-//	json:"data"    = []testDataRow{}
-var trEmpty = testResults{
-	Profile: "testProfileEmpty",
-	Region:  "testRegionEmpty",
-	Errors:  []string{},
-	Data:    []testDataRow{},
+// mockResultsEmpty returns a new empty result set.
+func mockResultsEmpty() *testResults {
+	return &testResults{
+		Profile: "testProfileEmpty",
+		Region:  "testRegionEmpty",
+		Errors:  []string{},
+		Data:    []testDataRow{},
+	}
 }
 
-// tdr1 is a testDataRow used for testing.
-//
-//	json:"struct_field" header:"Struct Field"
-//	  json:"info_string1" header:"Info String1" = testInfo1String1
-//	  json:"info_string2" header:"Info String2" = testInfo1String2
-//	json:"map_field"    header:"Map Field" = map[string]string{"key1": "value1", "key2": "value2"}
-//	json:"slice_field"  header:"Slice Field" = []string{"sliceValue1", "sliceValue2"}
-//	json:"string_field" header:"String Field" = testString1
-var tdr1 = testDataRow{
-	StructField: ti1,
-	MapField: map[string]string{
-		"key1": "value1",
-		"key2": "value2",
-	},
-	SliceField:  []string{"sliceValue1", "sliceValue2"},
-	StringField: "testString1",
+// mockDataRow1 returns the first row: a struct, a map, a slice and a string field.
+func mockDataRow1() testDataRow {
+	return testDataRow{
+		StructField: mockInfo1(),
+		MapField: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+		SliceField:  []string{"sliceValue1", "sliceValue2"},
+		StringField: "testString1",
+	}
 }
 
-// tdr2 is a testDataRow used for testing.
-//
-//	json:"struct_field" header:"Struct Field"
-//	  json:"info_string1" header:"Info String1" = testInfo2String1
-//	  json:"info_string2" header:"Info String2" = testInfo2String2
-//	json:"map_field" header:"Map Field" = map[string]string{"key3": "value3", "key4": "value4"}
-//	json:"slice_field" header:"Slice Field" = []string{"sliceValue3", "sliceValue4"}
-//	json:"string_field" header:"String Field" = testString2
-var tdr2 = testDataRow{
-	StructField: ti2,
-	MapField: map[string]string{
-		"key3": "value3",
-		"key4": "value4",
-	},
-	SliceField:  []string{"sliceValue3", "sliceValue4"},
-	StringField: "testString2",
+// mockDataRow2 returns the second row.
+func mockDataRow2() testDataRow {
+	return testDataRow{
+		StructField: mockInfo2(),
+		MapField: map[string]string{
+			"key3": "value3",
+			"key4": "value4",
+		},
+		SliceField:  []string{"sliceValue3", "sliceValue4"},
+		StringField: "testString2",
+	}
 }
 
-// ti1
-//
-//	json:"info_string1" header:"Info String1" = testInfo1String1
-//	json:"info_string2" header:"Info String2" = testInfo1String2
-var ti1 = testInfo{
-	InfoString1: "testInfo1String1",
-	InfoString2: "testInfo1String2",
+// mockInfo1 returns the struct field of the first row.
+func mockInfo1() testInfo {
+	return testInfo{
+		InfoString1: "testInfo1String1",
+		InfoString2: "testInfo1String2",
+	}
 }
 
-// ti2
-//
-//	json:"info_string1" header:"Info String1" = testInfo2String1
-//	json:"info_string2" header:"Info String2" = testInfo2String2
-var ti2 = testInfo{
-	InfoString1: "testInfo2String1",
-	InfoString2: "testInfo2String2",
+// mockInfo2 returns the struct field of the second row.
+func mockInfo2() testInfo {
+	return testInfo{
+		InfoString1: "testInfo2String1",
+		InfoString2: "testInfo2String2",
+	}
 }
 
 // jsonEmptyNoPretty is a json string used for testing.
-var jsonEmptyNoPretty = `{"profile":"testProfileEmpty","region":"testRegionEmpty","data":[]}`
+const jsonEmptyNoPretty = `{"profile":"testProfileEmpty","region":"testRegionEmpty","data":[]}`
 
 // jsonNoPretty is a json string used for testing.
 //
-//nolint:lll
-var jsonNoPretty = `{"profile":"testProfile","region":"testRegion","errors":["testError1","testError2"],"data":[{"struct_field":{"info_string1":"testInfo1String1","info_string2":"testInfo1String2"},"map_field":{"key1":"value1","key2":"value2"},"slice_field":["sliceValue1","sliceValue2"],"string_field":"testString1"},{"struct_field":{"info_string1":"testInfo2String1","info_string2":"testInfo2String2"},"map_field":{"key3":"value3","key4":"value4"},"slice_field":["sliceValue3","sliceValue4"],"string_field":"testString2"}]}`
+//nolint:lll // the expected compact JSON is one line by definition
+const jsonNoPretty = `{"profile":"testProfile","region":"testRegion","errors":["testError1","testError2"],"data":[{"struct_field":{"info_string1":"testInfo1String1","info_string2":"testInfo1String2"},"map_field":{"key1":"value1","key2":"value2"},"slice_field":["sliceValue1","sliceValue2"],"string_field":"testString1"},{"struct_field":{"info_string1":"testInfo2String1","info_string2":"testInfo2String2"},"map_field":{"key3":"value3","key4":"value4"},"slice_field":["sliceValue3","sliceValue4"],"string_field":"testString2"}]}`
 
 // jsonEmptyPretty is a json string used for testing.
-var jsonEmptyPretty = `{
+const jsonEmptyPretty = `{
   "profile": "testProfileEmpty",
   "region": "testRegionEmpty",
   "data": []
 }`
 
 // jsonPretty is a json string used for testing.
-var jsonPretty = `{
+const jsonPretty = `{
   "profile": "testProfile",
   "region": "testRegion",
   "errors": [
@@ -228,7 +210,7 @@ var jsonPretty = `{
 }`
 
 // tableNoTags is a test table output from tr.
-var tableNoTags = `+-------------------------------------------------------------+
+const tableNoTags = `+-------------------------------------------------------------+
 | [Profile] testProfile [Region] testRegion [Sort] field      |
 |                                                             |
 | testError1                                                  |
@@ -245,7 +227,7 @@ var tableNoTags = `+------------------------------------------------------------
 `
 
 // tableTags is a test table output from tr with tags.
-var tableTags = `+----------------------------------------------------------------------------+
+const tableTags = `+----------------------------------------------------------------------------+
 | [Profile] testProfile [Region] testRegion [Sort] field                     |
 |                                                                            |
 | testError1                                                                 |
@@ -262,7 +244,7 @@ var tableTags = `+--------------------------------------------------------------
 `
 
 // tableTagsFiltered is a test table output from tr with tags restricted to key1 and key3.
-var tableTagsFiltered = `+----------------------------------------------------------------------------+
+const tableTagsFiltered = `+----------------------------------------------------------------------------+
 | [Profile] testProfile [Region] testRegion [Sort] field                     |
 |                                                                            |
 | testError1                                                                 |
@@ -279,7 +261,7 @@ var tableTagsFiltered = `+------------------------------------------------------
 `
 
 // tableEmptyNoTags is a test table output from trEmpty.
-var tableEmptyNoTags = `+-------------------------------------------+
+const tableEmptyNoTags = `+-------------------------------------------+
 | [Profile] testProfileEmpty [Region] testR |
 | egionEmpty [Sort] field                   |
 +--------------+-------------+--------------+
@@ -289,7 +271,7 @@ var tableEmptyNoTags = `+-------------------------------------------+
 `
 
 // tableEmptyTags is a test table output from trEmpty with tags.
-var tableEmptyTags = `+--------------------------------------------------+
+const tableEmptyTags = `+--------------------------------------------------+
 | [Profile] testProfileEmpty [Region] testRegionEm |
 | pty [Sort] field                                 |
 +--------------+------+-------------+--------------+
