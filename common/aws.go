@@ -49,7 +49,7 @@ func AwsConfig(profile, region string) (aws.Config, error) {
 		config.WithRegion(region),
 	)
 	if err != nil {
-		return cfg, err
+		return cfg, fmt.Errorf("loading the AWS config of profile %q in %s: %w", profile, region, err)
 	}
 	return cfg, nil
 }
@@ -72,7 +72,7 @@ func awsConfigFile() string {
 func GetAwsProfiles() ([]string, error) {
 	cfg, err := ini.Load(awsConfigFile())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading the AWS config file: %w", err)
 	}
 	profiles := []string{}
 	for _, section := range cfg.Sections() {
