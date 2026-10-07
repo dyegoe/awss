@@ -194,8 +194,8 @@ func (r *Results) collectInstances(reservations []types.Reservation, nets []*net
 
 // hasPrivateIPIn reports whether any private IP of any network interface of inst is inside nets.
 func hasPrivateIPIn(inst *types.Instance, nets []*net.IPNet) bool {
-	for _, eni := range inst.NetworkInterfaces { //nolint:gocritic // rangeValCopy: AWS SDK struct is not pointer-based
-		for _, addr := range eni.PrivateIpAddresses {
+	for i := range inst.NetworkInterfaces {
+		for _, addr := range inst.NetworkInterfaces[i].PrivateIpAddresses {
 			ip := net.ParseIP(common.StringValue(addr.PrivateIpAddress))
 			if ip != nil && ipInAny(ip, nets) {
 				return true
@@ -218,8 +218,8 @@ func ipInAny(ip net.IP, nets []*net.IPNet) bool {
 // parseInstance converts a single EC2 Instance into a dataRow.
 func parseInstance(inst *types.Instance) dataRow {
 	enis := make([]string, 0, len(inst.NetworkInterfaces))
-	for _, eni := range inst.NetworkInterfaces { //nolint:gocritic
-		enis = append(enis, common.StringValue(eni.NetworkInterfaceId))
+	for i := range inst.NetworkInterfaces {
+		enis = append(enis, common.StringValue(inst.NetworkInterfaces[i].NetworkInterfaceId))
 	}
 	volumes := parseVolumeIDs(inst.BlockDeviceMappings)
 	var az string

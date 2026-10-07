@@ -169,8 +169,8 @@ func (r *Results) collectVolumeRows(
 }
 
 func (r *Results) appendVolumeRows(volumes []types.Volume, instanceIDSet map[string]struct{}) {
-	for _, vol := range volumes { //nolint:gocritic
-		rows := parseVolume(&vol)
+	for v := range volumes {
+		rows := parseVolume(&volumes[v])
 		for i := range rows {
 			r.Data = append(r.Data, rows[i])
 			if rows[i].InstanceID != "" {
