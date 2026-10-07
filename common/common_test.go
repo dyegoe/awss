@@ -86,61 +86,58 @@ func getStructToFiltersCases() []testStructToFiltersCase {
 //
 //nolint:funlen
 func TestParseTags(t *testing.T) {
-	type args struct {
-		tags []string
-	}
 	tests := []struct {
 		name    string
-		args    args
+		tags    []string
 		want    map[string][]string
 		wantErr bool
 	}{
 		{
 			name:    "empty",
-			args:    args{tags: []string{}},
+			tags:    []string{},
 			want:    map[string][]string{},
 			wantErr: false,
 		},
 		{
 			name:    "key=value",
-			args:    args{tags: []string{"key=value"}},
+			tags:    []string{"key=value"},
 			want:    map[string][]string{"key": {"value"}},
 			wantErr: false,
 		},
 		{
 			name:    "key=value,key2=value2",
-			args:    args{tags: []string{"key=value", "key2=value2"}},
+			tags:    []string{"key=value", "key2=value2"},
 			want:    map[string][]string{"key": {"value"}, "key2": {"value2"}},
 			wantErr: false,
 		},
 		{
 			name:    "key=value:value2",
-			args:    args{tags: []string{"key=value:value2"}},
+			tags:    []string{"key=value:value2"},
 			want:    map[string][]string{"key": {"value", "value2"}},
 			wantErr: false,
 		},
 		{
 			name:    "key=value:value2,key2=value3:value4",
-			args:    args{tags: []string{"key=value:value2", "key2=value3:value4"}},
+			tags:    []string{"key=value:value2", "key2=value3:value4"},
 			want:    map[string][]string{"key": {"value", "value2"}, "key2": {"value3", "value4"}},
 			wantErr: false,
 		},
 		{
 			name:    "key",
-			args:    args{tags: []string{"key"}},
+			tags:    []string{"key"},
 			want:    nil,
 			wantErr: true,
 		},
 		{
 			name:    "key=value:value2,key2",
-			args:    args{tags: []string{"key=value:value2", "key2"}},
+			tags:    []string{"key=value:value2", "key2"},
 			want:    nil,
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseTags(tt.args.tags)
+			got, err := ParseTags(tt.tags)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseTags() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -242,33 +239,30 @@ func TestStringValue(t *testing.T) {
 	value1 := ""
 	value2 := "value"
 
-	type args struct {
-		s *string
-	}
 	tests := []struct {
 		name string
-		args args
+		s    *string
 		want string
 	}{
 		{
 			name: "nil",
-			args: args{s: nil},
+			s:    nil,
 			want: "",
 		},
 		{
 			name: "empty",
-			args: args{s: &value1},
+			s:    &value1,
 			want: "",
 		},
 		{
 			name: "value",
-			args: args{s: &value2},
+			s:    &value2,
 			want: "value",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := StringValue(tt.args.s); got != tt.want {
+			if got := StringValue(tt.s); got != tt.want {
 				t.Errorf("StringValue()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
@@ -281,28 +275,25 @@ func TestString(t *testing.T) {
 	value1 := ""
 	value2 := "value"
 
-	type args struct {
-		s string
-	}
 	tests := []struct {
 		name string
-		args args
+		s    string
 		want *string
 	}{
 		{
 			name: "empty",
-			args: args{s: value1},
+			s:    value1,
 			want: &value1,
 		},
 		{
 			name: "value",
-			args: args{s: value2},
+			s:    value2,
 			want: &value2,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := String(tt.args.s); *got != *tt.want {
+			if got := String(tt.s); *got != *tt.want {
 				t.Errorf("String()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
@@ -311,39 +302,40 @@ func TestString(t *testing.T) {
 
 // TestStringInSlice tests the StringInSlice function.
 func TestStringInSlice(t *testing.T) {
-	type args struct {
+	tests := []struct {
+		name  string
 		s     string
 		slice []string
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
+		want  bool
 	}{
 		{
-			name: "empty",
-			args: args{s: "value", slice: []string{}},
-			want: false,
+			name:  "empty",
+			s:     "value",
+			slice: []string{},
+			want:  false,
 		},
 		{
-			name: "one value",
-			args: args{s: "value", slice: []string{"value"}},
-			want: true,
+			name:  "one value",
+			s:     "value",
+			slice: []string{"value"},
+			want:  true,
 		},
 		{
-			name: "two values",
-			args: args{s: "value", slice: []string{"value", "value2"}},
-			want: true,
+			name:  "two values",
+			s:     "value",
+			slice: []string{"value", "value2"},
+			want:  true,
 		},
 		{
-			name: "two but one not found",
-			args: args{s: "value", slice: []string{"value2", "value3"}},
-			want: false,
+			name:  "two but one not found",
+			s:     "value",
+			slice: []string{"value2", "value3"},
+			want:  false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := StringInSlice(tt.args.s, tt.args.slice); got != tt.want {
+			if got := StringInSlice(tt.s, tt.slice); got != tt.want {
 				t.Errorf("StringInSlice()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
@@ -352,34 +344,34 @@ func TestStringInSlice(t *testing.T) {
 
 // TestStringSliceToString tests the StringSliceToString function.
 func TestStringSliceToString(t *testing.T) {
-	type args struct {
-		s   []string
-		sep string
-	}
 	tests := []struct {
 		name string
-		args args
+		s    []string
+		sep  string
 		want string
 	}{
 		{
 			name: "empty",
-			args: args{s: []string{}, sep: ","},
+			s:    []string{},
+			sep:  ",",
 			want: "",
 		},
 		{
 			name: "one value",
-			args: args{s: []string{"value"}, sep: ","},
+			s:    []string{"value"},
+			sep:  ",",
 			want: "value",
 		},
 		{
 			name: "two values",
-			args: args{s: []string{"value", "value2"}, sep: ","},
+			s:    []string{"value", "value2"},
+			sep:  ",",
 			want: "value,value2",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := StringSliceToString(tt.args.s, tt.args.sep); got != tt.want {
+			if got := StringSliceToString(tt.s, tt.sep); got != tt.want {
 				t.Errorf("StringSliceToString()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
@@ -388,33 +380,30 @@ func TestStringSliceToString(t *testing.T) {
 
 // TestIPtoString tests the IPtoString function.
 func TestIPtoString(t *testing.T) {
-	type args struct {
-		i []net.IP
-	}
 	tests := []struct {
 		name string
-		args args
+		i    []net.IP
 		want []string
 	}{
 		{
 			name: "empty",
-			args: args{i: []net.IP{}},
+			i:    []net.IP{},
 			want: []string{},
 		},
 		{
 			name: "one ip",
-			args: args{i: []net.IP{net.ParseIP("172.16.0.1")}},
+			i:    []net.IP{net.ParseIP("172.16.0.1")},
 			want: []string{"172.16.0.1"},
 		},
 		{
 			name: "two ips",
-			args: args{i: []net.IP{net.ParseIP("172.16.0.1"), net.ParseIP("172.17.1.254")}},
+			i:    []net.IP{net.ParseIP("172.16.0.1"), net.ParseIP("172.17.1.254")},
 			want: []string{"172.16.0.1", "172.17.1.254"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IPtoString(tt.args.i); !reflect.DeepEqual(got, tt.want) {
+			if got := IPtoString(tt.i); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("IPtoString()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
