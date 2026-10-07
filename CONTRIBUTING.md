@@ -91,7 +91,9 @@ Ready to contribute? Here's how to set up `awss` for local development.
     conventional-commit message for you. The `commit-msg` hook and the `check-commits` CI job
     both validate the message format, so malformed messages are rejected before they land.
 
-7. Submit a pull request through the GitHub website.
+7. Submit a pull request through the GitHub website. Give it a Conventional Commits title,
+    such as `fix(search/ec2): nil-check SubnetId before dereference`: pull requests are
+    squash-merged, so the title becomes the commit on `main`, and the `PR title` CI job checks it.
 
 ## Pull Request Guidelines
 
