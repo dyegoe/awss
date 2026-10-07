@@ -47,6 +47,7 @@ const (
 	labelAllRegions     = "all-regions"
 	labelAllProfiles    = "all-profiles"
 	labelTimeout        = "timeout"
+	labelConcurrency    = "concurrency"
 
 	// defaultTimeout is generous so --profiles all over many regions is not cut short.
 	defaultTimeout = 5 * time.Minute
@@ -166,6 +167,11 @@ func persistentPreRun(cmd *cobra.Command, _ []string) error {
 	}
 	viper.Set(labelTimeout, timeout)
 
+	if c := viper.GetInt(labelConcurrency); c < 1 {
+		return fmt.Errorf("invalid concurrency: %v. Use a number of searches of 1 or more",
+			viper.Get(labelConcurrency))
+	}
+
 	return nil
 }
 
@@ -211,6 +217,8 @@ func initFlags() {
 	rootCmd.PersistentFlags().Duration(labelTimeout, defaultTimeout,
 		"Stop waiting for the searches after this `duration` (e.g. 90s, 5m). The profiles and regions "+
 			"that did not finish are reported as timed out; the others are printed. 0 disables it.")
+	rootCmd.PersistentFlags().Int(labelConcurrency, search.DefaultConcurrency,
+		"How many profile and region searches run at once. The others wait for a free slot.")
 }
 
 // initViper binds the flags to viper.
@@ -255,6 +263,9 @@ func initViper() error {
 	}
 	if err := viper.BindPFlag(labelTimeout, rootCmd.PersistentFlags().Lookup(labelTimeout)); err != nil {
 		return fmt.Errorf("error binding flag %s: %w", labelTimeout, err)
+	}
+	if err := viper.BindPFlag(labelConcurrency, rootCmd.PersistentFlags().Lookup(labelConcurrency)); err != nil {
+		return fmt.Errorf("error binding flag %s: %w", labelConcurrency, err)
 	}
 	viper.SetDefault(labelAllRegions, allRegionsDefault)
 
@@ -420,6 +431,7 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 			Regex:          boolLabel(spec.regexLabel),
 			MaxKeys:        intLabel(spec.maxKeysLabel),
 			MaxBuckets:     intLabel(spec.maxBucketsLabel),
+			Concurrency:    viper.GetInt(labelConcurrency),
 			Timeout:        viper.GetDuration(labelTimeout),
 		},
 	)
