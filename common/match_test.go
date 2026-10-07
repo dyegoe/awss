@@ -18,6 +18,7 @@ package common
 
 import "testing"
 
+// TestNewMatcher_errors checks that an invalid glob or regular expression is rejected.
 func TestNewMatcher_errors(t *testing.T) {
 	if _, err := NewMatcher([]string{"[unclosed"}, false); err == nil {
 		t.Error("NewMatcher(bad glob) error = nil, want error")
@@ -27,6 +28,8 @@ func TestNewMatcher_errors(t *testing.T) {
 	}
 }
 
+// TestMatcher_Match checks glob and regex matching: globs are anchored, regexes match anywhere
+// unless anchored, and no pattern matches everything.
 func TestMatcher_Match(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -59,6 +62,8 @@ func TestMatcher_Match(t *testing.T) {
 	}
 }
 
+// TestMatcher_Prefix checks the literal prefix sent to S3: the text before the first glob
+// metacharacter, or after ^ in a regex, and none when the patterns share no prefix.
 func TestMatcher_Prefix(t *testing.T) {
 	tests := []struct {
 		name     string

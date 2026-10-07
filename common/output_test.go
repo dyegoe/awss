@@ -33,35 +33,28 @@ import (
 
 // TestValidOutputs tests the ValidOutputs function.
 func TestValidOutputs(t *testing.T) {
-	type args struct {
-		o string
-	}
 	tests := []struct {
 		name  string
-		args  args
+		o     string
 		want  string
 		want1 bool
 	}{
 		{
-			name: "Valid output",
-			args: args{
-				o: "json",
-			},
+			name:  "Valid output",
+			o:     "json",
 			want:  "json, json-pretty, table",
 			want1: true,
 		},
 		{
-			name: "Invalid output",
-			args: args{
-				o: "invalid",
-			},
+			name:  "Invalid output",
+			o:     "invalid",
 			want:  "json, json-pretty, table",
 			want1: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := ValidOutputs(tt.args.o)
+			got, got1 := ValidOutputs(tt.o)
 			if got != tt.want {
 				t.Errorf("ValidOutputs() got\n%#v\nwant\n%#v", got, tt.want)
 			}
@@ -83,50 +76,49 @@ func TestPrintResults(t *testing.T) {
 		Table:      func(_ Results, _, _ bool, _ []string) string { return "table" },
 	}
 
-	type args struct {
-		results   Results
-		output    string
-		showEmpty bool
-		showTags  bool
-	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name    string
+		results Results
+		output  string
+		want    string
 	}{
 		{
-			name: "JSON output",
-			args: args{results: &tr, output: JSON, showEmpty: false, showTags: false},
-			want: "json\n",
+			name:    "JSON output",
+			results: &tr,
+			output:  JSON,
+			want:    "json\n",
 		},
 		{
-			name: "JSONPretty output",
-			args: args{results: &tr, output: JSONPretty, showEmpty: false, showTags: false},
-			want: "json-pretty\n",
+			name:    "JSONPretty output",
+			results: &tr,
+			output:  JSONPretty,
+			want:    "json-pretty\n",
 		},
 		{
-			name: "Table output",
-			args: args{results: &tr, output: Table, showEmpty: false, showTags: false},
-			want: "table\n",
+			name:    "Table output",
+			results: &tr,
+			output:  Table,
+			want:    "table\n",
 		},
 		{
-			name: "Invalid output",
-			args: args{results: &tr, output: "invalid", showEmpty: false, showTags: false},
-			want: "Invalid output format: invalid\n",
+			name:    "Invalid output",
+			results: &tr,
+			output:  "invalid",
+			want:    "Invalid output format: invalid\n",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resultsChan := make(chan Results, 1)
 			done := make(chan bool)
-			resultsChan <- tt.args.results
+			resultsChan <- tt.results
 			close(resultsChan)
 			go func() {
 				<-done
 				close(done)
 			}()
 			w := bytes.Buffer{}
-			PrintResults(&w, resultsChan, done, tt.args.output, tt.args.showEmpty, tt.args.showTags, nil)
+			PrintResults(&w, resultsChan, done, tt.output, false, false, nil)
 			if got := w.String(); got != tt.want {
 				t.Errorf("PrintResults()\n%#v\nwant\n%#v", got, tt.want)
 			}
@@ -134,69 +126,69 @@ func TestPrintResults(t *testing.T) {
 	}
 }
 
-// Test_toBold is a test function for toBold.
-func Test_toBold(t *testing.T) {
-	type args struct {
-		s string
-	}
+// TestToBold is a test function for toBold.
+func TestToBold(t *testing.T) {
 	tests := []struct {
 		name string
-		args args
+		s    string
 		want string
 	}{
 		{
 			name: "empty",
-			args: args{s: ""},
+			s:    "",
 			want: "",
 		},
 		{
 			name: "string",
-			args: args{s: "string"},
+			s:    "string",
 			want: "\033[1mstring\033[0m",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := toBold(tt.args.s); got != tt.want {
+			if got := toBold(tt.s); got != tt.want {
 				t.Errorf("toBold()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
 }
 
-// Test_toJSON is a test function for toJSON.
+// TestToJSON is a test function for toJSON.
 //
 //nolint:dupl
-func Test_toJSON(t *testing.T) {
-	type args struct {
+func TestToJSON(t *testing.T) {
+	tests := []struct {
+		name      string
 		r         Results
 		showEmpty bool
 		showTags  bool
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
+		want      string
 	}{
 		{
-			name: "empty json showEmpty false",
-			args: args{r: &trEmpty, showEmpty: false, showTags: false},
-			want: "",
+			name:      "empty json showEmpty false",
+			r:         &trEmpty,
+			showEmpty: false,
+			showTags:  false,
+			want:      "",
 		},
 		{
-			name: "empty json",
-			args: args{r: &trEmpty, showEmpty: true, showTags: false},
-			want: jsonEmptyNoPretty,
+			name:      "empty json",
+			r:         &trEmpty,
+			showEmpty: true,
+			showTags:  false,
+			want:      jsonEmptyNoPretty,
 		},
 		{
-			name: "json",
-			args: args{r: &tr, showEmpty: false, showTags: false},
-			want: jsonNoPretty,
+			name:      "json",
+			r:         &tr,
+			showEmpty: false,
+			showTags:  false,
+			want:      jsonNoPretty,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := toJSON(tt.args.r, tt.args.showEmpty, tt.args.showTags, nil)
+			got := toJSON(tt.r, tt.showEmpty, tt.showTags, nil)
 			if got != tt.want {
 				t.Errorf("toJSON()\n%#v\nwant\n%#v", got, tt.want)
 			}
@@ -204,39 +196,42 @@ func Test_toJSON(t *testing.T) {
 	}
 }
 
-// Test_toJSONPretty is a test function for toJSONPretty.
+// TestToJSONPretty is a test function for toJSONPretty.
 //
 //nolint:dupl
-func Test_toJSONPretty(t *testing.T) {
-	type args struct {
+func TestToJSONPretty(t *testing.T) {
+	tests := []struct {
+		name      string
 		r         Results
 		showEmpty bool
 		showTags  bool
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
+		want      string
 	}{
 		{
-			name: "empty json showEmpty false",
-			args: args{r: &trEmpty, showEmpty: false, showTags: false},
-			want: "",
+			name:      "empty json showEmpty false",
+			r:         &trEmpty,
+			showEmpty: false,
+			showTags:  false,
+			want:      "",
 		},
 		{
-			name: "empty json",
-			args: args{r: &trEmpty, showEmpty: true, showTags: false},
-			want: jsonEmptyPretty,
+			name:      "empty json",
+			r:         &trEmpty,
+			showEmpty: true,
+			showTags:  false,
+			want:      jsonEmptyPretty,
 		},
 		{
-			name: "json",
-			args: args{r: &tr, showEmpty: false, showTags: false},
-			want: jsonPretty,
+			name:      "json",
+			r:         &tr,
+			showEmpty: false,
+			showTags:  false,
+			want:      jsonPretty,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := toJSONPretty(tt.args.r, tt.args.showEmpty, tt.args.showTags, nil)
+			got := toJSONPretty(tt.r, tt.showEmpty, tt.showTags, nil)
 			if got != tt.want {
 				t.Errorf("toJSON()\n%#v\nwant\n%#v", got, tt.want)
 			}
@@ -244,58 +239,61 @@ func Test_toJSONPretty(t *testing.T) {
 	}
 }
 
-// Test_toTable is a test function for toTable.
-func Test_toTable(t *testing.T) {
+// TestToTable is a test function for toTable.
+func TestToTable(t *testing.T) {
 	// save the original function, defer the restore and mock the function
 	oldBold := Bold
 	defer func() { Bold = oldBold }()
 	Bold = func(s string) string { return s }
 
-	type args struct {
+	tests := []struct {
+		name      string
 		r         Results
 		showEmpty bool
 		showTags  bool
 		tagsKeys  []string
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
+		want      string
 	}{
 		{
 			name: "table with no tags",
-			args: args{r: &tr, showEmpty: false, showTags: false},
+			r:    &tr,
 			want: tableNoTags,
 		},
 		{
-			name: "table with tags",
-			args: args{r: &tr, showEmpty: false, showTags: true},
-			want: tableTags,
+			name:     "table with tags",
+			r:        &tr,
+			showTags: true,
+			want:     tableTags,
 		},
 		{
-			name: "table with tags filtered by key",
-			args: args{r: &tr, showEmpty: false, showTags: true, tagsKeys: []string{"key1", "key3"}},
-			want: tableTagsFiltered,
+			name:     "table with tags filtered by key",
+			r:        &tr,
+			showTags: true,
+			tagsKeys: []string{"key1", "key3"},
+			want:     tableTagsFiltered,
 		},
 		{
-			name: "empty table with no tags",
-			args: args{r: &trEmpty, showEmpty: true, showTags: false},
-			want: tableEmptyNoTags,
+			name:      "empty table with no tags",
+			r:         &trEmpty,
+			showEmpty: true,
+			want:      tableEmptyNoTags,
 		},
 		{
-			name: "empty table with tags",
-			args: args{r: &trEmpty, showEmpty: true, showTags: true},
-			want: tableEmptyTags,
+			name:      "empty table with tags",
+			r:         &trEmpty,
+			showEmpty: true,
+			showTags:  true,
+			want:      tableEmptyTags,
 		},
 		{
 			name: "empty table showEmpty false",
-			args: args{r: &trEmpty, showEmpty: false, showTags: false},
+			r:    &trEmpty,
 			want: "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := toTable(tt.args.r, tt.args.showEmpty, tt.args.showTags, tt.args.tagsKeys)
+			got := toTable(tt.r, tt.showEmpty, tt.showTags, tt.tagsKeys)
 			if got != tt.want {
 				t.Errorf("toTable()\n%#v\nwant\n%#v", got, tt.want)
 			}
@@ -303,25 +301,22 @@ func Test_toTable(t *testing.T) {
 	}
 }
 
-// Test_rowFromStruct is a test function for rowFromStruct.
-func Test_rowFromStruct(t *testing.T) {
-	type args struct {
+// TestRowFromStruct is a test function for rowFromStruct.
+func TestRowFromStruct(t *testing.T) {
+	tests := []struct {
+		name     string
 		i        interface{}
 		tagsKeys []string
-	}
-	tests := []struct {
-		name string
-		args args
-		want table.Row
+		want     table.Row
 	}{
 		{
 			name: "empty",
-			args: args{i: struct{}{}},
+			i:    struct{}{},
 			want: table.Row{},
 		},
 		{
 			name: "test struct",
-			args: args{i: tdr1},
+			i:    tdr1,
 			want: table.Row{
 				fmt.Sprintf("%s: %s\n%s: %s",
 					text.Bold.Sprint("Info String1"),
@@ -338,8 +333,9 @@ func Test_rowFromStruct(t *testing.T) {
 			},
 		},
 		{
-			name: "test struct with tagsKeys filter",
-			args: args{i: tdr1, tagsKeys: []string{"key1"}},
+			name:     "test struct with tagsKeys filter",
+			i:        tdr1,
+			tagsKeys: []string{"key1"},
 			want: table.Row{
 				fmt.Sprintf("%s: %s\n%s: %s",
 					text.Bold.Sprint("Info String1"),
@@ -354,31 +350,28 @@ func Test_rowFromStruct(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := rowFromStruct(tt.args.i, tt.args.tagsKeys); !reflect.DeepEqual(got, tt.want) {
+			if got := rowFromStruct(tt.i, tt.tagsKeys); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("rowFromStruct()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
 }
 
-// Test_headerStructFieldsToString is a test function for headerStructFieldsToString.
-func Test_headerStructFieldsToString(t *testing.T) {
-	type args struct {
-		i interface{}
-	}
+// TestHeaderStructFieldsToString is a test function for headerStructFieldsToString.
+func TestHeaderStructFieldsToString(t *testing.T) {
 	tests := []struct {
 		name string
-		args args
+		i    interface{}
 		want string
 	}{
 		{
 			name: "empty",
-			args: args{i: struct{}{}},
+			i:    struct{}{},
 			want: "",
 		},
 		{
 			name: "testInfo struct 1",
-			args: args{i: ti1},
+			i:    ti1,
 			want: fmt.Sprintf("%s: %s\n%s: %s",
 				text.Bold.Sprint("Info String1"),
 				"testInfo1String1",
@@ -387,7 +380,7 @@ func Test_headerStructFieldsToString(t *testing.T) {
 		},
 		{
 			name: "testInfo struct 2",
-			args: args{i: ti2},
+			i:    ti2,
 			want: fmt.Sprintf("%s: %s\n%s: %s",
 				text.Bold.Sprint("Info String1"),
 				"testInfo2String1",
@@ -397,42 +390,39 @@ func Test_headerStructFieldsToString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := headerStructFieldsToString(tt.args.i); got != tt.want {
+			if got := headerStructFieldsToString(tt.i); got != tt.want {
 				t.Errorf("headerStructFieldsToString()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
 }
 
-// Test_sortedStringMapToString is a test function for sortedStringMapToString.
-func Test_sortedStringMapToString(t *testing.T) {
-	type args struct {
-		m    map[string]string
-		keys []string
-	}
+// TestSortedStringMapToString is a test function for sortedStringMapToString.
+func TestSortedStringMapToString(t *testing.T) {
 	tests := []struct {
 		name string
-		args args
+		m    map[string]string
+		keys []string
 		want string
 	}{
 		{
 			name: "empty",
-			args: args{m: map[string]string{}},
+			m:    map[string]string{},
 			want: "",
 		},
 		{
 			name: "one",
-			args: args{m: map[string]string{"one": "1"}},
+			m:    map[string]string{"one": "1"},
 			want: fmt.Sprintf("%s: 1", text.Bold.Sprint("one")),
 		},
 		{
 			name: "two",
-			args: args{m: map[string]string{"one": "1", "two": "2"}},
+			m:    map[string]string{"one": "1", "two": "2"},
 			want: fmt.Sprintf("%s: 1\n%s: 2", text.Bold.Sprint("one"), text.Bold.Sprint("two")),
 		},
 		{
 			name: "three",
-			args: args{m: map[string]string{"one": "1", "two": "2", "three": "3"}},
+			m:    map[string]string{"one": "1", "two": "2", "three": "3"},
 			want: fmt.Sprintf("%s: 1\n%s: 3\n%s: 2",
 				text.Bold.Sprint("one"),
 				text.Bold.Sprint("three"),
@@ -440,86 +430,77 @@ func Test_sortedStringMapToString(t *testing.T) {
 		},
 		{
 			name: "filtered by keys",
-			args: args{m: map[string]string{"one": "1", "two": "2", "three": "3"}, keys: []string{"one", "two"}},
+			m:    map[string]string{"one": "1", "two": "2", "three": "3"},
+			keys: []string{"one", "two"},
 			want: fmt.Sprintf("%s: 1\n%s: 2", text.Bold.Sprint("one"), text.Bold.Sprint("two")),
 		},
 		{
 			name: "filtered by keys, no match",
-			args: args{m: map[string]string{"one": "1"}, keys: []string{"missing"}},
+			m:    map[string]string{"one": "1"},
+			keys: []string{"missing"},
 			want: "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := sortedStringMapToString(tt.args.m, tt.args.keys); got != tt.want {
+			if got := sortedStringMapToString(tt.m, tt.keys); got != tt.want {
 				t.Errorf("sortedStringMapToString()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
 }
 
-// Test_sortedStringSliceToString is a test function for sortedStringSliceToString.
-func Test_sortedStringSliceToString(t *testing.T) {
-	type args struct {
-		s []string
-	}
+// TestSortedStringSliceToString is a test function for sortedStringSliceToString.
+func TestSortedStringSliceToString(t *testing.T) {
 	tests := []struct {
 		name string
-		args args
+		s    []string
 		want string
 	}{
 		{
 			name: "empty",
-			args: args{s: []string{}},
+			s:    []string{},
 			want: "",
 		},
 		{
 			name: "one",
-			args: args{s: []string{"one"}},
+			s:    []string{"one"},
 			want: "one",
 		},
 		{
 			name: "two",
-			args: args{s: []string{"one", "two"}},
+			s:    []string{"one", "two"},
 			want: "one\ntwo",
 		},
 		{
 			name: "three",
-			args: args{s: []string{"one", "two", "three"}},
+			s:    []string{"one", "two", "three"},
 			want: "one\nthree\ntwo",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := sortedStringSliceToString(tt.args.s); got != tt.want {
+			if got := sortedStringSliceToString(tt.s); got != tt.want {
 				t.Errorf("sortedStringSliceToString()\n%#v\nwant\n%#v", got, tt.want)
 			}
 		})
 	}
 }
 
-// Test_printers_failedEmptyResults checks that an empty result set carrying errors
-// is printed by every format even when showEmpty is false, so failures stay visible.
-func Test_printers_failedEmptyResults(t *testing.T) {
+// TestOutputs_failedEmptyResults checks that every registered output prints an empty result set
+// that carries errors, even when showEmpty is false, so failures stay visible.
+func TestOutputs_failedEmptyResults(t *testing.T) {
 	failed := &testResults{
 		Profile: "bad",
 		Region:  "r1",
 		Errors:  []string{"api error InvalidClientTokenId"},
 	}
-	tests := []struct {
-		name    string
-		printer func(Results, bool, bool, []string) string
-	}{
-		{name: "json", printer: toJSON},
-		{name: "json-pretty", printer: toJSONPretty},
-		{name: "table", printer: toTable},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.printer(failed, false, false, nil)
+	for name, printer := range outputs {
+		t.Run(name, func(t *testing.T) {
+			got := printer(failed, false, false, nil)
 			for _, want := range []string{"bad", "r1", "InvalidClientTokenId"} {
 				if !strings.Contains(got, want) {
-					t.Errorf("%s output = %q, want it to contain %q", tt.name, got, want)
+					t.Errorf("%s output = %q, want it to contain %q", name, got, want)
 				}
 			}
 		})

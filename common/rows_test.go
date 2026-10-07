@@ -30,6 +30,7 @@ type testRow struct {
 	Tags   map[string]string `header:"Tags"`
 }
 
+// TestHeaders checks that only fields with a header tag become columns, in field order.
 func TestHeaders(t *testing.T) {
 	want := []interface{}{"ID", "Size", "Items", "Tags"}
 	if got := Headers(testRow{}); !reflect.DeepEqual(got, want) {
@@ -37,6 +38,7 @@ func TestHeaders(t *testing.T) {
 	}
 }
 
+// TestRows checks that each element of a slice becomes one row, and an empty slice none.
 func TestRows(t *testing.T) {
 	data := []testRow{{ID: "a"}, {ID: "b"}}
 	got := Rows(data)
@@ -49,6 +51,7 @@ func TestRows(t *testing.T) {
 	}
 }
 
+// TestSortFieldNames checks that the sort tags are listed alphabetically, and none without tags.
 func TestSortFieldNames(t *testing.T) {
 	want := []string{"count", "id", "items", "size"}
 	if got := SortFieldNames(testRow{}); !reflect.DeepEqual(got, want) {
@@ -59,6 +62,7 @@ func TestSortFieldNames(t *testing.T) {
 	}
 }
 
+// TestSortFields checks the sort tag to field mapping, and that an unknown field lists the options.
 func TestSortFields(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -96,6 +100,7 @@ func TestSortFields(t *testing.T) {
 	}
 }
 
+// TestSortByField checks sorting by strings, by numbers numerically, and by slices.
 func TestSortByField(t *testing.T) {
 	newData := func() []testRow {
 		return []testRow{
@@ -129,6 +134,7 @@ func TestSortByField(t *testing.T) {
 	}
 }
 
+// TestSortByField_isStable checks that rows with equal keys keep their input order.
 func TestSortByField_isStable(t *testing.T) {
 	data := []testRow{{ID: "x", Size: 1}, {ID: "y", Size: 1}, {ID: "w", Size: 0}}
 	SortByField(data, "Size")
@@ -139,6 +145,7 @@ func TestSortByField_isStable(t *testing.T) {
 	}
 }
 
+// TestLess_sliceDoesNotMutateInput checks that comparing slices does not sort the compared values.
 func TestLess_sliceDoesNotMutateInput(t *testing.T) {
 	a := []string{"z", "a"}
 	b := []string{"m"}
