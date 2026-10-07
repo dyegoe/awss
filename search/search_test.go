@@ -27,6 +27,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"testing"
@@ -108,6 +110,39 @@ func TestExecute_unknownCommand(t *testing.T) {
 	}
 	if called {
 		t.Error("Execute() built results for an unknown command")
+	}
+}
+
+// TestEngines_searchKeepsFilters checks that no search changes the filters map it is given: one
+// map is shared by every profile x region goroutine of a run (AGENTS.md). The profile does not
+// exist, so each search builds its filters and stops at the AWS config, with no AWS call.
+func TestEngines_searchKeepsFilters(t *testing.T) {
+	empty := filepath.Join(t.TempDir(), "config")
+	if err := os.WriteFile(empty, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AWS_CONFIG_FILE", empty)
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", empty)
+
+	// One key of every kind the commands send: IDs, names, tags, zones, CIDRs and S3 patterns.
+	sent := func() map[string][]string {
+		return map[string][]string{
+			"instance-id": {"i-1"}, "tag:Name": {"web-*"}, "tag": {"Env=prod:dev"},
+			"availability-zone": {"a", "b"}, "cidr": {"10.0.0.0/16"}, "vpc-id": {"vpc-1"},
+			"name": {"logs-*"}, "bucket": {"b1"}, "key": {"app/*"},
+		}
+	}
+	for cmd, eng := range engines {
+		t.Run(cmd, func(t *testing.T) {
+			filters := sent()
+			r := eng.new("awss-test-missing-profile", "us-east-1", filters, &Options{NoInstanceName: true})
+
+			r.Search(context.Background())
+
+			if !reflect.DeepEqual(filters, sent()) {
+				t.Errorf("%s Search() changed its filters to %v, want %v", cmd, filters, sent())
+			}
+		})
 	}
 }
 
