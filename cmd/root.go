@@ -189,9 +189,10 @@ func initFlags() {
 	rootCmd.PersistentFlags().String(labelConfig, "",
 		"config file path (default is $HOME/.awss/config.yaml)")
 	rootCmd.PersistentFlags().StringSlice(labelProfiles, []string{},
-		"Select the profile from ~/.aws/config. You can pass multiple profiles separated by comma. "+
-			"e.g. `profile1,profile2`. `all` uses the all-profiles list of the config file, or every "+
-			"profile in ~/.aws/config when that list is not set. If not set, falls back to the AWS SDK's default credential "+
+		"Select the profile from the AWS config file (AWS_CONFIG_FILE, or ~/.aws/config). You can pass "+
+			"multiple profiles separated by comma. e.g. `profile1,profile2`. `all` uses the all-profiles list of "+
+			"the config file, or every profile in the AWS config file when that list is not set. "+
+			"If not set, falls back to the AWS SDK's default credential "+
 			"resolution (AWS_PROFILE, static env credentials, or the `default` profile).")
 	rootCmd.PersistentFlags().StringSlice(labelRegions, []string{},
 		fmt.Sprintf(

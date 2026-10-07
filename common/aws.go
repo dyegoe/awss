@@ -54,20 +54,23 @@ func AwsConfig(profile, region string) (aws.Config, error) {
 	return cfg, nil
 }
 
-// defaultSharedConfigFilename is the default location of the AWS config file.
+// awsConfigFile returns the AWS config file the AWS SDK reads: AWS_CONFIG_FILE when it is set,
+// ~/.aws/config otherwise. The SDK reads only that one file, so awss must list profiles from it too.
 //
-// We use this var to be able to mock it in the tests.
-var defaultSharedConfigFilename = config.DefaultSharedConfigFilename()
+// It is resolved at each call, not at start-up, so the environment at run time decides.
+func awsConfigFile() string {
+	if f := os.Getenv("AWS_CONFIG_FILE"); f != "" {
+		return f
+	}
+	return config.DefaultSharedConfigFilename()
+}
 
-// GetAwsProfiles returns a list of profiles from the AWS config file.
-//
-// It is used to get the list of profiles from the AWS config file.
-// The default location is ~/.aws/config.
+// GetAwsProfiles returns the profiles of the AWS config file (see awsConfigFile).
 //
 // Named profiles are stored as `[profile name]` sections, while the default
 // profile is stored as a bare `[default]` section, so both forms are matched.
 func GetAwsProfiles() ([]string, error) {
-	cfg, err := ini.Load(defaultSharedConfigFilename)
+	cfg, err := ini.Load(awsConfigFile())
 	if err != nil {
 		return nil, err
 	}
@@ -184,12 +187,13 @@ var getAwsProfilesFn = GetAwsProfiles
 // If the user passes no profile, it returns a single empty-string profile so
 // the AWS SDK resolves credentials itself, in order: AWS_PROFILE, static
 // AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars, or the `default` profile.
-// This is intentionally not validated against ~/.aws/config, since that file
+// This is intentionally not validated against the AWS config file, since that file
 // may not exist when credentials come purely from the environment.
 // If the user passes the `all` profile, it returns allProfiles (the `all-profiles`
-// list of the awss config) when it is not empty, or else every profile in ~/.aws/config.
+// list of the awss config) when it is not empty, or else every profile in the AWS config file.
 // If the user passes a list of profiles, it will check if they are valid and return them.
-// Every returned profile, including the allProfiles list, must exist in ~/.aws/config.
+// Every returned profile, including the allProfiles list, must exist in the AWS config file
+// (AWS_CONFIG_FILE, or ~/.aws/config when it is not set).
 func CheckProfiles(profiles, allProfiles []string) ([]string, error) {
 	if len(profiles) == 0 {
 		return []string{""}, nil

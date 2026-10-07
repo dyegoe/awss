@@ -21,6 +21,8 @@ limitations under the License.
 package common
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -57,29 +59,50 @@ import (
 // 	}
 // }
 
-// TestGetAwsProfiles tests the GetAwsProfiles function.
+// TestGetAwsProfiles checks that profiles come from the file the AWS SDK reads: AWS_CONFIG_FILE
+// when it is set, ~/.aws/config otherwise.
 func TestGetAwsProfiles(t *testing.T) {
-	// save the original variable, defer the restore and mock the variable
-	oldDefaultSharedConfigFilename := defaultSharedConfigFilename
-	defer func() { defaultSharedConfigFilename = oldDefaultSharedConfigFilename }()
-	defaultSharedConfigFilename = "testdata/config"
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".aws"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	homeConfig := "[default]\nregion = us-east-1\n[profile home-only]\nregion = us-east-1\n"
+	if err := os.WriteFile(filepath.Join(home, ".aws", "config"), []byte(homeConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
-		name    string
-		want    []string
-		wantErr bool
+		name       string
+		home       string
+		configFile string
+		want       []string
+		wantErr    bool
 	}{
 		{
-			name: "default",
+			name: "AWS_CONFIG_FILE replaces ~/.aws/config", home: home, configFile: "testdata/config",
 			want: []string{"default", "profile1", "profile2"},
+		},
+		{
+			name: "~/.aws/config when AWS_CONFIG_FILE is not set", home: home,
+			want: []string{"default", "home-only"},
+		},
+		{
+			name: "missing AWS_CONFIG_FILE is an error, with no fallback", home: home,
+			configFile: filepath.Join(t.TempDir(), "missing"), wantErr: true,
+		},
+		{
+			name: "missing ~/.aws/config is an error", home: t.TempDir(), wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("HOME", tt.home)
+			t.Setenv("AWS_CONFIG_FILE", tt.configFile)
+
 			got, err := GetAwsProfiles()
+
 			if (err != nil) != tt.wantErr {
-				t.Errorf("GetAwsProfiles() error = %v, wantErr %v", err, tt.wantErr)
-				return
+				t.Fatalf("GetAwsProfiles() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetAwsProfiles()\n%#v\nwant\n%#v", got, tt.want)

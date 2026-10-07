@@ -222,8 +222,10 @@ cp awss /usr/local/bin
 
 ## Requirements
 
-- AWS credentials. awss uses the AWS SDK's standard resolution: named profiles from
-  `~/.aws/config` (`--profiles`), `AWS_PROFILE`, or `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`.
+- AWS credentials. awss uses the AWS SDK's standard resolution: named profiles from the AWS
+  config file (`--profiles`), `AWS_PROFILE`, or `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`. The
+  AWS config file is `AWS_CONFIG_FILE` when set, `~/.aws/config` otherwise, as for the AWS CLI;
+  awss validates `--profiles` and expands `--profiles all` from that same file.
 - A valid session for every profile you search. awss never logs in: run `aws sso login`, or your
   credential helper (for example Granted), before searching. A profile without a valid session
   reports its own error in its result set; the other profiles are searched as usual.
@@ -259,7 +261,7 @@ AWSS uses a YAML configuration file to set defaults. The default path is `~/.aws
 ```yaml
 profiles:
   - default
-all-profiles: []      # what --profiles all expands to; empty means every profile in ~/.aws/config
+all-profiles: []      # what --profiles all expands to; empty means every profile in the AWS config file
 regions:
   - us-east-1
 output: table
@@ -309,10 +311,10 @@ s3obj:
 
 Every key mirrors a flag: the flag wins when both are set. `all-regions` is the list
 `--regions all` expands to. `all-profiles` is the list `--profiles all` expands to; when it is
-empty or missing, `--profiles all` uses every `[default]` and `[profile ...]` section of
-`~/.aws/config`. Set it when `~/.aws/config` holds profiles you do not want to search, such as
-several privilege variants per account or MFA source profiles. Each entry must exist in
-`~/.aws/config`.
+empty or missing, `--profiles all` uses every `[default]` and `[profile ...]` section of the
+AWS config file (`AWS_CONFIG_FILE`, or `~/.aws/config`). Set it when that file holds profiles you
+do not want to search, such as several privilege variants per account or MFA source profiles.
+Each entry must exist in the AWS config file.
 
 ## Usage
 
@@ -377,5 +379,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and guidelines.
 - [Cobra](https://github.com/spf13/cobra)
 - [Viper](https://github.com/spf13/viper)
 - [Go-Pretty](https://github.com/jedib0t/go-pretty)
-- [ini.v1](https://github.com/go-ini/ini) (reads `~/.aws/config` for `--profiles all` and profile validation)
+- [ini.v1](https://github.com/go-ini/ini) (reads the AWS config file for `--profiles all` and profile validation)
 - [golang.org/x/term](https://pkg.go.dev/golang.org/x/term) (terminal width for tables)
