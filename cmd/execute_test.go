@@ -1,0 +1,367 @@
+/*
+Copyright © 2022 Dyego Alexandre Eugenio github@dyego.com.br
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cmd
+
+import (
+	"bytes"
+	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/dyegoe/awss/search"
+
+	"github.com/spf13/viper"
+)
+
+// The tests in this file run the real command tree with rootCmd.ExecuteC. Cobra and Viper hold
+// global state, so they never call t.Parallel(), and every case starts from resetCLI.
+
+// searchCall records the arguments one run passed to executeSearch.
+type searchCall struct {
+	cmd      string
+	profiles []string
+	regions  []string
+	filters  map[string][]string
+	opts     search.Options
+}
+
+// resetCLI rebuilds the command tree and viper as Execute does, in a clean environment, and
+// replaces executeSearch with a recorder. The returned slice holds the recorded calls.
+//
+// Rebuilding, rather than resetting flag values, is what keeps cases apart: a pflag slice that
+// was set once appends on the next parse, and Changed stays true.
+func resetCLI(t *testing.T, searchErr error) *[]searchCall {
+	t.Helper()
+
+	// No config file, profile or region from the machine running the tests.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("AWS_REGION", "")
+	t.Setenv("AWS_DEFAULT_REGION", "")
+	t.Setenv("AWS_PROFILE", "")
+
+	rootCmd.ResetCommands()
+	rootCmd.ResetFlags()
+	for _, sub := range subcommands {
+		sub.cmd.ResetFlags()
+	}
+	viper.Reset()
+	if err := setup(); err != nil {
+		t.Fatalf("setup() error = %v", err)
+	}
+
+	calls := &[]searchCall{}
+	old := executeSearch
+	executeSearch = func(cmd string, profiles, regions []string, filters map[string][]string, opts *search.Options) error {
+		*calls = append(*calls, searchCall{cmd: cmd, profiles: profiles, regions: regions, filters: filters, opts: *opts})
+		return searchErr
+	}
+	t.Cleanup(func() {
+		executeSearch = old
+		rootCmd.SetArgs(nil)
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+	})
+	return calls
+}
+
+// runCLI runs the root command with args and returns the error and what it printed.
+func runCLI(t *testing.T, args ...string) (string, error) {
+	t.Helper()
+	out := &bytes.Buffer{}
+	rootCmd.SetArgs(args)
+	rootCmd.SetOut(out)
+	rootCmd.SetErr(out)
+	_, err := rootCmd.ExecuteC()
+	return out.String(), err
+}
+
+// writeConfig writes an awss config file and returns its path.
+func writeConfig(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// defaultOpts returns the options a run gets with no global flag, for the given sort field.
+func defaultOpts(sortField string) search.Options {
+	return search.Options{SortField: sortField, Output: "table", Timeout: defaultTimeout}
+}
+
+// allCase is the case of "<cmd> --all" with every default: no filter, the default profile and
+// region, and the command's default sort field.
+func allCase(cmd, sortField string) executeCase {
+	return executeCase{
+		name: cmd + " --all",
+		args: []string{cmd, "--all"},
+		want: searchCall{
+			cmd: cmd, profiles: []string{""}, regions: []string{"us-east-1"},
+			filters: map[string][]string{}, opts: defaultOpts(sortField),
+		},
+	}
+}
+
+// executeCase is one table entry of TestExecute_search.
+type executeCase struct {
+	name string
+	args []string
+	// config, when set, is written to a file passed with --config.
+	config string
+	// regionEnv, when set, is the AWS_REGION of the run.
+	regionEnv string
+	want      searchCall
+}
+
+func executeCases() []executeCase {
+	return append(subcommandCases(), globalCases()...)
+}
+
+// subcommandCases runs each search subcommand with its own flags.
+func subcommandCases() []executeCase {
+	maxKeysOpts := defaultOpts("key")
+	maxKeysOpts.MaxKeys = 50
+	maxKeysOpts.Regex = true
+
+	return []executeCase{
+		allCase("ec2", "name"),
+		{
+			name: "ec2 filters and global flags",
+			args: []string{
+				"ec2", "-n", "web-*", "-s", "running,stopped", "-z", "a,b", "--cidrs", "10.0.0.0/16",
+				"--regions", "us-east-1,eu-west-1", "--output", "json", "--sort", "id",
+				"--show-empty", "--timeout", "90s",
+			},
+			want: searchCall{
+				cmd: "ec2", profiles: []string{""}, regions: []string{"us-east-1", "eu-west-1"},
+				filters: map[string][]string{
+					"tag:Name": {"web-*"}, "instance-state-name": {"running", "stopped"},
+					"availability-zone": {"a", "b"}, "cidr": {"10.0.0.0/16"},
+				},
+				opts: search.Options{SortField: "id", Output: "json", ShowEmpty: true, Timeout: 90 * time.Second},
+			},
+		},
+		{
+			name: "eni --no-instance-name",
+			args: []string{"eni", "--all", "--no-instance-name"},
+			want: searchCall{
+				cmd: "eni", profiles: []string{""}, regions: []string{"us-east-1"}, filters: map[string][]string{},
+				opts: search.Options{SortField: "id", Output: "table", NoInstanceName: true, Timeout: defaultTimeout},
+			},
+		},
+		allCase("ebs", "id"),
+		allCase("subnet", "name"),
+		{
+			name: "s3 name patterns with --regex",
+			args: []string{"s3", "-n", "^prod-", "--regex"},
+			want: searchCall{
+				cmd: "s3", profiles: []string{""}, regions: []string{"us-east-1"},
+				filters: map[string][]string{"name": {"^prod-"}},
+				opts:    search.Options{SortField: "name", Output: "table", Regex: true, Timeout: defaultTimeout},
+			},
+		},
+		{
+			name: "s3obj buckets, keys and --max-keys",
+			args: []string{"s3obj", "-b", "logs", "-K", "^app/", "--regex", "--max-keys", "50"},
+			want: searchCall{
+				cmd: "s3obj", profiles: []string{""}, regions: []string{"us-east-1"},
+				filters: map[string][]string{"bucket": {"logs"}, "key": {"^app/"}}, opts: maxKeysOpts,
+			},
+		},
+	}
+}
+
+// globalCases covers the global flags, the environment and the config file.
+func globalCases() []executeCase {
+	return []executeCase{
+		{
+			name: "--show-tags-keys implies --show-tags",
+			args: []string{"vpc", "--all", "--show-tags-keys", "Name,Environment"},
+			want: searchCall{
+				cmd: "vpc", profiles: []string{""}, regions: []string{"us-east-1"}, filters: map[string][]string{},
+				opts: search.Options{
+					SortField: "name", Output: "table", ShowTags: true,
+					TagsKeys: []string{"Name", "Environment"}, Timeout: defaultTimeout,
+				},
+			},
+		},
+		{
+			name:      "region from AWS_REGION when --regions is not set",
+			args:      []string{"vpc", "--all"},
+			regionEnv: "eu-west-1",
+			want: searchCall{
+				cmd: "vpc", profiles: []string{""}, regions: []string{"eu-west-1"},
+				filters: map[string][]string{}, opts: defaultOpts("name"),
+			},
+		},
+		{
+			name:   "config file sets the defaults",
+			args:   []string{"ec2", "--all"},
+			config: "regions: [eu-west-1]\noutput: json\ntimeout: 2m\nshow:\n  empty: true\nec2:\n  sort: type\n",
+			want: searchCall{
+				cmd: "ec2", profiles: []string{""}, regions: []string{"eu-west-1"}, filters: map[string][]string{},
+				opts: search.Options{SortField: "type", Output: "json", ShowEmpty: true, Timeout: 2 * time.Minute},
+			},
+		},
+		{
+			name:   "a flag wins over the config file",
+			args:   []string{"ec2", "--all", "--output", "table", "--timeout", "0", "--sort", "id"},
+			config: "output: json\ntimeout: 2m\nec2:\n  sort: type\n",
+			want: searchCall{
+				cmd: "ec2", profiles: []string{""}, regions: []string{"us-east-1"}, filters: map[string][]string{},
+				opts: search.Options{SortField: "id", Output: "table"},
+			},
+		},
+	}
+}
+
+// TestExecute_search runs every search subcommand through the command tree and checks what
+// reaches the search: the command, profiles, regions, filters and options.
+func TestExecute_search(t *testing.T) {
+	for _, tt := range executeCases() {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := resetCLI(t, nil)
+			if tt.regionEnv != "" {
+				t.Setenv("AWS_REGION", tt.regionEnv)
+			}
+			args := tt.args
+			if tt.config != "" {
+				args = append([]string{"--config", writeConfig(t, tt.config)}, args...)
+			}
+
+			out, err := runCLI(t, args...)
+
+			if err != nil {
+				t.Fatalf("Execute(%v) error = %v, output:\n%s", args, err, out)
+			}
+			if len(*calls) != 1 {
+				t.Fatalf("searches run = %d, want 1", len(*calls))
+			}
+			if got := (*calls)[0]; !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("search called with\n%+v\nwant\n%+v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestExecute_errors checks the argument and validation failures: each one fails the command
+// with a message naming the problem, and no search runs.
+func TestExecute_errors(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		config  string
+		wantErr string
+	}{
+		{name: "unknown subcommand", args: []string{"rds"}, wantErr: `unknown command "rds"`},
+		{name: "positional argument", args: []string{"ec2", "--all", "extra"}, wantErr: `unknown command "extra"`},
+		{name: "unknown flag", args: []string{"ec2", "--nope"}, wantErr: "unknown flag: --nope"},
+		{
+			name: "--all with a filter", args: []string{"ec2", "--all", "-n", "web"},
+			wantErr: "--all cannot be combined with --names",
+		},
+		{name: "invalid availability zone", args: []string{"ec2", "-z", "1a"}, wantErr: "must be just a letter"},
+		{name: "invalid sort field", args: []string{"vpc", "--all", "--sort", "nope"}, wantErr: "nope"},
+		{name: "invalid output", args: []string{"ec2", "--all", "--output", "xml"}, wantErr: "invalid output format: xml"},
+		{name: "unknown region", args: []string{"ec2", "--all", "--regions", "mars-1"}, wantErr: "region mars-1 not found"},
+		{name: "timeout without unit", args: []string{"ec2", "--all", "--timeout", "300"}, wantErr: `invalid argument "300"`},
+		{
+			name: "timeout without unit in the config file", args: []string{"ec2", "--all"},
+			config: "timeout: 300\n", wantErr: "invalid timeout: 300",
+		},
+		{name: "malformed tag", args: []string{"ec2", "-t", "NoEquals"}, wantErr: "invalid tag format: NoEquals"},
+		{name: "invalid CIDR", args: []string{"ec2", "--cidrs", "10.0.0.0"}, wantErr: "10.0.0.0"},
+		{name: "s3obj without --buckets", args: []string{"s3obj", "-K", "app/*"}, wantErr: "--buckets is required"},
+		{name: "missing config file", args: []string{"--config", "/nonexistent/awss.yaml", "ec2", "--all"},
+			wantErr: "config file not found: /nonexistent/awss.yaml"},
+		{name: "config path is a directory", args: []string{"--config", os.TempDir(), "ec2", "--all"},
+			wantErr: "config file is a directory"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := resetCLI(t, nil)
+			args := tt.args
+			if tt.config != "" {
+				args = append([]string{"--config", writeConfig(t, tt.config)}, args...)
+			}
+
+			out, err := runCLI(t, args...)
+
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("Execute(%v) error = %v, want it to contain %q", args, err, tt.wantErr)
+			}
+			if !strings.Contains(out, "Error: ") {
+				t.Errorf("output = %q, want the error printed", out)
+			}
+			if len(*calls) != 0 {
+				t.Errorf("searches run = %d, want 0", len(*calls))
+			}
+		})
+	}
+}
+
+// TestExecute_searchError checks that an error returned by the search fails the command.
+func TestExecute_searchError(t *testing.T) {
+	calls := resetCLI(t, errors.New("command ec2 not found"))
+
+	_, err := runCLI(t, "ec2", "--all")
+
+	if err == nil || err.Error() != "command ec2 not found" {
+		t.Errorf("Execute() error = %v, want the search error", err)
+	}
+	if len(*calls) != 1 {
+		t.Errorf("searches run = %d, want 1", len(*calls))
+	}
+}
+
+// TestExecute_resetBetweenRuns checks that resetCLI isolates runs: values set by one run do not
+// leak into the next, including slice flags that pflag would otherwise append to.
+func TestExecute_resetBetweenRuns(t *testing.T) {
+	resetCLI(t, nil)
+	if _, err := runCLI(t, "ec2", "-n", "first", "--regions", "eu-west-1", "--output", "json"); err != nil {
+		t.Fatalf("first run error = %v", err)
+	}
+
+	calls := resetCLI(t, nil)
+	if _, err := runCLI(t, "ec2", "-n", "second"); err != nil {
+		t.Fatalf("second run error = %v", err)
+	}
+
+	want := searchCall{
+		cmd: "ec2", profiles: []string{""}, regions: []string{"us-east-1"},
+		filters: map[string][]string{"tag:Name": {"second"}}, opts: defaultOpts("name"),
+	}
+	if len(*calls) != 1 || !reflect.DeepEqual((*calls)[0], want) {
+		t.Errorf("second run searched with %+v, want %+v", *calls, want)
+	}
+}
+
+// TestExecute_version checks the --version output.
+func TestExecute_version(t *testing.T) {
+	resetCLI(t, nil)
+
+	out, err := runCLI(t, "--version")
+
+	if err != nil || !strings.Contains(out, "awss version "+version) {
+		t.Errorf("--version = %q, %v; want the version", out, err)
+	}
+}
