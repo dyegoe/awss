@@ -170,12 +170,13 @@ cannot read the tags of still shows up, with the error listed above its table.
 
 #### S3 objects (`awss s3obj`)
 
-Searches object keys inside given buckets. Each region only scans the buckets that live in it,
-so use `--regions all` when you do not know the bucket's region.
+Searches object keys inside given buckets. `--buckets` takes bucket names or glob patterns
+(`'prod-logs-*'`); each region only scans the matching buckets that live in it, so use
+`--regions all` when you do not know the bucket's region.
 
 | Flag | Short | Description |
 | --- | --- | --- |
-| `--buckets` | `-b` | Buckets to scan, exact names. Required |
+| `--buckets` | `-b` | Buckets to scan: names or glob patterns (`'prod-logs-*'`). Required |
 | `--keys` | `-K` | Key patterns, globs by default (`logs/2024/*.gz`). Without it every key is listed |
 
 Sort by: `--sort bucket|key|size|modified|class` (default: `key`)
@@ -184,9 +185,16 @@ Additional flags:
 
 - `--regex` -- treat `--keys` patterns as Go regular expressions instead of globs
 - `--max-keys` -- stop after scanning this many keys per bucket (default 10000) and report it
+- `--max-buckets` -- the most buckets the patterns may match in one region (default 20). Above it,
+  that region scans nothing and reports how many matched: narrow the patterns or raise the limit
 
 In globs `*` also matches `/`. With one pattern, its literal prefix (`logs/2024/` above) is sent
-to S3 so only that part of the bucket is listed.
+to S3 so only that part of the bucket is listed. Bucket patterns are always globs: `--regex`
+applies to `--keys` only.
+
+There is no `--all`. Listing every bucket of every account is an inventory job, and each bucket
+costs up to `--max-keys` / 1000 calls; use S3 Inventory with Athena, or S3 Storage Lens, for it
+([#152](https://github.com/dyegoe/awss/issues/152)).
 
 ### Common behavior
 
@@ -307,6 +315,7 @@ s3obj:
   sort: key
   regex: false
   max-keys: 10000
+  max-buckets: 20
 ```
 
 Every key mirrors a flag: the flag wins when both are set. `all-regions` is the list

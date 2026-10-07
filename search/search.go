@@ -65,6 +65,10 @@ type Options struct {
 	// MaxKeys caps the keys scanned per bucket in the s3obj search. Zero means the search's default.
 	MaxKeys int
 
+	// MaxBuckets caps the buckets one profile and region may scan in the s3obj search. Zero means
+	// the search's default.
+	MaxBuckets int
+
 	// Timeout is how long the run may take. A profile and region still searching at the deadline
 	// is reported as timed out. Zero disables it.
 	Timeout time.Duration
@@ -134,7 +138,7 @@ var engines = map[string]engine{
 	},
 	"s3obj": {
 		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchS3obj.New(profile, region, filters, opts.SortField, opts.Regex, opts.MaxKeys)
+			return searchS3obj.New(profile, region, filters, opts.SortField, opts.Regex, opts.MaxKeys, opts.MaxBuckets)
 		},
 		sortFields:     searchS3obj.GetSortFields,
 		sortFieldNames: searchS3obj.SortFieldNames,

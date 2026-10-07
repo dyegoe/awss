@@ -145,6 +145,7 @@ func subcommandCases() []executeCase {
 	maxKeysOpts := defaultOpts("key")
 	maxKeysOpts.MaxKeys = 50
 	maxKeysOpts.Regex = true
+	maxKeysOpts.MaxBuckets = 5
 
 	return []executeCase{
 		allCase("ec2", "name"),
@@ -184,11 +185,13 @@ func subcommandCases() []executeCase {
 			},
 		},
 		{
-			name: "s3obj buckets, keys and --max-keys",
-			args: []string{"s3obj", "-b", "logs", "-K", "^app/", "--regex", "--max-keys", "50"},
+			name: "s3obj bucket pattern, keys, --max-keys and --max-buckets",
+			args: []string{
+				"s3obj", "-b", "logs-*", "-K", "^app/", "--regex", "--max-keys", "50", "--max-buckets", "5",
+			},
 			want: searchCall{
 				cmd: "s3obj", profiles: []string{""}, regions: []string{"us-east-1"},
-				filters: map[string][]string{"bucket": {"logs"}, "key": {"^app/"}}, opts: maxKeysOpts,
+				filters: map[string][]string{"bucket": {"logs-*"}, "key": {"^app/"}}, opts: maxKeysOpts,
 			},
 		},
 	}
@@ -343,6 +346,10 @@ func errorCases() []errorCase {
 		{name: "malformed tag", args: []string{"ec2", "-t", "NoEquals"}, wantErr: "invalid tag format: NoEquals"},
 		{name: "invalid CIDR", args: []string{"ec2", "--cidrs", "10.0.0.0"}, wantErr: "10.0.0.0"},
 		{name: "s3obj without --buckets", args: []string{"s3obj", "-K", "app/*"}, wantErr: "--buckets is required"},
+		{
+			name: "s3obj invalid bucket pattern", args: []string{"s3obj", "-b", "logs-[x"},
+			wantErr: "invalid --buckets pattern",
+		},
 		{name: "missing config file", args: []string{"--config", "/nonexistent/awss.yaml", "ec2", "--all"},
 			wantErr: "config file not found: /nonexistent/awss.yaml"},
 		{name: "config path is a directory", args: []string{"--config", os.TempDir(), "ec2", "--all"},
