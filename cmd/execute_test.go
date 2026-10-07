@@ -347,6 +347,8 @@ func errorCases() []errorCase {
 			wantErr: "config file not found: /nonexistent/awss.yaml"},
 		{name: "config path is a directory", args: []string{"--config", os.TempDir(), "ec2", "--all"},
 			wantErr: "config file is a directory"},
+		{name: "config path through a file", args: []string{"--config", "execute_test.go/config.yaml", "ec2", "--all"},
+			wantErr: "reading config file execute_test.go/config.yaml"},
 		{
 			name: "profile not in AWS_CONFIG_FILE", args: []string{"ec2", "--all", "--profiles", "dev,staging"},
 			awsConfig: testAwsConfig, wantErr: "profile staging not found",

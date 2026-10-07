@@ -287,6 +287,9 @@ func initConfig(cfg string) error {
 	if os.IsNotExist(err) && cfg != "" {
 		return fmt.Errorf("config file not found: %s", f)
 	}
+	if err != nil {
+		return fmt.Errorf("reading config file %s: %w", f, err)
+	}
 	// check if the path is a directory
 	if info.IsDir() {
 		return fmt.Errorf("config file is a directory: %s", f)
