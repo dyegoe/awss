@@ -28,6 +28,7 @@ linters:
     - predeclared
     - revive
     - staticcheck
+    - thelper
     - unconvert
     - unparam
     - unused
