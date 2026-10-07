@@ -14,7 +14,7 @@ Legend: [ ] to do · [~] in progress
 
 ## Testing
 
-Coverage per package as of 2026-10-06 (`go test -cover ./...`):
+Coverage per package as of 2026-10-07 (`go test -cover ./...`):
 
 | Package         | Coverage | Gap                                                          |
 | --------------- | -------: | ------------------------------------------------------------ |
@@ -24,13 +24,10 @@ Coverage per package as of 2026-10-06 (`go test -cover ./...`):
 | `search/subnet` |    97.8% | —                                                            |
 | `search/ec2`    |    97.5% | —                                                            |
 | `common`        |    93.2% | —                                                            |
+| `cmd`           |    91.7% | `Execute` (`os.Exit`), `BindPFlag` errors (unreachable)      |
 | `search/s3obj`  |    85.5% | —                                                            |
 | `search/s3`     |    80.8% | `Search()` (AWS config + client construction)                |
-| `cmd`           |    39.5% | `Execute`, `persistentPreRun`, `runSearch` happy path        |
 | `search`        |    99.1% | deadline and search ending at the same instant (not forced)  |
-
-- [ ] [**`cmd`: test root command execution.**](https://github.com/dyegoe/awss/issues/149)
-  Drive `rootCmd` with `ExecuteC()` in tests and capture stdout.
 
 ## Architecture
 
