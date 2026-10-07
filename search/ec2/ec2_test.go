@@ -38,25 +38,20 @@ import (
 
 // TestNew tests the New function.
 func TestNew(t *testing.T) {
-	type args struct {
+	tests := []struct {
+		name      string
 		profile   string
 		region    string
 		filters   map[string][]string
 		sortField string
-	}
-	tests := []struct {
-		name string
-		args args
-		want *Results
+		want      *Results
 	}{
 		{
-			name: "TestNew",
-			args: args{
-				profile:   "default",
-				region:    "us-east-1",
-				filters:   map[string][]string{"tag:Name": {"test"}},
-				sortField: "id",
-			},
+			name:      "TestNew",
+			profile:   "default",
+			region:    "us-east-1",
+			filters:   map[string][]string{"tag:Name": {"test"}},
+			sortField: "id",
 			want: &Results{
 				BaseResults: common.BaseResults{
 					Profile:   "default",
@@ -71,7 +66,7 @@ func TestNew(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := New(tt.args.profile, tt.args.region, tt.args.filters, tt.args.sortField)
+			got := New(tt.profile, tt.region, tt.filters, tt.sortField)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("New()\n%#v\nwant\n%#v", got, tt.want)
 			}
@@ -105,8 +100,8 @@ func mockResults() *Results {
 			SortField: "id",
 		},
 		Data: []dataRow{
-			*mockDataRow1,
-			*mockDataRow2,
+			mockDataRow1(),
+			mockDataRow2(),
 		},
 		Filters: map[string][]string{
 			"instance-id":                    {"i-1234567890abcdef0", "i-0987654321fedcba9"},
@@ -119,182 +114,88 @@ func mockResults() *Results {
 	}
 }
 
-var mockDataRow1 = &dataRow{
-	InstanceID:        "i-1234567890abcdef0",
-	InstanceName:      "instance-name-1",
-	InstanceType:      "t3.micro",
-	AvailabilityZone:  "us-east-1a",
-	InstanceState:     "running",
-	PrivateIPAddress:  "172.16.0.1",
-	PublicIPAddress:   "52.53.54.55",
-	NetworkInterfaces: []string{"eni-1234567890abcdef0"},
-	Volumes:           []string{"vol-1234567890abcdef0"},
-	Tags: map[string]string{
-		"Name":        "instance-name-1",
-		"Environment": "test",
-	},
+// mockDataRow1 returns a new instance row with a volume.
+func mockDataRow1() dataRow {
+	return dataRow{
+		InstanceID:        "i-1234567890abcdef0",
+		InstanceName:      "instance-name-1",
+		InstanceType:      "t3.micro",
+		AvailabilityZone:  "us-east-1a",
+		InstanceState:     "running",
+		PrivateIPAddress:  "172.16.0.1",
+		PublicIPAddress:   "52.53.54.55",
+		NetworkInterfaces: []string{"eni-1234567890abcdef0"},
+		Volumes:           []string{"vol-1234567890abcdef0"},
+		Tags: map[string]string{
+			"Name":        "instance-name-1",
+			"Environment": "test",
+		},
+	}
 }
 
-var mockDataRow2 = &dataRow{
-	InstanceID:        "i-1234567890abcdef1",
-	InstanceName:      "instance-name-2",
-	InstanceType:      "t3.medium",
-	AvailabilityZone:  "us-east-1b",
-	InstanceState:     "running",
-	PrivateIPAddress:  "172.16.0.2",
-	PublicIPAddress:   "52.53.54.56",
-	NetworkInterfaces: []string{"eni-1234567890abcdef1"},
-	Tags: map[string]string{
-		"Name":        "instance-name-2",
-		"Environment": "prod",
-	},
+// mockDataRow2 returns a new instance row without volumes.
+func mockDataRow2() dataRow {
+	return dataRow{
+		InstanceID:        "i-1234567890abcdef1",
+		InstanceName:      "instance-name-2",
+		InstanceType:      "t3.medium",
+		AvailabilityZone:  "us-east-1b",
+		InstanceState:     "running",
+		PrivateIPAddress:  "172.16.0.2",
+		PublicIPAddress:   "52.53.54.56",
+		NetworkInterfaces: []string{"eni-1234567890abcdef1"},
+		Tags: map[string]string{
+			"Name":        "instance-name-2",
+			"Environment": "prod",
+		},
+	}
 }
 
-// // TestResults_Search tests the Search function.
-// func TestResults_Search(t *testing.T) {
-// 	tests := []struct {
-// 		name    string
-// 		results *Results
-// 	}{
-// 		// TODO: Add test cases.
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			tt.results.Search()
-// 		})
-// 	}
-// }
-
-// TestResults_Len tests the Len function.
-func TestResults_Len(t *testing.T) {
+// TestResults_accessors tests Len and the BaseResults getters on a full and an empty result set.
+func TestResults_accessors(t *testing.T) {
 	tests := []struct {
-		name    string
-		results *Results
-		want    int
+		name          string
+		results       *Results
+		wantLen       int
+		wantProfile   string
+		wantRegion    string
+		wantSortField string
+		wantErrors    []string
 	}{
 		{
-			name:    "TestResults_Len",
-			results: mockResults(),
-			want:    2,
+			name: "two rows with errors", results: mockResults(),
+			wantLen:       2,
+			wantProfile:   "default",
+			wantRegion:    "us-east-1",
+			wantSortField: "id",
+			wantErrors:    []string{"error1", "error2"},
 		},
 		{
-			name:    "TestResults_Len_Empty",
-			results: mockResultsEmpty(),
-			want:    0,
+			name: "empty", results: mockResultsEmpty(),
+			wantLen:       0,
+			wantProfile:   "",
+			wantRegion:    "",
+			wantSortField: "",
+			wantErrors:    []string{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.results.Len(); got != tt.want {
-				t.Errorf("Results.Len()\n%#v\nwant\n%#v", got, tt.want)
+			r := tt.results
+			if got := r.Len(); got != tt.wantLen {
+				t.Errorf("Len() = %d, want %d", got, tt.wantLen)
 			}
-		})
-	}
-}
-
-// TestResults_GetProfile tests the GetProfile function.
-func TestResults_GetProfile(t *testing.T) {
-	tests := []struct {
-		name    string
-		results *Results
-		want    string
-	}{
-		{
-			name:    "TestResults_GetProfile",
-			results: mockResults(),
-			want:    "default",
-		},
-		{
-			name:    "TestResults_GetProfile_Empty",
-			results: mockResultsEmpty(),
-			want:    "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.results.GetProfile(); got != tt.want {
-				t.Errorf("Results.GetProfile()\n%#v\nwant\n%#v", got, tt.want)
+			if got := r.GetProfile(); got != tt.wantProfile {
+				t.Errorf("GetProfile() = %q, want %q", got, tt.wantProfile)
 			}
-		})
-	}
-}
-
-// TestResults_GetRegion tests the GetRegion function.
-func TestResults_GetRegion(t *testing.T) {
-	tests := []struct {
-		name    string
-		results *Results
-		want    string
-	}{
-		{
-			name:    "TestResults_GetRegion",
-			results: mockResults(),
-			want:    "us-east-1",
-		},
-		{
-			name:    "TestResults_GetRegion_Empty",
-			results: mockResultsEmpty(),
-			want:    "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.results.GetRegion(); got != tt.want {
-				t.Errorf("Results.GetRegion()\n%#v\nwant\n%#v", got, tt.want)
+			if got := r.GetRegion(); got != tt.wantRegion {
+				t.Errorf("GetRegion() = %q, want %q", got, tt.wantRegion)
 			}
-		})
-	}
-}
-
-// TestResults_GetErrors tests the GetErrors function.
-func TestResults_GetErrors(t *testing.T) {
-	tests := []struct {
-		name    string
-		results *Results
-		want    []string
-	}{
-		{
-			name:    "TestResults_GetErrors",
-			results: mockResults(),
-			want:    []string{"error1", "error2"},
-		},
-		{
-			name:    "TestResults_GetErrors_Empty",
-			results: mockResultsEmpty(),
-			want:    []string{},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.results.GetErrors(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Results.GetErrors()\n%#v\nwant\n%#v", got, tt.want)
+			if got := r.GetSortField(); got != tt.wantSortField {
+				t.Errorf("GetSortField() = %q, want %q", got, tt.wantSortField)
 			}
-		})
-	}
-}
-
-// TestResults_GetSortField tests the GetSortField function.
-func TestResults_GetSortField(t *testing.T) {
-	tests := []struct {
-		name    string
-		results *Results
-		want    string
-	}{
-		{
-			name:    "TestResults_GetSortField",
-			results: mockResults(),
-			want:    "id",
-		},
-		{
-			name:    "TestResults_GetSortField_Empty",
-			results: mockResultsEmpty(),
-			want:    "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.results.GetSortField(); got != tt.want {
-				t.Errorf("Results.GetSortField()\n%#v\nwant\n%#v", got, tt.want)
+			if got := r.GetErrors(); !reflect.DeepEqual(got, tt.wantErrors) {
+				t.Errorf("GetErrors() = %q, want %q", got, tt.wantErrors)
 			}
 		})
 	}
@@ -333,8 +234,8 @@ func TestResults_GetRows(t *testing.T) {
 			name:    "TestResults_GetRows",
 			results: mockResults(),
 			want: []interface{}{
-				*mockDataRow1,
-				*mockDataRow2,
+				mockDataRow1(),
+				mockDataRow2(),
 			},
 		},
 	}
@@ -394,35 +295,28 @@ func TestResults_getFilters(t *testing.T) {
 
 // TestResults_sortResults tests the sortResults function.
 func TestResults_sortResults(t *testing.T) {
-	type args struct {
-		field string
-	}
 	tests := []struct {
 		name    string
 		results *Results
-		args    args
+		field   string
 		wantErr bool
 	}{
 		{
 			name:    "type",
 			results: mockResults(),
-			args: args{
-				field: "type",
-			},
+			field:   "type",
 			wantErr: false,
 		},
 		{
 			name:    "invalid",
 			results: mockResults(),
-			args: args{
-				field: "invalid",
-			},
+			field:   "invalid",
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.results.sortResults(tt.args.field); (err != nil) != tt.wantErr {
+			if err := tt.results.sortResults(tt.field); (err != nil) != tt.wantErr {
 				t.Errorf("Results.sortResults() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -431,20 +325,15 @@ func TestResults_sortResults(t *testing.T) {
 
 // TestGetSortFields tests the getSortFields function.
 func TestGetSortFields(t *testing.T) {
-	type args struct {
-		f string
-	}
 	tests := []struct {
 		name    string
-		args    args
+		f       string
 		want    map[string]string
 		wantErr bool
 	}{
 		{
 			name: "TestGetSortFields",
-			args: args{
-				f: "id",
-			},
+			f:    "id",
 			want: map[string]string{
 				"id":         "InstanceID",
 				"name":       "InstanceName",
@@ -459,17 +348,15 @@ func TestGetSortFields(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "TestGetSortFields",
-			args: args{
-				f: "invalid",
-			},
+			name:    "TestGetSortFields",
+			f:       "invalid",
 			want:    nil,
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetSortFields(tt.args.f)
+			got, err := GetSortFields(tt.f)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetSortFields() error = %v, wantErr %v", err, tt.wantErr)
 				return
