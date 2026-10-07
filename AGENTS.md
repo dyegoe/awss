@@ -141,6 +141,9 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
   and run it with `runCLI` (`cmd/execute_test.go`). `resetCLI` rebuilds the commands, flags and
   Viper, because a reused pflag slice appends on the next parse. Never use `t.Parallel()` there:
   Cobra and Viper are global.
+- Tests must pass in any order and when run again (`go test -count=2 -shuffle=on ./...`). Never
+  share a mutable fixture between tests: return a fresh one from a function (`mockResults()` in
+  `search/vpc`), since some tests sort or change it in place.
 - Test files for output live in `common/output_test.go` — use `output_test_data.go` for fixtures.
 - Do not make real AWS API calls in tests.
 - Target ≥ 80% coverage per package.
