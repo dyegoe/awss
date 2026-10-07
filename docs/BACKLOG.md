@@ -14,26 +14,22 @@ Legend: [ ] to do · [~] in progress
 
 ## Testing
 
-Coverage per package as of 2026-10-07 (`go test -cover ./...`):
+Coverage per package as of 2026-10-07 (`make test`, which fails any package below 80%):
 
-| Package         | Coverage | Gap                                                          |
-| --------------- | -------: | ------------------------------------------------------------ |
-| `search/eni`    |    98.8% | —                                                            |
-| `search/vpc`    |    98.3% | —                                                            |
-| `search/ebs`    |    97.8% | —                                                            |
-| `search/subnet` |    97.8% | —                                                            |
-| `search/ec2`    |    97.5% | —                                                            |
-| `common`        |    93.5% | —                                                            |
-| `cmd`           |    92.0% | `Execute` (`os.Exit`), `BindPFlag` errors (unreachable)      |
-| `search/s3obj`  |    85.5% | —                                                            |
-| `search/s3`     |    80.8% | `Search()` (AWS config + client construction)                |
-| `search`        |    99.1% | deadline and search ending at the same instant (not forced)  |
-
-## Standards
-
-- [ ] [**Make the standards and guardrails explicit, mandatory and enforced.**](https://github.com/dyegoe/awss/issues/174)
-  One list of MUST rules in `AGENTS.md`, each with the linter, CI step or test that enforces it;
-  `docs/CODESTYLE.md` and `CONTRIBUTING.md` explain and link instead of restating.
+| Package             | Coverage | Gap                                                         |
+| ------------------- | -------: | ----------------------------------------------------------- |
+| `search/eni`        |    98.8% | —                                                           |
+| `search/vpc`        |    98.3% | —                                                           |
+| `search/ebs`        |    97.8% | —                                                           |
+| `search/subnet`     |    97.8% | —                                                           |
+| `search/ec2`        |    97.5% | —                                                           |
+| `common`            |    93.4% | —                                                           |
+| `internal/nesting`  |    92.4% | —                                                           |
+| `internal/testconv` |    90.1% | —                                                           |
+| `cmd`               |    92.0% | `Execute` (`os.Exit`), `BindPFlag` errors (unreachable)     |
+| `search/s3obj`      |    85.5% | —                                                           |
+| `search/s3`         |    80.8% | `Search()` (AWS config + client construction)               |
+| `search`            |    99.1% | deadline and search ending at the same instant (not forced) |
 
 ## Architecture
 
