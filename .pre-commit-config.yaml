@@ -17,8 +17,8 @@ repos:
         pass_filenames: false
       - id: go-unit-tests
         name: go test
-        description: golangci-lint only lints, it does not run tests, so this stays local.
-        entry: go test -race ./...
+        description: golangci-lint only lints, it does not run tests; make test is the CI test command.
+        entry: make test
         language: system
         types: [go]
         pass_filenames: false
