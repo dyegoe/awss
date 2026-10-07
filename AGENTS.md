@@ -32,6 +32,7 @@ search/vpc/          — VPC search logic and result type
 search/subnet/       — Subnet search logic, result type, and InCIDRs (overlapping subnets) lookup
 search/s3/           — S3 bucket search (per region, client-side name matching)
 search/s3obj/        — S3 object (key) search inside given buckets, capped by --max-keys
+internal/testconv/   — checks the test conventions of every package (run by its own test in CI)
 common/              — shared: Results interface, BaseResults, AWS helpers, filter builders,
                        output formatting, reflection row helpers (rows.go), Matcher (match.go), utilities
 ```
@@ -129,7 +130,21 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
 ## Testing conventions
 
 - Every package must have a `_test.go` file.
-- Use table-driven tests with named cases (`name string` as first field).
+- Test names and structure follow one convention (#173), checked in CI by `internal/testconv`
+  (`TestCheck_repository`) and the `thelper` linter. It mirrors the example naming rule of the
+  `testing` package and the Go wiki pages TableDrivenTests and CodeReviewComments:
+  - `Test<Subject>`, `Test<Type>_<Method>`, plus an optional `_<scenario>` in lowerCamel:
+    `TestExecute_timeout`, `TestResults_collect_badSortField`. The subject is an identifier of the
+    package, written as declared with its first letter capitalised (`parseSubnet` →
+    `TestParseSubnet`; an unexported method stays `TestResults_getFilters`). No `Test_` prefix.
+    The test of `main` is `TestMain_<scenario>`: a plain `TestMain` is reserved.
+  - Every test function has a doc comment saying what it checks. No commented-out tests.
+  - More than one case → a table: `tests := []struct{ name string; … }` with flat fields (no
+    gotests `args` struct), `for _, tt := range tests`, `t.Run(tt.name, …)`.
+  - Results are `got` and `want`; `t.Fatalf` for a failed precondition, `t.Errorf` for a mismatch.
+    A new failure message reads `Func(input) = got, want want`.
+  - One `TestResults_accessors` per search package covers `Len` and the `BaseResults` getters.
+  - Helpers call `t.Helper()` and take `t` first.
 - Mock AWS calls one of two ways, never with real credentials:
   - a package-level function variable that tests replace (`getAwsProfilesFn` in `common/aws.go`,
     `subnetsInCIDRs` in `search/ec2`, `executeSearch` in `cmd`);
@@ -143,8 +158,8 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
   and run it with `runCLI` (`cmd/execute_test.go`). `resetCLI` rebuilds the commands, flags and
   Viper, because a reused pflag slice appends on the next parse. Never use `t.Parallel()` there:
   Cobra and Viper are global.
-- Tests must pass in any order and when run again (`go test -count=2 -shuffle=on ./...`). Never
-  share a mutable fixture between tests: return a fresh one from a function (`mockResults()` in
+- Tests must pass in any order and when run again (`go test -count=2 -shuffle=on ./...`). No
+  package-level `var` in a test file: return a fresh fixture from a function (`mockResults()` in
   `search/vpc`), since some tests sort or change it in place.
 - Test files for output live in `common/output_test.go` — use `output_test_data.go` for fixtures.
 - Do not make real AWS API calls in tests.
