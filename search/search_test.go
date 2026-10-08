@@ -35,6 +35,9 @@ import (
 	"time"
 
 	"github.com/dyegoe/awss/common"
+	searchENI "github.com/dyegoe/awss/search/eni"
+	searchSubnet "github.com/dyegoe/awss/search/subnet"
+	searchVPC "github.com/dyegoe/awss/search/vpc"
 )
 
 // mockEngines swaps the registry for a single "test" engine and restores it after the test.
@@ -558,6 +561,29 @@ func TestWorkerCount(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := workerCount(tt.concurrency, tt.searches); got != tt.want {
 				t.Errorf("workerCount(%d, %d) = %d, want %d", tt.concurrency, tt.searches, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestEngines_accountNames checks that the searches with an Owner column receive the account
+// names of the run.
+func TestEngines_accountNames(t *testing.T) {
+	names := map[string]string{"111111111111": "network"}
+	opts := &Options{AccountNames: names}
+	tests := []struct {
+		name string
+		get  func(common.Results) map[string]string
+	}{
+		{name: "vpc", get: func(r common.Results) map[string]string { return r.(*searchVPC.Results).AccountNames }},
+		{name: "subnet", get: func(r common.Results) map[string]string { return r.(*searchSubnet.Results).AccountNames }},
+		{name: "eni", get: func(r common.Results) map[string]string { return r.(*searchENI.Results).AccountNames }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := engines[tt.name].new("default", "us-east-1", map[string][]string{}, opts)
+			if got := tt.get(r); !reflect.DeepEqual(got, names) {
+				t.Errorf("engines[%q].new AccountNames = %v, want %v", tt.name, got, names)
 			}
 		})
 	}

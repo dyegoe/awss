@@ -69,6 +69,11 @@ type Options struct {
 	// the search's default.
 	MaxBuckets int
 
+	// AccountNames maps an account ID to its name, for the Owner column of the searches that have
+	// one (vpc, subnet, eni). It is shared by every search of the run and only read. Nil means no
+	// names.
+	AccountNames map[string]string
+
 	// Concurrency is how many profile and region searches may run at once. Zero means
 	// DefaultConcurrency.
 	Concurrency int
@@ -113,7 +118,9 @@ var engines = map[string]engine{
 	},
 	"eni": {
 		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchENI.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
+			r := searchENI.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
+			r.AccountNames = opts.AccountNames
+			return r
 		},
 		sortFields:     searchENI.GetSortFields,
 		sortFieldNames: searchENI.SortFieldNames,
@@ -127,14 +134,18 @@ var engines = map[string]engine{
 	},
 	"vpc": {
 		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchVPC.New(profile, region, filters, opts.SortField)
+			r := searchVPC.New(profile, region, filters, opts.SortField)
+			r.AccountNames = opts.AccountNames
+			return r
 		},
 		sortFields:     searchVPC.GetSortFields,
 		sortFieldNames: searchVPC.SortFieldNames,
 	},
 	"subnet": {
 		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchSubnet.New(profile, region, filters, opts.SortField)
+			r := searchSubnet.New(profile, region, filters, opts.SortField)
+			r.AccountNames = opts.AccountNames
+			return r
 		},
 		sortFields:     searchSubnet.GetSortFields,
 		sortFieldNames: searchSubnet.SortFieldNames,

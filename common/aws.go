@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -76,11 +75,8 @@ func GetAwsProfiles() ([]string, error) {
 	}
 	profiles := []string{}
 	for _, section := range cfg.Sections() {
-		switch {
-		case section.Name() == "default":
-			profiles = append(profiles, "default")
-		case strings.HasPrefix(section.Name(), "profile "):
-			profiles = append(profiles, strings.TrimPrefix(section.Name(), "profile "))
+		if name, ok := profileName(section.Name()); ok {
+			profiles = append(profiles, name)
 		}
 	}
 	return profiles, nil

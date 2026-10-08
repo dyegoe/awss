@@ -354,6 +354,11 @@ func errorCases() []errorCase {
 			name: "timeout without unit in the config file", args: []string{"ec2", "--all"},
 			config: "timeout: 300\n", wantErr: "invalid timeout: 300",
 		},
+		{
+			name: "account ID listed twice in the config file", args: []string{"vpc", "--all"},
+			config:  "accounts:\n  \"111111111111\": a\n  \"111111111111\": b\n",
+			wantErr: `mapping key "111111111111" already defined`,
+		},
 		{name: "concurrency of 0", args: []string{"ec2", "--all", "--concurrency", "0"}, wantErr: "invalid concurrency: 0"},
 		{
 			name: "concurrency not a number in the config file", args: []string{"ec2", "--all"},
@@ -461,5 +466,89 @@ func TestExecute_version(t *testing.T) {
 
 	if err != nil || !strings.Contains(out, "awss version "+version) {
 		t.Errorf("--version = %q, %v; want the version", out, err)
+	}
+}
+
+// accountNamesCase is one table entry of TestExecute_accountNames.
+type accountNamesCase struct {
+	name      string
+	args      []string
+	awsConfig string
+	config    string
+	want      map[string]string
+	wantOut   string
+}
+
+// accountNamesCases are the runs of TestExecute_accountNames.
+func accountNamesCases() []accountNamesCase {
+	const awsConfig = "[profile network]\nsso_account_id = 111111111111\n" +
+		"[profile prod]\nrole_arn = arn:aws:iam::222222222222:role/ReadOnly\n"
+	return []accountNamesCase{
+		{
+			name: "profiles of the AWS config file", args: []string{"vpc", "--all"}, awsConfig: awsConfig,
+			want: map[string]string{"111111111111": "network", "222222222222": "prod"},
+		},
+		{
+			name: "the accounts map adds and overrides names", args: []string{"subnet", "--all"}, awsConfig: awsConfig,
+			config: "accounts:\n  \"111111111111\": Shared-Network\n  333333333333: tools\n",
+			want:   map[string]string{"111111111111": "Shared-Network", "222222222222": "prod", "333333333333": "tools"},
+		},
+		{
+			name: "an unquoted ID gets its leading zero back", args: []string{"eni", "--all"},
+			config: "accounts:\n  012345678901: zero\n",
+			want:   map[string]string{"012345678901": "zero"},
+		},
+		{
+			name: "an unusable entry is skipped with a warning", args: []string{"vpc", "--all"},
+			config:  "accounts:\n  prod: \"123456789012\"\n",
+			want:    nil,
+			wantOut: `awss: warning: accounts: "prod" is not a 12-digit account ID; ignored`,
+		},
+		{
+			name: "an unreadable AWS config file is a warning", args: []string{"vpc", "--all"},
+			awsConfig: "[profile unclosed\n",
+			want:      nil, wantOut: "awss: warning: no account names from the AWS config file",
+		},
+		{
+			name: "no AWS config file and no accounts map", args: []string{"vpc", "--all"},
+			want: nil,
+		},
+		{
+			name: "commands without an Owner column get no names", args: []string{"ec2", "--all"}, awsConfig: awsConfig,
+			config: "accounts:\n  \"333333333333\": tools\n",
+			want:   nil,
+		},
+	}
+}
+
+// TestExecute_accountNames checks the account names the vpc, subnet and eni commands pass to the
+// search: from the AWS config profiles, overridden by the accounts map of the awss config file,
+// none for the other commands, and the warnings printed for unusable entries.
+func TestExecute_accountNames(t *testing.T) {
+	for _, tt := range accountNamesCases() {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := resetCLI(t, nil)
+			if tt.awsConfig != "" {
+				useAwsConfig(t, tt.awsConfig)
+			}
+			args := tt.args
+			if tt.config != "" {
+				args = append([]string{"--config", writeConfig(t, tt.config)}, args...)
+			}
+
+			out, err := runCLI(t, args...)
+			if err != nil {
+				t.Fatalf("Execute(%v) error = %v, want nil", args, err)
+			}
+			if len(*calls) != 1 {
+				t.Fatalf("searches run = %d, want 1", len(*calls))
+			}
+			if got := (*calls)[0].opts.AccountNames; !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Execute(%v) AccountNames = %v, want %v", args, got, tt.want)
+			}
+			if tt.wantOut == "" && out != "" || !strings.Contains(out, tt.wantOut) {
+				t.Errorf("Execute(%v) output = %q, want %q", args, out, tt.wantOut)
+			}
+		})
 	}
 }

@@ -22,6 +22,8 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"time"
@@ -48,6 +50,7 @@ const (
 	labelAllProfiles    = "all-profiles"
 	labelTimeout        = "timeout"
 	labelConcurrency    = "concurrency"
+	labelAccounts       = "accounts"
 
 	// defaultTimeout is generous so --profiles all over many regions is not cut short.
 	defaultTimeout = 5 * time.Minute
@@ -380,6 +383,9 @@ type cmdSpec struct {
 
 	// filterFlags lists the filter flag names that cannot be combined with --all.
 	filterFlags []string
+
+	// accountNames is true for the commands with an Owner column, which get the account names.
+	accountNames bool
 }
 
 // boolLabel returns the viper bool at label, or false when label is empty.
@@ -416,6 +422,11 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 
 	tagsKeys := viper.GetStringSlice(labelTagsKeys)
 
+	var names map[string]string
+	if spec.accountNames {
+		names = accountNames(cmd.ErrOrStderr())
+	}
+
 	return executeSearch(
 		cmd.Name(),
 		viper.GetStringSlice(labelProfiles),
@@ -431,8 +442,31 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 			Regex:          boolLabel(spec.regexLabel),
 			MaxKeys:        intLabel(spec.maxKeysLabel),
 			MaxBuckets:     intLabel(spec.maxBucketsLabel),
+			AccountNames:   names,
 			Concurrency:    viper.GetInt(labelConcurrency),
 			Timeout:        viper.GetDuration(labelTimeout),
 		},
 	)
+}
+
+// accountNames returns the account names for the Owner column, keyed by account ID: the profiles
+// of the AWS config file, then the accounts map of the awss config file, which wins.
+//
+// Account names are optional, so nothing here fails the run: a problem is one warning on w. It
+// returns nil when no name was found.
+func accountNames(w io.Writer) map[string]string {
+	names, err := common.ProfileAccountNames()
+	if err != nil {
+		fmt.Fprintf(w, "awss: warning: no account names from the AWS config file: %v\n", err)
+		names = map[string]string{}
+	}
+	configured, warnings := common.ConfiguredAccountNames(viper.Get(labelAccounts))
+	for _, warning := range warnings {
+		fmt.Fprintf(w, "awss: warning: %s\n", warning)
+	}
+	maps.Copy(names, configured)
+	if len(names) == 0 {
+		return nil
+	}
+	return names
 }

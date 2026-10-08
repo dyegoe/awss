@@ -609,7 +609,7 @@ func TestResults_collect_badSortField(t *testing.T) {
 
 // TestSortFieldNames tests that every sort tag of eniInfo is listed.
 func TestSortFieldNames(t *testing.T) {
-	want := []string{"az", "id", "instance-id", "instance-name", "owner", "status", "subnet-id", "type"}
+	want := []string{"az", "id", "instance-id", "instance-name", "owner", "owner-name", "status", "subnet-id", "type"}
 	if got := SortFieldNames(); !reflect.DeepEqual(got, want) {
 		t.Errorf("SortFieldNames() = %v, want %v", got, want)
 	}
@@ -675,6 +675,46 @@ func TestResults_collectENIs_pageSize(t *testing.T) {
 			}
 			if tt.input.MaxResults != nil {
 				t.Errorf("collectENIs changed the caller's input")
+			}
+		})
+	}
+}
+
+// TestResults_collect_ownerNames checks that a known owner gets its name from AccountNames, that
+// an unknown owner keeps only its ID, and that no map means no names.
+func TestResults_collect_ownerNames(t *testing.T) {
+	owned := func(id, owner string) types.NetworkInterface {
+		i := iface(id, "")
+		i.OwnerId = aws.String(owner)
+		return i
+	}
+	tests := []struct {
+		name  string
+		names map[string]string
+		want  []string
+	}{
+		{
+			name: "known and unknown owners", names: map[string]string{"111111111111": "network"},
+			want: []string{"network", ""},
+		},
+		{name: "no account names", names: nil, want: []string{"", ""}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := New("default", "us-east-1", nil, "id", true)
+			r.AccountNames = tt.names
+			client := &fakeEC2{eniPages: [][]types.NetworkInterface{
+				{owned("eni-a", "111111111111"), owned("eni-b", "222222222222")},
+			}}
+
+			r.collect(context.Background(), client, &ec2.DescribeNetworkInterfacesInput{})
+
+			got := []string{}
+			for i := range r.Data {
+				got = append(got, r.Data[i].InterfaceInfo.OwnerName)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("OwnerName of the rows = %q, want %q", got, tt.want)
 			}
 		})
 	}

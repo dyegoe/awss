@@ -45,6 +45,10 @@ type Results struct {
 
 	// NoInstanceName skips the instance name lookup when true.
 	NoInstanceName bool `json:"-"`
+
+	// AccountNames maps an account ID to its name, for the Owner column. It is built once per run
+	// and shared by every search of the run, so it is only read.
+	AccountNames map[string]string `json:"-"`
 }
 
 // dataRow represents a row of the ENIs search results.
@@ -87,6 +91,9 @@ type eniInfo struct {
 
 	// OwnerID is the ID of the AWS account that owns the network interface.
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
+
+	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
+	OwnerName string `json:"owner_name,omitempty" header:"Owner" sort:"owner-name"`
 
 	// RequesterID is the account or service that created the network interface (JSON output only).
 	RequesterID string `json:"requester_id,omitempty"`
@@ -186,6 +193,7 @@ func (r *Results) collectENIs(
 		}
 		for i := range page.NetworkInterfaces {
 			row := parseENIRow(&page.NetworkInterfaces[i])
+			row.InterfaceInfo.OwnerName = r.AccountNames[row.InterfaceInfo.OwnerID]
 			r.Data = append(r.Data, row)
 			if row.InterfaceInfo.InstanceID != "" {
 				instanceIDs = append(instanceIDs, row.InterfaceInfo.InstanceID)

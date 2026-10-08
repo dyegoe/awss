@@ -49,6 +49,10 @@ type Results struct {
 
 	// Filters is a map of strings used to search.
 	Filters map[string][]string `json:"-"`
+
+	// AccountNames maps an account ID to its name, for the Owner column. It is built once per run
+	// and shared by every search of the run, so it is only read.
+	AccountNames map[string]string `json:"-"`
 }
 
 // dataRow represents a row of the VPCs search results.
@@ -73,6 +77,9 @@ type dataRow struct {
 
 	// OwnerID is the ID of the AWS account that owns the VPC.
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
+
+	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
+	OwnerName string `json:"owner_name,omitempty" header:"Owner" sort:"owner-name"`
 
 	// DhcpOptionsID is the ID of the DHCP options set associated with the VPC.
 	DhcpOptionsID string `json:"dhcp_options_id,omitempty" header:"DHCP Options ID" sort:"dhcp"`
@@ -138,7 +145,9 @@ func (r *Results) collect(ctx context.Context, client ec2.DescribeVpcsAPIClient,
 			return
 		}
 		for i := range page.Vpcs {
-			r.Data = append(r.Data, parseVpc(&page.Vpcs[i]))
+			row := parseVpc(&page.Vpcs[i])
+			row.OwnerName = r.AccountNames[row.OwnerID]
+			r.Data = append(r.Data, row)
 		}
 	}
 

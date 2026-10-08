@@ -51,6 +51,10 @@ type Results struct {
 
 	// Filters is a map of strings used to search.
 	Filters map[string][]string `json:"-"`
+
+	// AccountNames maps an account ID to its name, for the Owner column. It is built once per run
+	// and shared by every search of the run, so it is only read.
+	AccountNames map[string]string `json:"-"`
 }
 
 // dataRow represents a row of the subnets search results.
@@ -84,6 +88,9 @@ type dataRow struct {
 
 	// OwnerID is the ID of the AWS account that owns the subnet.
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
+
+	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
+	OwnerName string `json:"owner_name,omitempty" header:"Owner" sort:"owner-name"`
 
 	// Tags are the tags assigned to the subnet.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
@@ -146,7 +153,9 @@ func (r *Results) collect(ctx context.Context, client ec2.DescribeSubnetsAPIClie
 			return
 		}
 		for i := range page.Subnets {
-			r.Data = append(r.Data, parseSubnet(&page.Subnets[i]))
+			row := parseSubnet(&page.Subnets[i])
+			row.OwnerName = r.AccountNames[row.OwnerID]
+			r.Data = append(r.Data, row)
 		}
 	}
 
