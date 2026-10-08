@@ -112,6 +112,7 @@ reviewer and the author own it. **SHOULD** rules may be broken with a reason in 
 |---|---|
 | Work on an issue happens on an issue-numbered branch and lands through a pull request; never commit to `main`. | branch protection on `main`, review |
 | Commit messages follow Conventional Commits (see Commit message format). | `cz check` (CI `check-commits`, `commit-msg` hook) |
+| A pull request title follows Conventional Commits: the squash merge makes it the commit on `main`. | `cz check` (CI `PR title`) |
 | Pull requests are squash-merged; agents open them and never merge. | repository settings, review |
 | A change to authentication, profiles or shared VPCs carries the exact `awss` commands for the real AWS check in its pull request (see Changes that need a real AWS check). | review |
 | A new flag, command, sort field or config key appears in `README.md`. | review |
