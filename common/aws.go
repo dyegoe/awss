@@ -87,20 +87,27 @@ func GetAwsProfiles() ([]string, error) {
 }
 
 // TagName returns the value of the tag:Name from a slice of types.Tag.
+//
+// A tag with a nil key is skipped, and a nil value reads as "".
 func TagName(tags []types.Tag) string {
 	for _, tag := range tags {
-		if *tag.Key == "Name" {
-			return *tag.Value
+		if aws.ToString(tag.Key) == "Name" {
+			return aws.ToString(tag.Value)
 		}
 	}
 	return ""
 }
 
 // TagsToMap takes a slice of types.Tag and returns a map of tags and values.
+//
+// A tag with a nil key is skipped, as in S3TagsToMap, and a nil value reads as "".
 func TagsToMap(tags []types.Tag) map[string]string {
 	data := map[string]string{}
 	for _, t := range tags {
-		data[*t.Key] = *t.Value
+		if t.Key == nil {
+			continue
+		}
+		data[*t.Key] = aws.ToString(t.Value)
 	}
 	return data
 }

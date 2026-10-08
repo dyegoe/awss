@@ -274,6 +274,16 @@ func TestTagName(t *testing.T) {
 			tags: []types.Tag{{Key: aws.String("Environment"), Value: aws.String("value")}},
 			want: "",
 		},
+		{
+			name: "nil key skipped",
+			tags: []types.Tag{{Value: aws.String("orphan")}, {Key: aws.String("Name"), Value: aws.String("value")}},
+			want: "value",
+		},
+		{
+			name: "Name with a nil value",
+			tags: []types.Tag{{Key: aws.String("Name")}},
+			want: "",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -308,6 +318,11 @@ func TestTagsToMap(t *testing.T) {
 				{Key: aws.String("Environment"), Value: aws.String("value2")},
 			},
 			want: map[string]string{"Name": "value", "Environment": "value2"},
+		},
+		{
+			name: "nil key skipped, nil value empty",
+			tags: []types.Tag{{Value: aws.String("orphan")}, {Key: aws.String("Empty")}},
+			want: map[string]string{"Empty": ""},
 		},
 	}
 	for _, tt := range tests {
