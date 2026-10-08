@@ -86,9 +86,10 @@ func subnetRunE(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	return runSearch(cmd, &cmdSpec{
-		allLabel:    labelSubnetAll,
-		sortLabel:   labelSubnetSort,
-		filterFlags: subnetFilterFlags,
+		allLabel:     labelSubnetAll,
+		sortLabel:    labelSubnetSort,
+		filterFlags:  subnetFilterFlags,
+		accountNames: true,
 	}, subnetF.AvailabilityZones, subnetF.Tags, subnetF)
 }
 

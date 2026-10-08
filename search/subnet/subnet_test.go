@@ -115,7 +115,7 @@ func TestResults_accessors(t *testing.T) {
 	}
 	wantHeaders := []interface{}{
 		"ID", "Name", "VPC ID", "CIDR", "AZ", "Available IPs", "State",
-		"Public IP on Launch", "Default for AZ", "Owner ID", "Tags",
+		"Public IP on Launch", "Default for AZ", "Owner ID", "Owner", "Tags",
 	}
 	if got := r.GetHeaders(); !reflect.DeepEqual(got, wantHeaders) {
 		t.Errorf("GetHeaders()\n%#v\nwant\n%#v", got, wantHeaders)
@@ -275,7 +275,7 @@ func TestGetSortFields(t *testing.T) {
 	want := map[string]string{
 		"id": "SubnetID", "name": "Name", "vpc-id": "VpcID", "cidr": "CidrBlock", "az": "AvailabilityZone",
 		"available-ips": "AvailableIPs", "state": "State", "public-ip": "MapPublicIP",
-		"default": "DefaultForAz", "owner": "OwnerID",
+		"default": "DefaultForAz", "owner": "OwnerID", "owner-name": "OwnerName",
 	}
 	got, err := GetSortFields("id")
 	if err != nil {
@@ -287,7 +287,9 @@ func TestGetSortFields(t *testing.T) {
 	if _, err := GetSortFields("invalid"); err == nil {
 		t.Error("GetSortFields(invalid) error = nil, want error")
 	}
-	wantNames := []string{"available-ips", "az", "cidr", "default", "id", "name", "owner", "public-ip", "state", "vpc-id"}
+	wantNames := []string{
+		"available-ips", "az", "cidr", "default", "id", "name", "owner", "owner-name", "public-ip", "state", "vpc-id",
+	}
 	if names := SortFieldNames(); !reflect.DeepEqual(names, wantNames) {
 		t.Errorf("SortFieldNames() = %v, want %v", names, wantNames)
 	}
@@ -555,5 +557,45 @@ func TestInCIDRs_empty(t *testing.T) {
 	subnets, vpcs, err := InCIDRs(context.Background(), "awss-test-missing-profile", "us-east-1", nil)
 	if err != nil || !reflect.DeepEqual(subnets, []string{}) || !reflect.DeepEqual(vpcs, []string{}) {
 		t.Errorf("InCIDRs(nil) = %v, %v, %v; want empty, empty, nil", subnets, vpcs, err)
+	}
+}
+
+// TestResults_collect_ownerNames checks that a known owner gets its name from AccountNames, that
+// an unknown owner keeps only its ID, and that no map means no names.
+func TestResults_collect_ownerNames(t *testing.T) {
+	owned := func(id, owner string) types.Subnet {
+		s := subnet(id, "vpc-1", "10.0.0.0/24")
+		s.OwnerId = aws.String(owner)
+		return s
+	}
+	tests := []struct {
+		name  string
+		names map[string]string
+		want  []string
+	}{
+		{
+			name: "known and unknown owners", names: map[string]string{"111111111111": "network"},
+			want: []string{"network", ""},
+		},
+		{name: "no account names", names: nil, want: []string{"", ""}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := New("default", "us-east-1", nil, "id")
+			r.AccountNames = tt.names
+			client := &fakeDescribeSubnets{
+				pages: [][]types.Subnet{{owned("subnet-a", "111111111111"), owned("subnet-b", "222222222222")}},
+			}
+
+			r.collect(context.Background(), client, &ec2.DescribeSubnetsInput{})
+
+			got := []string{}
+			for i := range r.Data {
+				got = append(got, r.Data[i].OwnerName)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("OwnerName of the rows = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

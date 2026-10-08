@@ -78,6 +78,7 @@ func eniRunE(cmd *cobra.Command, _ []string) error {
 		sortLabel:           labelEniSort,
 		noInstanceNameLabel: labelEniNoInstanceName,
 		filterFlags:         eniFilterFlags,
+		accountNames:        true,
 	}, eniF.AvailabilityZones, eniF.Tags, eniF)
 }
 

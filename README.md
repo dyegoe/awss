@@ -15,6 +15,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Restrict which tag keys are shown in table output: `--show-tags-keys Name,Environment` (implies `--show-tags`)
 - Timeout: `--timeout 90s` (default `5m`, `0` disables it); see [Common behavior](#common-behavior)
 - Concurrency: `--concurrency 8` (default `32`), how many profile and region searches run at once
+- Account names next to owner account IDs, from the `accounts` map of the config file; see [Account names](#account-names)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
 
@@ -74,14 +75,15 @@ Filter by:
 | `--public-ips` | `-P` | Public IP addresses |
 | `--owner-ids` | `-o` | Owner account IDs |
 
-Sort by: `--sort id|type|az|status|subnet-id|instance-id|instance-name|owner` (default: `id`)
+Sort by: `--sort id|type|az|status|subnet-id|instance-id|instance-name|owner|owner-name` (default: `id`)
 
 Additional flags:
 
 - `--no-instance-name` -- skip instance name lookup for faster results
 
-The table shows the owner account of each ENI, which tells ENIs of other accounts apart in a
-shared VPC. The JSON output also carries `requester_id` and `requester_managed`, which identify
+The table shows the owner account of each ENI, with its name (see
+[Account names](#account-names)), which tells ENIs of other accounts apart in a shared VPC.
+The JSON output also carries `requester_id` and `requester_managed`, which identify
 ENIs created by AWS services (Lambda, EKS, VPC endpoints, NAT gateways). Instance names of ENIs
 owned by another account stay empty: look them up with that account's profile.
 
@@ -123,7 +125,7 @@ Filter by:
 | `--default` | `-d` | Default VPC (`true`, `false`) |
 | `--owner-ids` | `-o` | Owner account IDs |
 
-Sort by: `--sort id|name|cidr|cidrs|state|default|owner|dhcp` (default: `name`)
+Sort by: `--sort id|name|cidr|cidrs|state|default|owner|owner-name|dhcp` (default: `name`)
 
 #### Subnets (`awss subnet`)
 
@@ -143,7 +145,7 @@ Filter by:
 | `--default-for-az` | `-d` | Default subnet of its AZ (`true`, `false`) |
 | `--public-ip-on-launch` | `-p` | Instances get a public IP on launch (`true`, `false`) |
 
-Sort by: `--sort id|name|vpc-id|cidr|az|available-ips|state|public-ip|default|owner` (default: `name`)
+Sort by: `--sort id|name|vpc-id|cidr|az|available-ips|state|public-ip|default|owner|owner-name` (default: `name`)
 
 #### S3 buckets (`awss s3`)
 
@@ -216,6 +218,26 @@ costs up to `--max-keys` / 1000 calls; use S3 Inventory with Athena, or S3 Stora
   `search did not start before the <duration> timeout`; raise `--timeout` or `--concurrency`.
   The value must be 1 or more. Set it in the config file with `concurrency:`.
 
+### Account names
+
+`vpc`, `subnet` and `eni` show an **Owner** column (JSON `owner_name`, sort field `owner-name`)
+next to **Owner ID**: the name of the account, which matters in a shared VPC, where the owner is
+usually a network account. The names come from the `accounts` map of `~/.awss/config.yaml`, from
+account ID to name, with no AWS call:
+
+```yaml
+accounts:
+  "123456789012": network-prd
+  "012345678901": Shared-Services
+```
+
+- Quote the IDs: an unquoted ID is read as a number and loses its leading zeros (awss restores
+  them, since account IDs have 12 digits).
+- An entry that is not an account ID, or has no name, is skipped with a warning on stderr. An ID
+  listed twice is a YAML error: the config file does not load.
+- An account not in the map leaves **Owner** empty. Profile names of the AWS config file are not
+  used: a profile name such as `admins-network-prd` names a role in an account, not the account.
+
 ## Installation
 
 Download the binary for your platform (Linux and macOS, amd64 and arm64) from the
@@ -283,6 +305,7 @@ regions:
 output: table
 timeout: 5m           # --timeout; a duration with a unit (90s, 5m), 0 disables it
 concurrency: 32       # --concurrency; profile and region searches running at once, 1 or more
+accounts: {}          # account ID -> name for the Owner column; see Account names
 show:
   empty: false        # --show-empty
   tags: false         # --show-tags
