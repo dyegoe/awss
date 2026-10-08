@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
 	"time"
@@ -449,22 +448,16 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 	)
 }
 
-// accountNames returns the account names for the Owner column, keyed by account ID: the profiles
-// of the AWS config file, then the accounts map of the awss config file, which wins.
+// accountNames returns the account names for the Owner column, keyed by account ID, from the
+// accounts map of the awss config file.
 //
-// Account names are optional, so nothing here fails the run: a problem is one warning on w. It
-// returns nil when no name was found.
+// Account names are optional, so nothing here fails the run: an unusable entry is one warning on
+// w. It returns nil when no name was found.
 func accountNames(w io.Writer) map[string]string {
-	names, err := common.ProfileAccountNames()
-	if err != nil {
-		fmt.Fprintf(w, "awss: warning: no account names from the AWS config file: %v\n", err)
-		names = map[string]string{}
-	}
-	configured, warnings := common.ConfiguredAccountNames(viper.Get(labelAccounts))
+	names, warnings := common.ConfiguredAccountNames(viper.Get(labelAccounts))
 	for _, warning := range warnings {
 		fmt.Fprintf(w, "awss: warning: %s\n", warning)
 	}
-	maps.Copy(names, configured)
 	if len(names) == 0 {
 		return nil
 	}

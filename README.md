@@ -15,7 +15,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Restrict which tag keys are shown in table output: `--show-tags-keys Name,Environment` (implies `--show-tags`)
 - Timeout: `--timeout 90s` (default `5m`, `0` disables it); see [Common behavior](#common-behavior)
 - Concurrency: `--concurrency 8` (default `32`), how many profile and region searches run at once
-- Account names next to owner account IDs, from your AWS config file; see [Account names](#account-names)
+- Account names next to owner account IDs, from the `accounts` map of the config file; see [Account names](#account-names)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
 
@@ -82,7 +82,8 @@ Additional flags:
 - `--no-instance-name` -- skip instance name lookup for faster results
 
 The table shows the owner account of each ENI, with its name (see
-[Account names](#account-names)), which tells ENIs of other accounts apart in a shared VPC. The JSON output also carries `requester_id` and `requester_managed`, which identify
+[Account names](#account-names)), which tells ENIs of other accounts apart in a shared VPC.
+The JSON output also carries `requester_id` and `requester_managed`, which identify
 ENIs created by AWS services (Lambda, EKS, VPC endpoints, NAT gateways). Instance names of ENIs
 owned by another account stay empty: look them up with that account's profile.
 
@@ -221,30 +222,21 @@ costs up to `--max-keys` / 1000 calls; use S3 Inventory with Athena, or S3 Stora
 
 `vpc`, `subnet` and `eni` show an **Owner** column (JSON `owner_name`, sort field `owner-name`)
 next to **Owner ID**: the name of the account, which matters in a shared VPC, where the owner is
-usually a network account. The names come from files you already have, with no AWS call:
+usually a network account. The names come from the `accounts` map of `~/.awss/config.yaml`, from
+account ID to name, with no AWS call:
 
-1. **The AWS config file** (`AWS_CONFIG_FILE`, else `~/.aws/config`). A profile names its account
-   with `role_arn` (the account inside the ARN), `sso_account_id`, or `granted_sso_account_id`
-   ([Granted](https://granted.dev)). The name is the profile name. When several profiles point
-   to one account (one per role), the first in alphabetical order is used.
-2. **The `accounts` map of `~/.awss/config.yaml`**, from account ID to name. It adds accounts
-   you have no profile for, such as the network account that owns shared subnets, and it wins
-   over a profile name:
+```yaml
+accounts:
+  "123456789012": network-prd
+  "012345678901": Shared-Services
+```
 
-   ```yaml
-   accounts:
-     "123456789012": network-prod
-     "012345678901": Shared-Services
-   ```
-
-   Quote the IDs: an unquoted ID is read as a number and loses its leading zeros (awss restores
-   them, since account IDs have 12 digits). An entry that is not an account ID, or has no name,
-   is skipped with a warning on stderr. An ID listed twice is a YAML error: the config file does
-   not load.
-
-Both are optional. An account with no name leaves **Owner** empty, and a missing or unreadable
-AWS config file never fails a search: it only gives fewer names (an unreadable one prints a
-warning on stderr).
+- Quote the IDs: an unquoted ID is read as a number and loses its leading zeros (awss restores
+  them, since account IDs have 12 digits).
+- An entry that is not an account ID, or has no name, is skipped with a warning on stderr. An ID
+  listed twice is a YAML error: the config file does not load.
+- An account not in the map leaves **Owner** empty. Profile names of the AWS config file are not
+  used: a profile name such as `admins-network-prd` names a role in an account, not the account.
 
 ## Installation
 

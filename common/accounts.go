@@ -17,107 +17,13 @@ limitations under the License.
 package common
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"sort"
 	"strings"
-
-	"gopkg.in/ini.v1"
 )
 
 // accountIDLength is the number of digits of an AWS account ID.
 const accountIDLength = 12
-
-// accountIDKeys are the AWS config file keys that name a profile's account, in the order they are
-// read. role_arn comes first: in a chained profile it is the account the profile ends up in.
-var accountIDKeys = []string{"role_arn", "sso_account_id", "granted_sso_account_id"}
-
-// ProfileAccountNames returns the account names found in the AWS config file (see awsConfigFile),
-// keyed by account ID. The name of an account is the name of a profile that points to it.
-//
-// A profile names its account in role_arn (the account inside the ARN), sso_account_id or, for
-// Granted, granted_sso_account_id. A profile with none of them is skipped. When several profiles
-// point to the same account, the first in alphabetical order wins.
-//
-// A missing file gives an empty map and no error: account names are optional. A file that
-// exists but cannot be read gives an error.
-func ProfileAccountNames() (map[string]string, error) {
-	path := awsConfigFile()
-	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
-		return map[string]string{}, nil
-	}
-	cfg, err := ini.Load(path)
-	if err != nil {
-		return nil, fmt.Errorf("reading the AWS config file: %w", err)
-	}
-
-	type profile struct{ name, id string }
-	profiles := []profile{}
-	for _, section := range cfg.Sections() {
-		name, ok := profileName(section.Name())
-		if !ok {
-			continue
-		}
-		if id := sectionAccountID(section); id != "" {
-			profiles = append(profiles, profile{name: name, id: id})
-		}
-	}
-	sort.Slice(profiles, func(i, j int) bool { return profiles[i].name < profiles[j].name })
-
-	names := map[string]string{}
-	for _, p := range profiles {
-		if _, taken := names[p.id]; !taken {
-			names[p.id] = p.name
-		}
-	}
-	return names, nil
-}
-
-// profileName returns the profile name of an AWS config file section: "default" for the bare
-// [default] section, and the name after "profile " for named profiles.
-func profileName(section string) (string, bool) {
-	switch {
-	case section == "default":
-		return "default", true
-	case strings.HasPrefix(section, "profile "):
-		return strings.TrimPrefix(section, "profile "), true
-	}
-	return "", false
-}
-
-// sectionAccountID returns the account ID a profile section points to, or "" when it names none.
-func sectionAccountID(section *ini.Section) string {
-	for _, key := range accountIDKeys {
-		if !section.HasKey(key) {
-			continue
-		}
-		value := strings.TrimSpace(section.Key(key).String())
-		if key == "role_arn" {
-			value = arnAccountID(value)
-		}
-		if isAccountID(value) {
-			return value
-		}
-	}
-	return ""
-}
-
-// arnAccountID returns the account field of an ARN (arn:partition:service:region:account:resource),
-// or "" when s is not an ARN.
-func arnAccountID(s string) string {
-	parts := strings.Split(s, ":")
-	if len(parts) < 6 || parts[0] != "arn" {
-		return ""
-	}
-	return parts[4]
-}
-
-// isAccountID reports whether s is a 12-digit AWS account ID.
-func isAccountID(s string) bool {
-	return len(s) == accountIDLength && isDigits(s)
-}
 
 // isDigits reports whether s is a non-empty string of ASCII digits.
 func isDigits(s string) bool {
