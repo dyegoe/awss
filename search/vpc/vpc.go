@@ -153,12 +153,12 @@ func (r *Results) collect(ctx context.Context, client ec2.DescribeVpcsAPIClient,
 // parseVpc converts a single Vpc into a dataRow.
 func parseVpc(vpc *types.Vpc) dataRow {
 	row := dataRow{
-		VpcID:         common.StringValue(vpc.VpcId),
+		VpcID:         aws.ToString(vpc.VpcId),
 		Name:          common.TagName(vpc.Tags),
-		CidrBlock:     common.StringValue(vpc.CidrBlock),
+		CidrBlock:     aws.ToString(vpc.CidrBlock),
 		State:         string(vpc.State),
-		OwnerID:       common.StringValue(vpc.OwnerId),
-		DhcpOptionsID: common.StringValue(vpc.DhcpOptionsId),
+		OwnerID:       aws.ToString(vpc.OwnerId),
+		DhcpOptionsID: aws.ToString(vpc.DhcpOptionsId),
 		Tags:          common.TagsToMap(vpc.Tags),
 	}
 	if vpc.IsDefault != nil {

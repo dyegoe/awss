@@ -87,20 +87,27 @@ func GetAwsProfiles() ([]string, error) {
 }
 
 // TagName returns the value of the tag:Name from a slice of types.Tag.
+//
+// A tag with a nil key is skipped, and a nil value reads as "".
 func TagName(tags []types.Tag) string {
 	for _, tag := range tags {
-		if *tag.Key == "Name" {
-			return *tag.Value
+		if aws.ToString(tag.Key) == "Name" {
+			return aws.ToString(tag.Value)
 		}
 	}
 	return ""
 }
 
 // TagsToMap takes a slice of types.Tag and returns a map of tags and values.
+//
+// A tag with a nil key is skipped, as in S3TagsToMap, and a nil value reads as "".
 func TagsToMap(tags []types.Tag) map[string]string {
 	data := map[string]string{}
 	for _, t := range tags {
-		data[*t.Key] = *t.Value
+		if t.Key == nil {
+			continue
+		}
+		data[*t.Key] = aws.ToString(t.Value)
 	}
 	return data
 }
@@ -114,7 +121,7 @@ func S3TagsToMap(tags []s3types.Tag) map[string]string {
 		if t.Key == nil {
 			continue
 		}
-		data[*t.Key] = StringValue(t.Value)
+		data[*t.Key] = aws.ToString(t.Value)
 	}
 	return data
 }
@@ -126,7 +133,7 @@ func FilterNames(names []string) []types.Filter {
 	}
 	return []types.Filter{
 		{
-			Name:   String("tag:Name"),
+			Name:   aws.String("tag:Name"),
 			Values: names,
 		},
 	}
@@ -145,7 +152,7 @@ func FilterTags(tags []string) ([]types.Filter, error) {
 	filters := []types.Filter{}
 	for key, values := range parsed {
 		filters = append(filters, types.Filter{
-			Name:   String(fmt.Sprintf("tag:%s", key)),
+			Name:   aws.String(fmt.Sprintf("tag:%s", key)),
 			Values: values,
 		})
 	}
@@ -173,7 +180,7 @@ func FilterAvailabilityZones(availabilityZones []string, region string) []types.
 	}
 	return []types.Filter{
 		{
-			Name:   String("availability-zone"),
+			Name:   aws.String("availability-zone"),
 			Values: azs,
 		},
 	}
@@ -298,7 +305,7 @@ func FilterDefault(key string, values []string) []types.Filter {
 	}
 	return []types.Filter{
 		{
-			Name:   String(key),
+			Name:   aws.String(key),
 			Values: values,
 		},
 	}

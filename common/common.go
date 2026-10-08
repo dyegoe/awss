@@ -115,19 +115,6 @@ func CIDRsOverlap(a, b *net.IPNet) bool {
 	return a.Contains(b.IP) || b.Contains(a.IP)
 }
 
-// StringValue returns an empty string if the pointer is nil.
-func StringValue(s *string) string {
-	if s != nil {
-		return *s
-	}
-	return ""
-}
-
-// String returns a pointer to a string.
-func String(s string) *string {
-	return &s
-}
-
 // StringInSlice returns true if the string is in the slice.
 func StringInSlice(s string, slice []string) bool {
 	for _, v := range slice {

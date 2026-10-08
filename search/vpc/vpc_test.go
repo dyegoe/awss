@@ -206,18 +206,18 @@ func TestParseVpc(t *testing.T) {
 		{
 			name: "all fields",
 			vpc: types.Vpc{
-				VpcId:         common.String("vpc-1"),
-				CidrBlock:     common.String("10.0.0.0/16"),
+				VpcId:         aws.String("vpc-1"),
+				CidrBlock:     aws.String("10.0.0.0/16"),
 				State:         types.VpcStateAvailable,
 				IsDefault:     &isDefault,
-				OwnerId:       common.String("123456789012"),
-				DhcpOptionsId: common.String("dopt-1"),
+				OwnerId:       aws.String("123456789012"),
+				DhcpOptionsId: aws.String("dopt-1"),
 				CidrBlockAssociationSet: []types.VpcCidrBlockAssociation{
-					{CidrBlock: common.String("10.0.0.0/16")},
+					{CidrBlock: aws.String("10.0.0.0/16")},
 					{CidrBlock: nil},
-					{CidrBlock: common.String("10.1.0.0/16")},
+					{CidrBlock: aws.String("10.1.0.0/16")},
 				},
-				Tags: []types.Tag{{Key: common.String("Name"), Value: common.String("prod")}},
+				Tags: []types.Tag{{Key: aws.String("Name"), Value: aws.String("prod")}},
 			},
 			want: dataRow{
 				VpcID:         "vpc-1",
@@ -322,13 +322,13 @@ func (f *fakeDescribeVpcs) DescribeVpcs(
 		out.Vpcs = f.pages[page]
 	}
 	if page < len(f.pages)-1 {
-		out.NextToken = common.String(fmt.Sprint(page + 1))
+		out.NextToken = aws.String(fmt.Sprint(page + 1))
 	}
 	return out, nil
 }
 
 // vpc returns a VPC with the given ID.
-func vpc(id string) types.Vpc { return types.Vpc{VpcId: common.String(id)} }
+func vpc(id string) types.Vpc { return types.Vpc{VpcId: aws.String(id)} }
 
 // collectCase is one table entry of TestResults_collect.
 type collectCase struct {

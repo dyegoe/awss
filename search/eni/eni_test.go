@@ -276,11 +276,11 @@ func TestResults_getFilters(t *testing.T) {
 			want: &ec2.DescribeNetworkInterfacesInput{
 				NetworkInterfaceIds: []string{"eni-1234567890abcdef0"},
 				Filters: []types.Filter{
-					{Name: common.String("tag:key"), Values: []string{"value", "value3"}},
-					{Name: common.String("tag:key2"), Values: []string{"value2"}},
-					{Name: common.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b"}},
-					{Name: common.String("private-ip-address"), Values: []string{"172.16.0.1"}},
-					{Name: common.String("owner-id"), Values: []string{"123456789012"}},
+					{Name: aws.String("tag:key"), Values: []string{"value", "value3"}},
+					{Name: aws.String("tag:key2"), Values: []string{"value2"}},
+					{Name: aws.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b"}},
+					{Name: aws.String("private-ip-address"), Values: []string{"172.16.0.1"}},
+					{Name: aws.String("owner-id"), Values: []string{"123456789012"}},
 				},
 			},
 		},
@@ -355,9 +355,9 @@ func TestParseENIRow(t *testing.T) {
 		{
 			name: "owner and requester",
 			eni: &types.NetworkInterface{
-				NetworkInterfaceId: common.String("eni-1"),
-				OwnerId:            common.String("111111111111"),
-				RequesterId:        common.String("AROAEXAMPLE:lambda"),
+				NetworkInterfaceId: aws.String("eni-1"),
+				OwnerId:            aws.String("111111111111"),
+				RequesterId:        aws.String("AROAEXAMPLE:lambda"),
 				RequesterManaged:   aws.Bool(true),
 			},
 			want: eniInfo{
@@ -369,7 +369,7 @@ func TestParseENIRow(t *testing.T) {
 		},
 		{
 			name: "nil owner and requester",
-			eni:  &types.NetworkInterface{NetworkInterfaceId: common.String("eni-2")},
+			eni:  &types.NetworkInterface{NetworkInterfaceId: aws.String("eni-2")},
 			want: eniInfo{NetworkInterfaceID: "eni-2"},
 		},
 	}
@@ -407,7 +407,7 @@ func (f *fakeEC2) DescribeNetworkInterfaces(
 		out.NetworkInterfaces = f.eniPages[page]
 	}
 	if page < len(f.eniPages)-1 {
-		out.NextToken = common.String(fmt.Sprint(page + 1))
+		out.NextToken = aws.String(fmt.Sprint(page + 1))
 	}
 	return out, nil
 }
@@ -424,9 +424,9 @@ func (f *fakeEC2) DescribeInstances(
 
 // iface returns a network interface, attached to instanceID unless it is empty.
 func iface(id, instanceID string) types.NetworkInterface {
-	n := types.NetworkInterface{NetworkInterfaceId: common.String(id)}
+	n := types.NetworkInterface{NetworkInterfaceId: aws.String(id)}
 	if instanceID != "" {
-		n.Attachment = &types.NetworkInterfaceAttachment{InstanceId: common.String(instanceID)}
+		n.Attachment = &types.NetworkInterfaceAttachment{InstanceId: aws.String(instanceID)}
 	}
 	return n
 }
@@ -434,8 +434,8 @@ func iface(id, instanceID string) types.NetworkInterface {
 // instance returns an instance with the given ID and Name tag.
 func instance(id, name string) types.Instance {
 	return types.Instance{
-		InstanceId: common.String(id),
-		Tags:       []types.Tag{{Key: common.String("Name"), Value: common.String(name)}},
+		InstanceId: aws.String(id),
+		Tags:       []types.Tag{{Key: aws.String("Name"), Value: aws.String(name)}},
 	}
 }
 
@@ -580,10 +580,10 @@ func TestParseENIRow_ips(t *testing.T) {
 	eni := &types.NetworkInterface{
 		PrivateIpAddresses: []types.NetworkInterfacePrivateIpAddress{
 			{
-				PrivateIpAddress: common.String("10.0.0.1"),
-				Association:      &types.NetworkInterfaceAssociation{PublicIp: common.String("203.0.113.1")},
+				PrivateIpAddress: aws.String("10.0.0.1"),
+				Association:      &types.NetworkInterfaceAssociation{PublicIp: aws.String("203.0.113.1")},
 			},
-			{PrivateIpAddress: common.String("10.0.0.2")},
+			{PrivateIpAddress: aws.String("10.0.0.2")},
 		},
 	}
 	row := parseENIRow(eni)

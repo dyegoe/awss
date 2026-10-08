@@ -263,10 +263,10 @@ func TestResults_getFilters(t *testing.T) {
 			want: &ec2.DescribeVolumesInput{
 				VolumeIds: []string{"vol-1234567890abcdef0"},
 				Filters: []types.Filter{
-					{Name: common.String("tag:key"), Values: []string{"value", "value3"}},
-					{Name: common.String("tag:key2"), Values: []string{"value2"}},
-					{Name: common.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b"}},
-					{Name: common.String("status"), Values: []string{"available"}},
+					{Name: aws.String("tag:key"), Values: []string{"value", "value3"}},
+					{Name: aws.String("tag:key2"), Values: []string{"value2"}},
+					{Name: aws.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b"}},
+					{Name: aws.String("status"), Values: []string{"available"}},
 				},
 			},
 		},
@@ -516,7 +516,7 @@ func (f *fakeEC2) DescribeVolumes(
 		out.Volumes = f.volPages[page]
 	}
 	if page < len(f.volPages)-1 {
-		out.NextToken = common.String(fmt.Sprint(page + 1))
+		out.NextToken = aws.String(fmt.Sprint(page + 1))
 	}
 	return out, nil
 }
@@ -533,9 +533,9 @@ func (f *fakeEC2) DescribeInstances(
 
 // volume returns a volume attached to each of instanceIDs, or unattached when there are none.
 func volume(id string, instanceIDs ...string) types.Volume {
-	v := types.Volume{VolumeId: common.String(id)}
+	v := types.Volume{VolumeId: aws.String(id)}
 	for _, inst := range instanceIDs {
-		v.Attachments = append(v.Attachments, types.VolumeAttachment{InstanceId: common.String(inst)})
+		v.Attachments = append(v.Attachments, types.VolumeAttachment{InstanceId: aws.String(inst)})
 	}
 	return v
 }
@@ -543,8 +543,8 @@ func volume(id string, instanceIDs ...string) types.Volume {
 // instance returns an instance with the given ID and Name tag.
 func instance(id, name string) types.Instance {
 	return types.Instance{
-		InstanceId: common.String(id),
-		Tags:       []types.Tag{{Key: common.String("Name"), Value: common.String(name)}},
+		InstanceId: aws.String(id),
+		Tags:       []types.Tag{{Key: aws.String("Name"), Value: aws.String(name)}},
 	}
 }
 
