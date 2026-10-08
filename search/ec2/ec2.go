@@ -196,7 +196,7 @@ func (r *Results) collectInstances(reservations []types.Reservation, nets []*net
 func hasPrivateIPIn(inst *types.Instance, nets []*net.IPNet) bool {
 	for i := range inst.NetworkInterfaces {
 		for _, addr := range inst.NetworkInterfaces[i].PrivateIpAddresses {
-			ip := net.ParseIP(common.StringValue(addr.PrivateIpAddress))
+			ip := net.ParseIP(aws.ToString(addr.PrivateIpAddress))
 			if ip != nil && ipInAny(ip, nets) {
 				return true
 			}
@@ -219,25 +219,25 @@ func ipInAny(ip net.IP, nets []*net.IPNet) bool {
 func parseInstance(inst *types.Instance) dataRow {
 	enis := make([]string, 0, len(inst.NetworkInterfaces))
 	for i := range inst.NetworkInterfaces {
-		enis = append(enis, common.StringValue(inst.NetworkInterfaces[i].NetworkInterfaceId))
+		enis = append(enis, aws.ToString(inst.NetworkInterfaces[i].NetworkInterfaceId))
 	}
 	volumes := parseVolumeIDs(inst.BlockDeviceMappings)
 	var az string
 	if inst.Placement != nil {
-		az = common.StringValue(inst.Placement.AvailabilityZone)
+		az = aws.ToString(inst.Placement.AvailabilityZone)
 	}
 	var state string
 	if inst.State != nil {
 		state = string(inst.State.Name)
 	}
 	return dataRow{
-		InstanceID:        common.StringValue(inst.InstanceId),
+		InstanceID:        aws.ToString(inst.InstanceId),
 		InstanceName:      common.TagName(inst.Tags),
 		InstanceType:      string(inst.InstanceType),
 		AvailabilityZone:  az,
 		InstanceState:     state,
-		PrivateIPAddress:  common.StringValue(inst.PrivateIpAddress),
-		PublicIPAddress:   common.StringValue(inst.PublicIpAddress),
+		PrivateIPAddress:  aws.ToString(inst.PrivateIpAddress),
+		PublicIPAddress:   aws.ToString(inst.PublicIpAddress),
 		NetworkInterfaces: enis,
 		Volumes:           volumes,
 		Tags:              common.TagsToMap(inst.Tags),
@@ -395,7 +395,7 @@ func InstanceNames(
 		}
 		for _, res := range page.Reservations {
 			for i := range res.Instances {
-				names[common.StringValue(res.Instances[i].InstanceId)] = common.TagName(res.Instances[i].Tags)
+				names[aws.ToString(res.Instances[i].InstanceId)] = common.TagName(res.Instances[i].Tags)
 			}
 		}
 	}

@@ -262,12 +262,12 @@ func TestResults_getFilters(t *testing.T) {
 			want: &ec2.DescribeInstancesInput{
 				InstanceIds: []string{"i-1234567890abcdef0", "i-0987654321fedcba9"},
 				Filters: []types.Filter{
-					{Name: common.String("tag:Name"), Values: []string{"instance-name-1", "instance-name-2"}},
-					{Name: common.String("tag:key"), Values: []string{"value", "value3"}},
-					{Name: common.String("tag:key2"), Values: []string{"value2"}},
-					{Name: common.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b"}},
-					{Name: common.String("instance-state-name"), Values: []string{"running", "stopped"}},
-					{Name: common.String("block-device-mapping.volume-id"), Values: []string{"vol-1234567890abcdef0"}},
+					{Name: aws.String("tag:Name"), Values: []string{"instance-name-1", "instance-name-2"}},
+					{Name: aws.String("tag:key"), Values: []string{"value", "value3"}},
+					{Name: aws.String("tag:key2"), Values: []string{"value2"}},
+					{Name: aws.String("availability-zone"), Values: []string{"us-east-1a", "us-east-1b"}},
+					{Name: aws.String("instance-state-name"), Values: []string{"running", "stopped"}},
+					{Name: aws.String("block-device-mapping.volume-id"), Values: []string{"vol-1234567890abcdef0"}},
 				},
 			},
 		},
@@ -383,23 +383,23 @@ func TestParseVolumeIDs(t *testing.T) {
 		{
 			name: "nil ebs block is skipped",
 			mappings: []types.InstanceBlockDeviceMapping{
-				{DeviceName: common.String("/dev/sda1"), Ebs: nil},
+				{DeviceName: aws.String("/dev/sda1"), Ebs: nil},
 			},
 			want: nil,
 		},
 		{
 			name: "nil volume id is skipped",
 			mappings: []types.InstanceBlockDeviceMapping{
-				{DeviceName: common.String("/dev/sda1"), Ebs: &types.EbsInstanceBlockDevice{VolumeId: nil}},
+				{DeviceName: aws.String("/dev/sda1"), Ebs: &types.EbsInstanceBlockDevice{VolumeId: nil}},
 			},
 			want: nil,
 		},
 		{
 			name: "two volumes",
 			mappings: []types.InstanceBlockDeviceMapping{
-				{DeviceName: common.String("/dev/sda1"), Ebs: &types.EbsInstanceBlockDevice{VolumeId: common.String("vol-1")}},
-				{DeviceName: common.String("/dev/sdf"), Ebs: nil},
-				{DeviceName: common.String("/dev/sdg"), Ebs: &types.EbsInstanceBlockDevice{VolumeId: common.String("vol-2")}},
+				{DeviceName: aws.String("/dev/sda1"), Ebs: &types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-1")}},
+				{DeviceName: aws.String("/dev/sdf"), Ebs: nil},
+				{DeviceName: aws.String("/dev/sdg"), Ebs: &types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-2")}},
 			},
 			want: []string{"vol-1", "vol-2"},
 		},
@@ -416,9 +416,9 @@ func TestParseVolumeIDs(t *testing.T) {
 // TestParseInstance_volumes tests that parseInstance fills the Volumes column and tolerates nil fields.
 func TestParseInstance_volumes(t *testing.T) {
 	inst := types.Instance{
-		InstanceId: common.String("i-1"),
+		InstanceId: aws.String("i-1"),
 		BlockDeviceMappings: []types.InstanceBlockDeviceMapping{
-			{Ebs: &types.EbsInstanceBlockDevice{VolumeId: common.String("vol-a")}},
+			{Ebs: &types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-a")}},
 			{Ebs: nil},
 		},
 	}
@@ -607,12 +607,12 @@ func TestResults_Search_cidrNoMatch(t *testing.T) {
 
 // instanceWithIPs returns an instance whose network interfaces have the given private IPs, one ENI per slice.
 func instanceWithIPs(id string, enis ...[]string) types.Instance {
-	inst := types.Instance{InstanceId: common.String(id)}
+	inst := types.Instance{InstanceId: aws.String(id)}
 	for _, ips := range enis {
 		eni := types.InstanceNetworkInterface{}
 		for _, ip := range ips {
 			eni.PrivateIpAddresses = append(eni.PrivateIpAddresses,
-				types.InstancePrivateIpAddress{PrivateIpAddress: common.String(ip)})
+				types.InstancePrivateIpAddress{PrivateIpAddress: aws.String(ip)})
 		}
 		inst.NetworkInterfaces = append(inst.NetworkInterfaces, eni)
 	}
@@ -705,16 +705,16 @@ func (f *fakeDescribeInstances) DescribeInstances(
 		out.Reservations = []types.Reservation{{Instances: f.pages[page]}}
 	}
 	if page < len(f.pages)-1 {
-		out.NextToken = common.String(fmt.Sprint(page + 1))
+		out.NextToken = aws.String(fmt.Sprint(page + 1))
 	}
 	return out, nil
 }
 
 // namedInstance returns an instance with the given ID and, when name is not empty, a Name tag.
 func namedInstance(id, name string) types.Instance {
-	inst := types.Instance{InstanceId: common.String(id)}
+	inst := types.Instance{InstanceId: aws.String(id)}
 	if name != "" {
-		inst.Tags = []types.Tag{{Key: common.String("Name"), Value: common.String(name)}}
+		inst.Tags = []types.Tag{{Key: aws.String("Name"), Value: aws.String(name)}}
 	}
 	return inst
 }

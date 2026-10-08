@@ -225,10 +225,10 @@ func (r *Results) sortIfRequested() {
 // contains a single, sortable InstanceID and Device value.
 func parseVolume(vol *types.Volume) []dataRow {
 	base := dataRow{
-		VolumeID:         common.StringValue(vol.VolumeId),
+		VolumeID:         aws.ToString(vol.VolumeId),
 		VolumeType:       string(vol.VolumeType),
 		State:            string(vol.State),
-		AvailabilityZone: common.StringValue(vol.AvailabilityZone),
+		AvailabilityZone: aws.ToString(vol.AvailabilityZone),
 		Tags:             common.TagsToMap(vol.Tags),
 	}
 	if vol.Size != nil {
@@ -243,8 +243,8 @@ func parseVolume(vol *types.Volume) []dataRow {
 	rows := make([]dataRow, 0, len(vol.Attachments))
 	for _, att := range vol.Attachments {
 		row := base
-		row.InstanceID = common.StringValue(att.InstanceId)
-		row.Device = common.StringValue(att.Device)
+		row.InstanceID = aws.ToString(att.InstanceId)
+		row.Device = aws.ToString(att.Device)
 		rows = append(rows, row)
 	}
 	return rows

@@ -192,16 +192,16 @@ func TestParseSubnet(t *testing.T) {
 	yes, no := true, false
 	var count int32 = 251
 	full := types.Subnet{
-		SubnetId:                common.String("subnet-1"),
-		VpcId:                   common.String("vpc-1"),
-		CidrBlock:               common.String("10.0.1.0/24"),
-		AvailabilityZone:        common.String("us-east-1a"),
+		SubnetId:                aws.String("subnet-1"),
+		VpcId:                   aws.String("vpc-1"),
+		CidrBlock:               aws.String("10.0.1.0/24"),
+		AvailabilityZone:        aws.String("us-east-1a"),
 		AvailableIpAddressCount: &count,
 		State:                   types.SubnetStateAvailable,
 		MapPublicIpOnLaunch:     &yes,
 		DefaultForAz:            &no,
-		OwnerId:                 common.String("123456789012"),
-		Tags:                    []types.Tag{{Key: common.String("Name"), Value: common.String("public-a")}},
+		OwnerId:                 aws.String("123456789012"),
+		Tags:                    []types.Tag{{Key: aws.String("Name"), Value: aws.String("public-a")}},
 	}
 	tests := []struct {
 		name   string
@@ -314,19 +314,19 @@ func (f *fakeDescribeSubnets) DescribeSubnets(
 		out.Subnets = f.pages[page]
 	}
 	if page < len(f.pages)-1 {
-		out.NextToken = common.String(fmt.Sprint(page + 1))
+		out.NextToken = aws.String(fmt.Sprint(page + 1))
 	}
 	return out, nil
 }
 
 // subnet returns a subnet with the given ID, VPC ID and CIDR block. Empty values stay nil.
 func subnet(id, vpcID, cidr string) types.Subnet {
-	s := types.Subnet{SubnetId: common.String(id)}
+	s := types.Subnet{SubnetId: aws.String(id)}
 	if vpcID != "" {
-		s.VpcId = common.String(vpcID)
+		s.VpcId = aws.String(vpcID)
 	}
 	if cidr != "" {
-		s.CidrBlock = common.String(cidr)
+		s.CidrBlock = aws.String(cidr)
 	}
 	return s
 }

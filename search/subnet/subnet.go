@@ -161,13 +161,13 @@ func (r *Results) collect(ctx context.Context, client ec2.DescribeSubnetsAPIClie
 // parseSubnet converts a single Subnet into a dataRow.
 func parseSubnet(subnet *types.Subnet) dataRow {
 	row := dataRow{
-		SubnetID:         common.StringValue(subnet.SubnetId),
+		SubnetID:         aws.ToString(subnet.SubnetId),
 		Name:             common.TagName(subnet.Tags),
-		VpcID:            common.StringValue(subnet.VpcId),
-		CidrBlock:        common.StringValue(subnet.CidrBlock),
-		AvailabilityZone: common.StringValue(subnet.AvailabilityZone),
+		VpcID:            aws.ToString(subnet.VpcId),
+		CidrBlock:        aws.ToString(subnet.CidrBlock),
+		AvailabilityZone: aws.ToString(subnet.AvailabilityZone),
 		State:            string(subnet.State),
-		OwnerID:          common.StringValue(subnet.OwnerId),
+		OwnerID:          aws.ToString(subnet.OwnerId),
 		Tags:             common.TagsToMap(subnet.Tags),
 	}
 	if subnet.AvailableIpAddressCount != nil {

@@ -70,11 +70,12 @@ no `SubnetId`):
 SubnetID: *eni.SubnetId,
 
 // Good
-SubnetID: common.StringValue(eni.SubnetId),
+SubnetID: aws.ToString(eni.SubnetId),
 ```
 
-Use `common.StringValue(ptr)` for `*string` fields.
-For other pointer types, write an explicit guard:
+Use the SDK's `aws.ToString(ptr)` for `*string` fields, and `aws.ToInt32`, `aws.ToBool` and the
+other `aws.To*` helpers for scalar pointers: each returns the zero value for nil.
+For pointers to structs, write an explicit guard:
 
 ```go
 if eni.Attachment != nil && eni.Attachment.InstanceId != nil {

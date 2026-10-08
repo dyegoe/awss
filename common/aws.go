@@ -114,7 +114,7 @@ func S3TagsToMap(tags []s3types.Tag) map[string]string {
 		if t.Key == nil {
 			continue
 		}
-		data[*t.Key] = StringValue(t.Value)
+		data[*t.Key] = aws.ToString(t.Value)
 	}
 	return data
 }
@@ -126,7 +126,7 @@ func FilterNames(names []string) []types.Filter {
 	}
 	return []types.Filter{
 		{
-			Name:   String("tag:Name"),
+			Name:   aws.String("tag:Name"),
 			Values: names,
 		},
 	}
@@ -145,7 +145,7 @@ func FilterTags(tags []string) ([]types.Filter, error) {
 	filters := []types.Filter{}
 	for key, values := range parsed {
 		filters = append(filters, types.Filter{
-			Name:   String(fmt.Sprintf("tag:%s", key)),
+			Name:   aws.String(fmt.Sprintf("tag:%s", key)),
 			Values: values,
 		})
 	}
@@ -173,7 +173,7 @@ func FilterAvailabilityZones(availabilityZones []string, region string) []types.
 	}
 	return []types.Filter{
 		{
-			Name:   String("availability-zone"),
+			Name:   aws.String("availability-zone"),
 			Values: azs,
 		},
 	}
@@ -298,7 +298,7 @@ func FilterDefault(key string, values []string) []types.Filter {
 	}
 	return []types.Filter{
 		{
-			Name:   String(key),
+			Name:   aws.String(key),
 			Values: values,
 		},
 	}

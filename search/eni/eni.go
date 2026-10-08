@@ -215,13 +215,13 @@ func (r *Results) enrichInstanceNames(ctx context.Context, client ec2.DescribeIn
 func parseENIRow(eni *types.NetworkInterface) dataRow {
 	row := dataRow{
 		InterfaceInfo: eniInfo{
-			NetworkInterfaceID: common.StringValue(eni.NetworkInterfaceId),
+			NetworkInterfaceID: aws.ToString(eni.NetworkInterfaceId),
 			InterfaceType:      string(eni.InterfaceType),
-			AvailabilityZone:   common.StringValue(eni.AvailabilityZone),
-			SubnetID:           common.StringValue(eni.SubnetId),
+			AvailabilityZone:   aws.ToString(eni.AvailabilityZone),
+			SubnetID:           aws.ToString(eni.SubnetId),
 			Status:             string(eni.Status),
-			OwnerID:            common.StringValue(eni.OwnerId),
-			RequesterID:        common.StringValue(eni.RequesterId),
+			OwnerID:            aws.ToString(eni.OwnerId),
+			RequesterID:        aws.ToString(eni.RequesterId),
 		},
 		Tags: common.TagsToMap(eni.TagSet),
 	}
@@ -232,9 +232,9 @@ func parseENIRow(eni *types.NetworkInterface) dataRow {
 		row.InterfaceInfo.RequesterManaged = *eni.RequesterManaged
 	}
 	for _, ip := range eni.PrivateIpAddresses {
-		row.PrivateIPAddresses = append(row.PrivateIPAddresses, common.StringValue(ip.PrivateIpAddress))
+		row.PrivateIPAddresses = append(row.PrivateIPAddresses, aws.ToString(ip.PrivateIpAddress))
 		if ip.Association != nil {
-			row.PublicIPAddresses = append(row.PublicIPAddresses, common.StringValue(ip.Association.PublicIp))
+			row.PublicIPAddresses = append(row.PublicIPAddresses, aws.ToString(ip.Association.PublicIp))
 		}
 	}
 	return row

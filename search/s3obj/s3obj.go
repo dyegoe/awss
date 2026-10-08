@@ -28,6 +28,7 @@ import (
 
 	"github.com/dyegoe/awss/common"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -174,14 +175,14 @@ func (r *Results) bucketsInRegion(ctx context.Context, client s3.ListBucketsAPIC
 	}
 
 	var buckets []string
-	paginator := s3.NewListBucketsPaginator(client, &s3.ListBucketsInput{BucketRegion: common.String(r.Region)})
+	paginator := s3.NewListBucketsPaginator(client, &s3.ListBucketsInput{BucketRegion: aws.String(r.Region)})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error listing buckets: %w", err)
 		}
 		for i := range page.Buckets {
-			if name := common.StringValue(page.Buckets[i].Name); matcher.Match(name) {
+			if name := aws.ToString(page.Buckets[i].Name); matcher.Match(name) {
 				buckets = append(buckets, name)
 			}
 		}
@@ -203,9 +204,9 @@ func (r *Results) bucketsInRegion(ctx context.Context, client s3.ListBucketsAPIC
 func (r *Results) collectBucket(
 	ctx context.Context, client s3.ListObjectsV2APIClient, bucket string, m *common.Matcher,
 ) error {
-	input := &s3.ListObjectsV2Input{Bucket: common.String(bucket)}
+	input := &s3.ListObjectsV2Input{Bucket: aws.String(bucket)}
 	if prefix := m.Prefix(); prefix != "" {
-		input.Prefix = common.String(prefix)
+		input.Prefix = aws.String(prefix)
 	}
 
 	scanned := 0
@@ -233,7 +234,7 @@ func (r *Results) collectBucket(
 func parseObject(bucket string, obj *types.Object) dataRow {
 	row := dataRow{
 		Bucket:       bucket,
-		Key:          common.StringValue(obj.Key),
+		Key:          aws.ToString(obj.Key),
 		StorageClass: string(obj.StorageClass),
 	}
 	if obj.Size != nil {

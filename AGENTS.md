@@ -82,7 +82,7 @@ reviewer and the author own it. **SHOULD** rules may be broken with a reason in 
 |---|---|
 | Wrap every error from another module with context (`fmt.Errorf("doing x: %w", err)`); never drop or ignore an error. | `wrapcheck`, `errcheck`, `nilerr` |
 | A failing profile or region records its error in its own result set and the run continues; `Search()` never panics or stops the run. | tests (`search` package: logged-out profile, timeout) |
-| Nil-check every pointer from an AWS SDK response before use (`common.StringValue` for `*string`). | review |
+| Nil-check every pointer from an AWS SDK response before use (the SDK's `aws.ToString` for `*string`). | review |
 | No `context.TODO()`; pass the caller's `ctx`. `context.Background()` only at the top of `search.Execute` and in helpers with no caller context. | `forbidigo`, `noctx` |
 | Control statements nest at most 3 levels deep in a function. | `internal/nesting` (`TestCheck_repository`) |
 | Functions stay small: at most 60 lines and 50 statements, cyclomatic complexity at most 15. | `funlen`, `gocyclo` |

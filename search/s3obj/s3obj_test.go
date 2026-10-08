@@ -26,6 +26,7 @@ import (
 
 	"github.com/dyegoe/awss/common"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -49,8 +50,8 @@ func (f *fakeS3) ListBuckets(
 		return nil, f.bucketsErr
 	}
 	out := &s3.ListBucketsOutput{}
-	for _, name := range f.bucketsInRegion[common.StringValue(in.BucketRegion)] {
-		out.Buckets = append(out.Buckets, types.Bucket{Name: common.String(name)})
+	for _, name := range f.bucketsInRegion[aws.ToString(in.BucketRegion)] {
+		out.Buckets = append(out.Buckets, types.Bucket{Name: aws.String(name)})
 	}
 	return out, nil
 }
@@ -59,7 +60,7 @@ func (f *fakeS3) ListObjectsV2(
 	_ context.Context, in *s3.ListObjectsV2Input, _ ...func(*s3.Options),
 ) (*s3.ListObjectsV2Output, error) {
 	f.listObjectsInputs = append(f.listObjectsInputs, in)
-	bucket := common.StringValue(in.Bucket)
+	bucket := aws.ToString(in.Bucket)
 	if err := f.objectsErr[bucket]; err != nil {
 		return nil, err
 	}
@@ -75,13 +76,13 @@ func (f *fakeS3) ListObjectsV2(
 	if page < len(pages)-1 {
 		truncated := true
 		out.IsTruncated = &truncated
-		out.NextContinuationToken = common.String(string(rune('0' + page + 1)))
+		out.NextContinuationToken = aws.String(string(rune('0' + page + 1)))
 	}
 	return out, nil
 }
 
 func obj(key string, size int64) types.Object {
-	return types.Object{Key: common.String(key), Size: &size, StorageClass: types.ObjectStorageClassStandard}
+	return types.Object{Key: aws.String(key), Size: &size, StorageClass: types.ObjectStorageClassStandard}
 }
 
 func keys(rows []dataRow) []string {
@@ -134,7 +135,7 @@ func TestParseObject(t *testing.T) {
 	modified := time.Date(2024, 5, 6, 7, 8, 9, 0, time.UTC)
 	size := int64(42)
 	full := types.Object{
-		Key: common.String("logs/a.gz"), Size: &size, LastModified: &modified,
+		Key: aws.String("logs/a.gz"), Size: &size, LastModified: &modified,
 		StorageClass: types.ObjectStorageClassGlacier,
 	}
 	want := dataRow{Bucket: "b", Key: "logs/a.gz", Size: 42, LastModified: "2024-05-06T07:08:09Z", StorageClass: "GLACIER"}
@@ -227,7 +228,7 @@ func TestResults_bucketsInRegion(t *testing.T) {
 					t.Errorf("bucketsInRegion(%v) = %v, want %v", tt.buckets, got, tt.want)
 				}
 			}
-			if region := common.StringValue(client.listBucketsInputs[0].BucketRegion); region != "us-east-1" {
+			if region := aws.ToString(client.listBucketsInputs[0].BucketRegion); region != "us-east-1" {
 				t.Errorf("ListBuckets BucketRegion = %q, want us-east-1", region)
 			}
 		})
@@ -372,7 +373,7 @@ func TestResults_collect(t *testing.T) {
 				t.Errorf("collect() errors = %v, want %v", r.Errors, tt.wantErrs)
 			}
 			if len(tt.client.listObjectsInputs) > 0 {
-				if got := common.StringValue(tt.client.listObjectsInputs[0].Prefix); got != tt.wantPrefix {
+				if got := aws.ToString(tt.client.listObjectsInputs[0].Prefix); got != tt.wantPrefix {
 					t.Errorf("ListObjectsV2 Prefix = %q, want %q", got, tt.wantPrefix)
 				}
 			}

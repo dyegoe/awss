@@ -29,6 +29,7 @@ import (
 
 	"github.com/dyegoe/awss/common"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -146,9 +147,9 @@ func (r *Results) matcher() (*common.Matcher, error) {
 //
 // The listing is narrowed server-side with the literal prefix of the pattern when there is one.
 func (r *Results) collectBuckets(ctx context.Context, client s3.ListBucketsAPIClient, matcher *common.Matcher) error {
-	input := &s3.ListBucketsInput{BucketRegion: common.String(r.Region)}
+	input := &s3.ListBucketsInput{BucketRegion: aws.String(r.Region)}
 	if prefix := matcher.Prefix(); prefix != "" {
-		input.Prefix = common.String(prefix)
+		input.Prefix = aws.String(prefix)
 	}
 
 	paginator := s3.NewListBucketsPaginator(client, input)
@@ -196,7 +197,7 @@ func (r *Results) collectTags(ctx context.Context, client getBucketTaggingAPICli
 
 // bucketTags returns the tags of one bucket. A bucket without tags returns an empty map.
 func bucketTags(ctx context.Context, client getBucketTaggingAPIClient, bucket string) (map[string]string, error) {
-	out, err := client.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: common.String(bucket)})
+	out, err := client.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
 	var apiErr smithy.APIError
 	if errors.As(err, &apiErr) && apiErr.ErrorCode() == errCodeNoSuchTagSet {
 		return map[string]string{}, nil
@@ -213,9 +214,9 @@ func bucketTags(ctx context.Context, client getBucketTaggingAPIClient, bucket st
 // parseBucket converts a single Bucket into a dataRow.
 func parseBucket(bucket *types.Bucket) dataRow {
 	row := dataRow{
-		Name:   common.StringValue(bucket.Name),
-		Region: common.StringValue(bucket.BucketRegion),
-		ARN:    common.StringValue(bucket.BucketArn),
+		Name:   aws.ToString(bucket.Name),
+		Region: aws.ToString(bucket.BucketRegion),
+		ARN:    aws.ToString(bucket.BucketArn),
 	}
 	if bucket.CreationDate != nil {
 		row.CreationDate = bucket.CreationDate.UTC().Format(time.RFC3339)

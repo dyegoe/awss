@@ -27,6 +27,7 @@ import (
 
 	"github.com/dyegoe/awss/common"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -49,7 +50,7 @@ func (f *fakeListBuckets) ListBuckets(
 	page := len(f.inputs) - 1
 	out := &s3.ListBucketsOutput{Buckets: f.pages[page]}
 	if page < len(f.pages)-1 {
-		out.ContinuationToken = common.String(fmt.Sprint(page + 1))
+		out.ContinuationToken = aws.String(fmt.Sprint(page + 1))
 	}
 	return out, nil
 }
@@ -63,7 +64,7 @@ type fakeGetBucketTagging struct {
 func (f *fakeGetBucketTagging) GetBucketTagging(
 	_ context.Context, in *s3.GetBucketTaggingInput, _ ...func(*s3.Options),
 ) (*s3.GetBucketTaggingOutput, error) {
-	name := common.StringValue(in.Bucket)
+	name := aws.ToString(in.Bucket)
 	if err := f.errs[name]; err != nil {
 		return nil, err
 	}
@@ -71,7 +72,7 @@ func (f *fakeGetBucketTagging) GetBucketTagging(
 }
 
 func bucket(name string) types.Bucket {
-	return types.Bucket{Name: common.String(name), BucketRegion: common.String("us-east-1")}
+	return types.Bucket{Name: aws.String(name), BucketRegion: aws.String("us-east-1")}
 }
 
 // TestNew tests the New function.
@@ -125,9 +126,9 @@ func TestParseBucket(t *testing.T) {
 		{
 			name: "all fields, date in UTC",
 			bucket: types.Bucket{
-				Name:         common.String("prod-logs"),
-				BucketRegion: common.String("eu-west-1"),
-				BucketArn:    common.String("arn:aws:s3:::prod-logs"),
+				Name:         aws.String("prod-logs"),
+				BucketRegion: aws.String("eu-west-1"),
+				BucketArn:    aws.String("arn:aws:s3:::prod-logs"),
 				CreationDate: &created,
 			},
 			want: dataRow{
@@ -226,10 +227,10 @@ func TestResults_collectBuckets(t *testing.T) {
 				t.Errorf("ListBuckets called %d times, want %d (one per page)", len(client.inputs), len(tt.pages))
 			}
 			first := client.inputs[0]
-			if common.StringValue(first.BucketRegion) != "us-east-1" {
-				t.Errorf("BucketRegion = %q, want us-east-1", common.StringValue(first.BucketRegion))
+			if aws.ToString(first.BucketRegion) != "us-east-1" {
+				t.Errorf("BucketRegion = %q, want us-east-1", aws.ToString(first.BucketRegion))
 			}
-			if got := common.StringValue(first.Prefix); got != tt.wantPrefix {
+			if got := aws.ToString(first.Prefix); got != tt.wantPrefix {
 				t.Errorf("Prefix = %q, want %q", got, tt.wantPrefix)
 			}
 		})
@@ -313,8 +314,8 @@ func TestResults_collectTags(t *testing.T) {
 			name:    "tags read",
 			buckets: []string{"a", "b"},
 			client: &fakeGetBucketTagging{tags: map[string][]types.Tag{
-				"a": {{Key: common.String("Env"), Value: common.String("prod")}},
-				"b": {{Key: common.String("Team"), Value: common.String("net")}},
+				"a": {{Key: aws.String("Env"), Value: aws.String("prod")}},
+				"b": {{Key: aws.String("Team"), Value: aws.String("net")}},
 			}},
 			wantTags:   []map[string]string{{"Env": "prod"}, {"Team": "net"}},
 			wantErrors: []string{},
