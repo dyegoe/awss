@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.15.0](https://github.com/dyegoe/awss/compare/v0.14.0...v0.15.0) (2026-10-08)
+
+
+### Features
+
+* **search/s3obj:** accept bucket glob patterns, capped by --max-buckets ([#152](https://github.com/dyegoe/awss/issues/152)) ([#179](https://github.com/dyegoe/awss/issues/179)) ([398c422](https://github.com/dyegoe/awss/commit/398c4228507356fe472c723aee88e8aace58c6d0))
+* **search:** add --timeout so a stalled profile or region cannot block the run ([#142](https://github.com/dyegoe/awss/issues/142)) ([#164](https://github.com/dyegoe/awss/issues/164)) ([d747ef6](https://github.com/dyegoe/awss/commit/d747ef64f9d9ae86e71977ad162f77b09005adad))
+* **search:** bound the profile x region fan-out with --concurrency ([#178](https://github.com/dyegoe/awss/issues/178)) ([#182](https://github.com/dyegoe/awss/issues/182)) ([93aa986](https://github.com/dyegoe/awss/commit/93aa986714a03a22974b5f7ba50b3e06179c6b14))
+
+
+### Bug Fixes
+
+* **cmd:** report an unreadable --config path instead of panicking ([#174](https://github.com/dyegoe/awss/issues/174)) ([ae170ea](https://github.com/dyegoe/awss/commit/ae170eaf70e283fbbc904b9a7708e618e5780b44))
+* **common:** read profiles from AWS_CONFIG_FILE like the AWS SDK ([#168](https://github.com/dyegoe/awss/issues/168)) ([dbef9c3](https://github.com/dyegoe/awss/commit/dbef9c34d875edb99425e2f975e01a65138d9a66))
+* **search:** remove the WhoAmI pre-authentication step ([#143](https://github.com/dyegoe/awss/issues/143)) ([#166](https://github.com/dyegoe/awss/issues/166)) ([f7ce7be](https://github.com/dyegoe/awss/commit/f7ce7bea6e7372deb4670a0976acb62a3f08be47))
+
 ## [0.14.0](https://github.com/dyegoe/awss/compare/v0.13.0...v0.14.0) (2026-10-06)
 
 
