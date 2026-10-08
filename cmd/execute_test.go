@@ -106,7 +106,9 @@ func writeConfig(t *testing.T, content string) string {
 
 // defaultOpts returns the options a run gets with no global flag, for the given sort field.
 func defaultOpts(sortField string) search.Options {
-	return search.Options{SortField: sortField, Output: "table", Timeout: defaultTimeout}
+	return search.Options{
+		SortField: sortField, Output: "table", Concurrency: search.DefaultConcurrency, Timeout: defaultTimeout,
+	}
 }
 
 // allCase is the case of "<cmd> --all" with every default: no filter, the default profile and
@@ -146,6 +148,10 @@ func subcommandCases() []executeCase {
 	maxKeysOpts.MaxKeys = 50
 	maxKeysOpts.Regex = true
 	maxKeysOpts.MaxBuckets = 5
+	noNameOpts := defaultOpts("id")
+	noNameOpts.NoInstanceName = true
+	regexOpts := defaultOpts("name")
+	regexOpts.Regex = true
 
 	return []executeCase{
 		allCase("ec2", "name"),
@@ -154,7 +160,7 @@ func subcommandCases() []executeCase {
 			args: []string{
 				"ec2", "-n", "web-*", "-s", "running,stopped", "-z", "a,b", "--cidrs", "10.0.0.0/16",
 				"--regions", "us-east-1,eu-west-1", "--output", "json", "--sort", "id",
-				"--show-empty", "--timeout", "90s",
+				"--show-empty", "--timeout", "90s", "--concurrency", "8",
 			},
 			want: searchCall{
 				cmd: "ec2", profiles: []string{""}, regions: []string{"us-east-1", "eu-west-1"},
@@ -162,7 +168,9 @@ func subcommandCases() []executeCase {
 					"tag:Name": {"web-*"}, "instance-state-name": {"running", "stopped"},
 					"availability-zone": {"a", "b"}, "cidr": {"10.0.0.0/16"},
 				},
-				opts: search.Options{SortField: "id", Output: "json", ShowEmpty: true, Timeout: 90 * time.Second},
+				opts: search.Options{
+					SortField: "id", Output: "json", ShowEmpty: true, Concurrency: 8, Timeout: 90 * time.Second,
+				},
 			},
 		},
 		{
@@ -170,7 +178,7 @@ func subcommandCases() []executeCase {
 			args: []string{"eni", "--all", "--no-instance-name"},
 			want: searchCall{
 				cmd: "eni", profiles: []string{""}, regions: []string{"us-east-1"}, filters: map[string][]string{},
-				opts: search.Options{SortField: "id", Output: "table", NoInstanceName: true, Timeout: defaultTimeout},
+				opts: noNameOpts,
 			},
 		},
 		allCase("ebs", "id"),
@@ -181,7 +189,7 @@ func subcommandCases() []executeCase {
 			want: searchCall{
 				cmd: "s3", profiles: []string{""}, regions: []string{"us-east-1"},
 				filters: map[string][]string{"name": {"^prod-"}},
-				opts:    search.Options{SortField: "name", Output: "table", Regex: true, Timeout: defaultTimeout},
+				opts:    regexOpts,
 			},
 		},
 		{
@@ -248,7 +256,7 @@ func globalCases() []executeCase {
 				cmd: "vpc", profiles: []string{""}, regions: []string{"us-east-1"}, filters: map[string][]string{},
 				opts: search.Options{
 					SortField: "name", Output: "table", ShowTags: true,
-					TagsKeys: []string{"Name", "Environment"}, Timeout: defaultTimeout,
+					TagsKeys: []string{"Name", "Environment"}, Concurrency: search.DefaultConcurrency, Timeout: defaultTimeout,
 				},
 			},
 		},
@@ -262,21 +270,24 @@ func globalCases() []executeCase {
 			},
 		},
 		{
-			name:   "config file sets the defaults",
-			args:   []string{"ec2", "--all"},
-			config: "regions: [eu-west-1]\noutput: json\ntimeout: 2m\nshow:\n  empty: true\nec2:\n  sort: type\n",
+			name: "config file sets the defaults",
+			args: []string{"ec2", "--all"},
+			config: "regions: [eu-west-1]\noutput: json\ntimeout: 2m\nconcurrency: 4\n" +
+				"show:\n  empty: true\nec2:\n  sort: type\n",
 			want: searchCall{
 				cmd: "ec2", profiles: []string{""}, regions: []string{"eu-west-1"}, filters: map[string][]string{},
-				opts: search.Options{SortField: "type", Output: "json", ShowEmpty: true, Timeout: 2 * time.Minute},
+				opts: search.Options{
+					SortField: "type", Output: "json", ShowEmpty: true, Concurrency: 4, Timeout: 2 * time.Minute,
+				},
 			},
 		},
 		{
 			name:   "a flag wins over the config file",
-			args:   []string{"ec2", "--all", "--output", "table", "--timeout", "0", "--sort", "id"},
-			config: "output: json\ntimeout: 2m\nec2:\n  sort: type\n",
+			args:   []string{"ec2", "--all", "--output", "table", "--timeout", "0", "--sort", "id", "--concurrency", "2"},
+			config: "output: json\ntimeout: 2m\nconcurrency: 4\nec2:\n  sort: type\n",
 			want: searchCall{
 				cmd: "ec2", profiles: []string{""}, regions: []string{"us-east-1"}, filters: map[string][]string{},
-				opts: search.Options{SortField: "id", Output: "table"},
+				opts: search.Options{SortField: "id", Output: "table", Concurrency: 2},
 			},
 		},
 	}
@@ -342,6 +353,11 @@ func errorCases() []errorCase {
 		{
 			name: "timeout without unit in the config file", args: []string{"ec2", "--all"},
 			config: "timeout: 300\n", wantErr: "invalid timeout: 300",
+		},
+		{name: "concurrency of 0", args: []string{"ec2", "--all", "--concurrency", "0"}, wantErr: "invalid concurrency: 0"},
+		{
+			name: "concurrency not a number in the config file", args: []string{"ec2", "--all"},
+			config: "concurrency: many\n", wantErr: "invalid concurrency: many",
 		},
 		{name: "malformed tag", args: []string{"ec2", "-t", "NoEquals"}, wantErr: "invalid tag format: NoEquals"},
 		{name: "invalid CIDR", args: []string{"ec2", "--cidrs", "10.0.0.0"}, wantErr: "10.0.0.0"},

@@ -14,6 +14,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Show tags in table output: `--show-tags`
 - Restrict which tag keys are shown in table output: `--show-tags-keys Name,Environment` (implies `--show-tags`)
 - Timeout: `--timeout 90s` (default `5m`, `0` disables it); see [Common behavior](#common-behavior)
+- Concurrency: `--concurrency 8` (default `32`), how many profile and region searches run at once
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
 
@@ -207,6 +208,13 @@ costs up to `--max-keys` / 1000 calls; use S3 Inventory with Athena, or S3 Stora
   rows could be incomplete; the profiles and regions that finished are printed as usual, and the
   command still exits 0. Use a duration with a unit (`90s`, `5m`); `0` disables the timeout. Set
   it in the config file with `timeout:`.
+- `--concurrency` (default `32`) caps the profile and region searches that run at once; the
+  others wait for a free slot without calling AWS. `--profiles all --regions all` over 150
+  profiles is about 2,550 searches: the cap bounds the open connections, the credential lookups
+  and the finished result sets waiting in memory to be printed. A search still waiting at the
+  `--timeout` deadline is not started and is printed with the error
+  `search did not start before the <duration> timeout`; raise `--timeout` or `--concurrency`.
+  The value must be 1 or more. Set it in the config file with `concurrency:`.
 
 ## Installation
 
@@ -274,6 +282,7 @@ regions:
   - us-east-1
 output: table
 timeout: 5m           # --timeout; a duration with a unit (90s, 5m), 0 disables it
+concurrency: 32       # --concurrency; profile and region searches running at once, 1 or more
 show:
   empty: false        # --show-empty
   tags: false         # --show-tags

@@ -409,3 +409,156 @@ func TestExecute_loggedOutProfile(t *testing.T) {
 		t.Errorf("printed result sets\n%+v\nwant\n%+v", got, want)
 	}
 }
+
+// concurrencyProbe counts the searches running at once. Each search waits until the expected
+// number is running and then 50ms more, time for a pool without a limit to start the others, so
+// a pool that never fills, or one that runs more, shows in max.
+type concurrencyProbe struct {
+	mu       sync.Mutex
+	want     int
+	active   int
+	max      int
+	finished int
+	full     chan struct{}
+	filled   bool
+}
+
+// search is the Search body of every result set: it blocks until want searches have run at once,
+// plus the grace time.
+func (p *concurrencyProbe) search(_ context.Context, _ *timedResults) {
+	p.mu.Lock()
+	p.active++
+	p.max = max(p.max, p.active)
+	// Later searches reach want again as the first ones finish; close only once.
+	if p.active == p.want && !p.filled {
+		p.filled = true
+		time.AfterFunc(50*time.Millisecond, func() { close(p.full) })
+	}
+	p.mu.Unlock()
+
+	select {
+	case <-p.full:
+	case <-time.After(2 * time.Second): // the pool never filled; max reports it
+	}
+
+	p.mu.Lock()
+	p.active--
+	p.finished++
+	p.mu.Unlock()
+}
+
+// TestExecute_concurrency checks that at most opts.Concurrency searches run at once, that the
+// default applies when it is not set, that it never exceeds the searches to run, and that every
+// profile x region still completes.
+func TestExecute_concurrency(t *testing.T) {
+	tests := []struct {
+		name        string
+		concurrency int
+		profiles    int
+		regions     int
+		wantMax     int
+	}{
+		{name: "one at a time", concurrency: 1, profiles: 3, regions: 2, wantMax: 1},
+		{name: "a limit below the searches", concurrency: 3, profiles: 4, regions: 3, wantMax: 3},
+		{name: "zero uses the default", concurrency: 0, profiles: 20, regions: 3, wantMax: DefaultConcurrency},
+		{name: "a limit above the searches", concurrency: 50, profiles: 5, regions: 1, wantMax: 5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			probe := &concurrencyProbe{want: tt.wantMax, full: make(chan struct{})}
+			mockEngines(t, func(profile, region string, _ map[string][]string, _ *Options) common.Results {
+				return &timedResults{
+					BaseResults: common.BaseResults{Profile: profile, Region: region},
+					Data:        []string{},
+					search:      probe.search,
+				}
+			})
+			captureStdout(t)
+
+			profiles := make([]string, tt.profiles)
+			for i := range profiles {
+				profiles[i] = fmt.Sprintf("p%d", i)
+			}
+			regions := make([]string, tt.regions)
+			for i := range regions {
+				regions[i] = fmt.Sprintf("r%d", i)
+			}
+
+			opts := &Options{Output: common.JSON, Concurrency: tt.concurrency}
+			if err := Execute("test", profiles, regions, map[string][]string{}, opts); err != nil {
+				t.Fatalf("Execute() error = %v, want nil", err)
+			}
+			if probe.max != tt.wantMax {
+				t.Errorf("searches running at once = %d, want %d", probe.max, tt.wantMax)
+			}
+			if want := tt.profiles * tt.regions; probe.finished != want {
+				t.Errorf("searches finished = %d, want %d", probe.finished, want)
+			}
+		})
+	}
+}
+
+// TestExecute_timeoutWhileWaiting checks that a search still waiting for a free slot at the
+// deadline is reported as not started, and never calls its Search.
+func TestExecute_timeoutWhileWaiting(t *testing.T) {
+	started := make(chan string, 2)
+	mockTimedEngine(t, map[string]func(context.Context, *timedResults){
+		// Holds the only slot until the deadline.
+		"first": func(ctx context.Context, r *timedResults) {
+			started <- r.Profile
+			<-ctx.Done()
+		},
+		"second": func(_ context.Context, r *timedResults) { started <- r.Profile },
+	})
+	out := captureStdout(t)
+
+	opts := &Options{Output: common.JSON, Concurrency: 1, Timeout: 50 * time.Millisecond}
+	err := Execute("test", []string{"first", "second"}, []string{"us-east-1"}, map[string][]string{}, opts)
+	if err != nil {
+		t.Fatalf("Execute() error = %v, want nil", err)
+	}
+	// Drained, not closed: a search returning at the deadline may still be sending.
+	var got []string
+	for len(started) > 0 {
+		got = append(got, <-started)
+	}
+	if !reflect.DeepEqual(got, []string{"first"}) {
+		t.Errorf("searches started = %v, want [first]", got)
+	}
+	want := map[string]printedSet{
+		"first": {
+			Profile: "first", Region: "us-east-1", Data: []string{},
+			Errors: []string{"search timed out after 50ms; raise --timeout, or set it to 0 to disable it"},
+		},
+		"second": {
+			Profile: "second", Region: "us-east-1", Data: []string{},
+			Errors: []string{"search did not start before the 50ms timeout; raise --timeout or --concurrency"},
+		},
+	}
+	if got := decodePrinted(t, out); !reflect.DeepEqual(got, want) {
+		t.Errorf("printed result sets\n%+v\nwant\n%+v", got, want)
+	}
+}
+
+// TestWorkerCount checks the number of workers for a concurrency and a number of searches.
+func TestWorkerCount(t *testing.T) {
+	tests := []struct {
+		name        string
+		concurrency int
+		searches    int
+		want        int
+	}{
+		{name: "the limit", concurrency: 8, searches: 100, want: 8},
+		{name: "fewer searches than the limit", concurrency: 8, searches: 3, want: 3},
+		{name: "zero uses the default", concurrency: 0, searches: 100, want: DefaultConcurrency},
+		{name: "negative uses the default", concurrency: -1, searches: 100, want: DefaultConcurrency},
+		{name: "no searches", concurrency: 8, searches: 0, want: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := workerCount(tt.concurrency, tt.searches); got != tt.want {
+				t.Errorf("workerCount(%d, %d) = %d, want %d", tt.concurrency, tt.searches, got, tt.want)
+			}
+		})
+	}
+}
