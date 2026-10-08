@@ -24,8 +24,8 @@ is open to whoever wants to implement it.
 ### Implement Features
 
 Look through the GitHub issues for features. Anything tagged with "enhancement"
-is open to whoever wants to implement it. Smaller technical improvements that have no issue yet
-are listed in `docs/BACKLOG.md`.
+is open to whoever wants to implement it. For a smaller technical improvement, open an issue
+first, so the work is tracked in one place.
 
 ### Submit Feedback
 

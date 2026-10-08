@@ -116,7 +116,7 @@ reviewer and the author own it. **SHOULD** rules may be broken with a reason in 
 | Pull requests are squash-merged; agents open them and never merge. | repository settings, review |
 | A change to authentication, profiles or shared VPCs carries the exact `awss` commands for the real AWS check in its pull request (see Changes that need a real AWS check). | review |
 | A new flag, command, sort field or config key appears in `README.md`. | review |
-| A finished backlog item is removed from `docs/BACKLOG.md`, not ticked. | review |
+| A pull request names the issue it closes (`Closes #N`), so merging closes it. | review |
 | The `go` directive of `go.mod` is the only Go version; CI and releases read it. | CI (`go-version-file`) |
 
 ### SHOULD
@@ -136,12 +136,13 @@ silently passes is worse than none, because the rule looks enforced.
 
 ---
 
-## Backlog and workflow
+## Issues and workflow
 
-Open improvements live in `docs/BACKLOG.md`; feature requests live in GitHub issues.
+All open work lives in GitHub issues: features, bugs, refactors and small technical improvements.
+There is no backlog file; an improvement without an issue gets one first.
 Work on an issue happens on an issue-numbered branch (`<number>-short-title`) and lands through a
-pull request; never commit straight to `main`. When an item is done, remove it from the backlog
-(history lives in `CHANGELOG.md` and git), do not tick it.
+pull request that closes it (`Closes #N`); never commit straight to `main`. History lives in
+`CHANGELOG.md` and git.
 
 - The maintainer reviews and merges pull requests; agents open them and do not merge.
 - Pull requests are squash-merged, so release-please lists each change once in the changelog.
