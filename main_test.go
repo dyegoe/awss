@@ -51,7 +51,7 @@ func TestMain_cli(t *testing.T) {
 			name: "validation error exits 1", args: []string{"ec2", "--all", "--output", "xml"},
 			wantOut: "Error: invalid output format: xml", wantExit: 1,
 		},
-		{name: "unknown command exits 1", args: []string{"rds"}, wantOut: `Error: unknown command "rds"`, wantExit: 1},
+		{name: "unknown command exits 1", args: []string{"nope"}, wantOut: `Error: unknown command "nope"`, wantExit: 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

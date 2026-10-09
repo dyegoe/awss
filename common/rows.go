@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"cmp"
 	"fmt"
 	"reflect"
 	"sort"
@@ -99,11 +100,18 @@ func SortByField[T any](data []T, fieldName string) {
 	})
 }
 
+// Version is a version string, such as an engine version, that sorts naturally: 8.0.39 before
+// 13.4 before 13.15. It prints and marshals as a plain string.
+type Version string
+
 // Less reports whether a sorts before b.
 //
-// Integers compare numerically, slices compare by their sorted comma-joined elements,
-// and everything else compares by its string form.
+// Integers compare numerically, a Version compares naturally (see NaturalLess), slices compare by
+// their sorted comma-joined elements, and everything else compares by its string form.
 func Less(a, b reflect.Value) bool {
+	if a.Type() == reflect.TypeFor[Version]() {
+		return NaturalLess(a.String(), b.String())
+	}
 	switch a.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return a.Int() < b.Int()
@@ -114,6 +122,46 @@ func Less(a, b reflect.Value) bool {
 	default:
 		return a.String() < b.String()
 	}
+}
+
+// NaturalLess reports whether a sorts before b when the runs of digits compare as numbers: 13.4
+// before 13.15, and 8.0 before 13.0. Other characters compare as text; at a tie, the shorter
+// string sorts first.
+func NaturalLess(a, b string) bool {
+	for a != "" && b != "" {
+		da, db := digitPrefix(a), digitPrefix(b)
+		if da != "" && db != "" {
+			if c := compareNumbers(da, db); c != 0 {
+				return c < 0
+			}
+			a, b = a[len(da):], b[len(db):]
+			continue
+		}
+		if a[0] != b[0] {
+			return a[0] < b[0]
+		}
+		a, b = a[1:], b[1:]
+	}
+	return len(a) < len(b)
+}
+
+// compareNumbers compares two runs of digits as numbers, of any length: -1, 0 or +1.
+func compareNumbers(a, b string) int {
+	a, b = strings.TrimLeft(a, "0"), strings.TrimLeft(b, "0")
+	// Without leading zeros, a longer number is a larger one.
+	if len(a) != len(b) {
+		return cmp.Compare(len(a), len(b))
+	}
+	return strings.Compare(a, b)
+}
+
+// digitPrefix returns the run of ASCII digits s starts with, or "".
+func digitPrefix(s string) string {
+	i := 0
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+	return s[:i]
 }
 
 // sliceSortKey returns a comparable key for a slice: its elements formatted, sorted and joined.

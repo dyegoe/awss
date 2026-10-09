@@ -346,7 +346,7 @@ type errorCase struct {
 // errorCases lists argument and validation failures.
 func errorCases() []errorCase {
 	return []errorCase{
-		{name: "unknown subcommand", args: []string{"rds"}, wantErr: `unknown command "rds"`},
+		{name: "unknown subcommand", args: []string{"nope"}, wantErr: `unknown command "nope"`},
 		{name: "positional argument", args: []string{"ec2", "--all", "extra"}, wantErr: `unknown command "extra"`},
 		{name: "unknown flag", args: []string{"ec2", "--nope"}, wantErr: "unknown flag: --nope"},
 		{

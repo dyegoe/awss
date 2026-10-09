@@ -154,3 +154,48 @@ func TestLess_sliceDoesNotMutateInput(t *testing.T) {
 		t.Errorf("Less() mutated its input slice: %v", a)
 	}
 }
+
+// TestNaturalLess checks that runs of digits compare as numbers and the rest as text.
+func TestNaturalLess(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b string
+		want bool
+	}{
+		{name: "minor 4 before 15", a: "13.4", b: "13.15", want: true},
+		{name: "minor 15 after 4", a: "13.15", b: "13.4", want: false},
+		{name: "major 8 before 13", a: "8.0.39", b: "13.4", want: true},
+		{name: "equal", a: "16.4", b: "16.4", want: false},
+		{name: "prefix first", a: "16", b: "16.4", want: true},
+		{name: "leading zeros are the same number", a: "1.05", b: "1.5", want: false},
+		{name: "text part", a: "5.7.mysql_aurora.2", b: "5.7.mysql_aurora.10", want: true},
+		{name: "letters as text", a: "10.a", b: "10.b", want: true},
+		{name: "digit before letter", a: "1", b: "a", want: true},
+		{name: "empty first", a: "", b: "1", want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NaturalLess(tt.a, tt.b); got != tt.want {
+				t.Errorf("NaturalLess(%q, %q) = %v, want %v", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestSortByField_version checks that a Version field sorts naturally and a plain string as text.
+func TestSortByField_version(t *testing.T) {
+	type row struct {
+		V Version
+		S string
+	}
+	data := []row{{"13.15", "13.15"}, {"8.0.39", "8.0.39"}, {"13.4", "13.4"}}
+
+	SortByField(data, "V")
+	if got := []Version{data[0].V, data[1].V, data[2].V}; !reflect.DeepEqual(got, []Version{"8.0.39", "13.4", "13.15"}) {
+		t.Errorf("SortByField(V) = %v, want [8.0.39 13.4 13.15]", got)
+	}
+	SortByField(data, "S")
+	if got := []string{data[0].S, data[1].S, data[2].S}; !reflect.DeepEqual(got, []string{"13.15", "13.4", "8.0.39"}) {
+		t.Errorf("SortByField(S) = %v, want [13.15 13.4 8.0.39]", got)
+	}
+}

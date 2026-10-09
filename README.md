@@ -200,6 +200,44 @@ There is no `--all`. Listing every bucket of every account is an inventory job, 
 costs up to `--max-keys` / 1000 calls; use S3 Inventory with Athena, or S3 Storage Lens, for it
 ([#152](https://github.com/dyegoe/awss/issues/152)).
 
+#### RDS DB instances (`awss rds`)
+
+Searches RDS DB instances, including the instances of Aurora clusters (with their cluster ID).
+`DescribeDBInstances` filters only by identifier, engine and cluster; awss matches the other
+filters on the results. Filters combine with AND.
+
+| Flag | Short | Matched by | Description |
+| --- | --- | --- | --- |
+| `--all` | `-a` | | Search all DB instances (no filters) |
+| `--ids` | `-i` | AWS | DB instance identifiers |
+| `--engines` | `-e` | AWS | Engines: `postgres`, `aurora-postgresql`, `mysql`, ... |
+| `--clusters` | `-c` | AWS | The Aurora or Multi-AZ clusters the instances belong to |
+| `--names` | `-n` | awss | Identifier patterns: globs, or Go regular expressions with `--regex` |
+| `--engine-versions` | `-V` | awss | Engine version globs: `'13*'` finds every 13.x |
+| `--tags` | `-t` | awss | `Key=Value1:Value2,Other=Value`: every key must match (AND), the values of one key are alternatives (OR), values accept globs |
+
+```bash
+# PostgreSQL 13: the engine narrows the call, the version is matched on the results
+awss rds -e postgres -V '13*' --profiles all --regions all
+
+# The instances of one Aurora cluster
+awss rds -c my-aurora-cluster
+```
+
+Table columns: ID, Engine, Version, Class, Status, Multi-AZ, AZ, Cluster, and Tags with
+`--show-tags` / `--show-tags-keys` (the tags come with the listing: no extra call). The table
+stays about 120 characters wide, so these fields are in `--output json` only: `endpoint`
+(`host:port`, empty while the instance is being created), `vpc_id`, `publicly_accessible`,
+`encrypted`, `storage_type` and `storage_gib`. The endpoint is not a filter (AWS has none); find
+one with jq:
+
+```bash
+awss rds -a --output json | jq -r '.data[] | [.id, .endpoint] | @tsv'
+```
+
+Sort by: `--sort id|engine|version|class|status|az|vpc|cluster` (default: `id`). Versions sort
+by number: 8.0.39, 13.4, 13.15, 16.4.
+
 #### Organization accounts (`awss org`)
 
 Lists the accounts of the AWS Organization: ID, name, email, status and the date each account
@@ -485,6 +523,9 @@ awss s3 --names 'logs|backup' --regex
 
 # Gzipped logs of January 2024 in a bucket, biggest first
 awss --regions all s3obj -b my-logs -K 'logs/2024-01/*.gz' --sort size
+
+# Every PostgreSQL 13 instance, everywhere
+awss rds -e postgres -V '13*' --profiles all --regions all
 
 # JSON output for scripting
 awss ec2 --all --output json
