@@ -77,14 +77,7 @@ other filters.
 var rdsFilterFlags = []string{flagIDs, "engines", "clusters", flagNames, "engine-versions", flagTags}
 
 func rdsRunE(cmd *cobra.Command, _ []string) error {
-	// Validate the patterns early, before any AWS call.
-	if _, err := common.NewMatcher(rdsF.Names, viper.GetBool(labelRdsRegex)); err != nil {
-		return err
-	}
-	if _, err := common.NewMatcher(rdsF.EngineVersions, false); err != nil {
-		return fmt.Errorf("engine versions: %w", err)
-	}
-	if _, err := common.NewTagMatcher(rdsF.Tags); err != nil {
+	if err := checkRDSPatterns(rdsF.Names, rdsF.EngineVersions, rdsF.Tags, viper.GetBool(labelRdsRegex)); err != nil {
 		return err
 	}
 	return runSearch(cmd, &cmdSpec{
@@ -93,6 +86,21 @@ func rdsRunE(cmd *cobra.Command, _ []string) error {
 		regexLabel:  labelRdsRegex,
 		filterFlags: rdsFilterFlags,
 	}, nil, nil, rdsF)
+}
+
+// checkRDSPatterns validates the patterns awss matches in the rds and rds-cluster searches, before
+// any AWS call.
+func checkRDSPatterns(names, versions, tags []string, regex bool) error {
+	if _, err := common.NewMatcher(names, regex); err != nil {
+		return err
+	}
+	if _, err := common.NewMatcher(versions, false); err != nil {
+		return fmt.Errorf("engine versions: %w", err)
+	}
+	if _, err := common.NewTagMatcher(tags); err != nil {
+		return err
+	}
+	return nil
 }
 
 func rdsInitFlags() {

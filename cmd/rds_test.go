@@ -30,17 +30,56 @@ func TestRdsFilterFlags_coversStruct(t *testing.T) {
 	checkFilterFlags(t, "rds", rdsCmd, reflect.TypeOf(rdsFilters{}).NumField(), rdsFilterFlags)
 }
 
+// filterCase is one run of a search command: the filters and options it must send, or the error
+// that stops it before any search.
+type filterCase struct {
+	name        string
+	args        []string
+	wantFilters map[string][]string
+	wantSort    string
+	wantRegex   bool
+	wantErr     string
+}
+
+// runFilterCases runs each case through the command tree and checks what reached the search.
+// defaultSort is the sort field a case gets when it sets none.
+func runFilterCases(t *testing.T, command, defaultSort string, tests []filterCase) {
+	t.Helper()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := resetCLI(t, nil)
+
+			_, err := runCLI(t, tt.args...)
+
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) || len(*calls) != 0 {
+					t.Errorf("Execute(%v) error = %v, searches %d, want an error containing %q and no search",
+						tt.args, err, len(*calls), tt.wantErr)
+				}
+				return
+			}
+			if err != nil || len(*calls) != 1 {
+				t.Fatalf("Execute(%v) error = %v, searches %d, want one search", tt.args, err, len(*calls))
+			}
+			got := (*calls)[0]
+			wantSort := tt.wantSort
+			if wantSort == "" {
+				wantSort = defaultSort
+			}
+			if got.cmd != command || !reflect.DeepEqual(got.filters, tt.wantFilters) ||
+				got.opts.SortField != wantSort || got.opts.Regex != tt.wantRegex {
+				t.Errorf("Execute(%v) = %s %v sort %q regex %v, want %s %v sort %q regex %v", tt.args,
+					got.cmd, got.filters, got.opts.SortField, got.opts.Regex,
+					command, tt.wantFilters, wantSort, tt.wantRegex)
+			}
+		})
+	}
+}
+
 // TestExecute_rds checks the filters and options every rds flag sends to the search, and the
 // invalid values rejected before any search.
 func TestExecute_rds(t *testing.T) {
-	tests := []struct {
-		name        string
-		args        []string
-		wantFilters map[string][]string
-		wantSort    string
-		wantRegex   bool
-		wantErr     string
-	}{
+	runFilterCases(t, "rds", "id", []filterCase{
 		{name: "--all", args: []string{"rds", "-a"}, wantFilters: map[string][]string{}},
 		{name: "--ids", args: []string{"rds", "-i", "db-1,db-2"},
 			wantFilters: map[string][]string{"db-instance-id": {"db-1", "db-2"}}},
@@ -63,33 +102,5 @@ func TestExecute_rds(t *testing.T) {
 		{name: "bad tag", args: []string{"rds", "-t", "Env"}, wantErr: "invalid tag format: Env"},
 		{name: "bad tag glob", args: []string{"rds", "-t", "Env=[p"}, wantErr: "tag Env: invalid pattern"},
 		{name: "bad sort field", args: []string{"rds", "-a", "--sort", "size"}, wantErr: "size"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			calls := resetCLI(t, nil)
-
-			_, err := runCLI(t, tt.args...)
-
-			if tt.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), tt.wantErr) || len(*calls) != 0 {
-					t.Errorf("Execute(%v) error = %v, searches %d, want an error containing %q and no search",
-						tt.args, err, len(*calls), tt.wantErr)
-				}
-				return
-			}
-			if err != nil || len(*calls) != 1 {
-				t.Fatalf("Execute(%v) error = %v, searches %d, want one search", tt.args, err, len(*calls))
-			}
-			got := (*calls)[0]
-			wantSort := tt.wantSort
-			if wantSort == "" {
-				wantSort = "id"
-			}
-			if got.cmd != "rds" || !reflect.DeepEqual(got.filters, tt.wantFilters) ||
-				got.opts.SortField != wantSort || got.opts.Regex != tt.wantRegex {
-				t.Errorf("Execute(%v) = %s %v sort %q regex %v, want rds %v sort %q regex %v", tt.args,
-					got.cmd, got.filters, got.opts.SortField, got.opts.Regex, tt.wantFilters, wantSort, tt.wantRegex)
-			}
-		})
-	}
+	})
 }

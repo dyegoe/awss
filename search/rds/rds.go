@@ -126,15 +126,46 @@ func New(profile, region string, filters map[string][]string, sortField string, 
 	}
 }
 
-// localFilters are the filters awss matches on the results.
-type localFilters struct {
+// LocalFilters are the filters awss matches on the results, since the RDS Describe calls cannot
+// filter on them: the identifier (FilterKeyName), the engine version (FilterKeyEngineVersion) and
+// the tags (FilterKeyTag). The rds-cluster search uses them too.
+type LocalFilters struct {
 	names, versions *common.Matcher
 	tags            *common.TagMatcher
 }
 
-// match reports whether row passes every local filter.
-func (f *localFilters) match(row *dataRow) bool {
-	return f.names.Match(row.ID) && f.versions.Match(string(row.EngineVersion)) && f.tags.Match(row.Tags)
+// NewLocalFilters builds the local filters from a filters map, which it only reads. regex makes
+// the name patterns Go regular expressions instead of globs.
+func NewLocalFilters(filters map[string][]string, regex bool) (*LocalFilters, error) {
+	f := &LocalFilters{}
+	var err error
+	if f.names, err = common.NewMatcher(filters[FilterKeyName], regex); err != nil {
+		return nil, fmt.Errorf("names: %w", err)
+	}
+	if f.versions, err = common.NewMatcher(filters[FilterKeyEngineVersion], false); err != nil {
+		return nil, fmt.Errorf("engine versions: %w", err)
+	}
+	if f.tags, err = common.NewTagMatcher(filters[FilterKeyTag]); err != nil {
+		return nil, fmt.Errorf("tags: %w", err)
+	}
+	return f, nil
+}
+
+// Match reports whether a resource with this identifier, engine version and tags passes every
+// local filter.
+func (f *LocalFilters) Match(id, version string, tags map[string]string) bool {
+	return f.names.Match(id) && f.versions.Match(version) && f.tags.Match(tags)
+}
+
+// AWSFilters returns the DescribeDB* filters of the given keys that have values, in key order.
+func AWSFilters(filters map[string][]string, keys ...string) []types.Filter {
+	var out []types.Filter
+	for _, key := range keys {
+		if values := filters[key]; len(values) > 0 {
+			out = append(out, types.Filter{Name: aws.String(key), Values: values})
+		}
+	}
+	return out
 }
 
 // Search performs the RDS DB instances search.
@@ -158,7 +189,7 @@ func (r *Results) Search(ctx context.Context) {
 
 // collect describes the DB instances, keeps those that pass the local filters and sorts the rows.
 func (r *Results) collect(
-	ctx context.Context, client rds.DescribeDBInstancesAPIClient, input *rds.DescribeDBInstancesInput, local *localFilters,
+	ctx context.Context, client rds.DescribeDBInstancesAPIClient, input *rds.DescribeDBInstancesInput, local *LocalFilters,
 ) {
 	paged := *input
 	paged.MaxRecords = aws.Int32(pageSize)
@@ -171,7 +202,7 @@ func (r *Results) collect(
 			return
 		}
 		for i := range page.DBInstances {
-			if row := parseInstance(&page.DBInstances[i]); local.match(&row) {
+			if row := parseInstance(&page.DBInstances[i]); local.Match(row.ID, string(row.EngineVersion), row.Tags) {
 				r.Data = append(r.Data, row)
 			}
 		}
@@ -187,25 +218,12 @@ func (r *Results) collect(
 
 // getFilters splits r.Filters into the DescribeDBInstances filters and the local ones. It reads
 // r.Filters and never changes it: one map is shared by every search of a run.
-func (r *Results) getFilters() (*rds.DescribeDBInstancesInput, *localFilters, error) {
-	input := &rds.DescribeDBInstancesInput{}
-	local := &localFilters{}
-	var err error
-
-	for _, key := range []string{FilterKeyID, FilterKeyEngine, FilterKeyCluster} {
-		if values := r.Filters[key]; len(values) > 0 {
-			input.Filters = append(input.Filters, types.Filter{Name: aws.String(key), Values: values})
-		}
+func (r *Results) getFilters() (*rds.DescribeDBInstancesInput, *LocalFilters, error) {
+	local, err := NewLocalFilters(r.Filters, r.Regex)
+	if err != nil {
+		return nil, nil, err
 	}
-	if local.names, err = common.NewMatcher(r.Filters[FilterKeyName], r.Regex); err != nil {
-		return nil, nil, fmt.Errorf("names: %w", err)
-	}
-	if local.versions, err = common.NewMatcher(r.Filters[FilterKeyEngineVersion], false); err != nil {
-		return nil, nil, fmt.Errorf("engine versions: %w", err)
-	}
-	if local.tags, err = common.NewTagMatcher(r.Filters[FilterKeyTag]); err != nil {
-		return nil, nil, fmt.Errorf("tags: %w", err)
-	}
+	input := &rds.DescribeDBInstancesInput{Filters: AWSFilters(r.Filters, FilterKeyID, FilterKeyEngine, FilterKeyCluster)}
 	return input, local, nil
 }
 
@@ -217,14 +235,14 @@ func parseInstance(db *types.DBInstance) dataRow {
 		EngineVersion:    common.Version(aws.ToString(db.EngineVersion)),
 		Class:            aws.ToString(db.DBInstanceClass),
 		Status:           aws.ToString(db.DBInstanceStatus),
-		MultiAZ:          formatBool(db.MultiAZ),
+		MultiAZ:          FormatBool(db.MultiAZ),
 		AvailabilityZone: aws.ToString(db.AvailabilityZone),
-		Public:           formatBool(db.PubliclyAccessible),
-		Encrypted:        formatBool(db.StorageEncrypted),
+		Public:           FormatBool(db.PubliclyAccessible),
+		Encrypted:        FormatBool(db.StorageEncrypted),
 		ClusterID:        aws.ToString(db.DBClusterIdentifier),
 		StorageType:      aws.ToString(db.StorageType),
 		StorageGiB:       aws.ToInt32(db.AllocatedStorage),
-		Tags:             tagsToMap(db.TagList),
+		Tags:             TagsToMap(db.TagList),
 	}
 	if db.Endpoint != nil && db.Endpoint.Address != nil {
 		row.Endpoint = *db.Endpoint.Address
@@ -238,17 +256,17 @@ func parseInstance(db *types.DBInstance) dataRow {
 	return row
 }
 
-// formatBool returns "true" or "false", or "" when b is nil.
-func formatBool(b *bool) string {
+// FormatBool returns "true" or "false", or "" when b is nil.
+func FormatBool(b *bool) string {
 	if b == nil {
 		return ""
 	}
 	return strconv.FormatBool(*b)
 }
 
-// tagsToMap converts RDS tags to a map. RDS uses its own Tag type, so it cannot share
+// TagsToMap converts RDS tags to a map. RDS uses its own Tag type, so it cannot share
 // common.TagsToMap. A tag with a nil key is skipped and a nil value reads as "".
-func tagsToMap(tags []types.Tag) map[string]string {
+func TagsToMap(tags []types.Tag) map[string]string {
 	m := make(map[string]string, len(tags))
 	for _, t := range tags {
 		if t.Key != nil {
