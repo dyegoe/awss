@@ -107,7 +107,7 @@ func TestExecute_unknownCommand(t *testing.T) {
 	})
 
 	opts := &Options{Output: common.JSON}
-	err := Execute("nope", []string{"default"}, []string{"us-east-1"}, map[string][]string{}, opts)
+	_, err := Execute("nope", []string{"default"}, []string{"us-east-1"}, map[string][]string{}, opts)
 	if err == nil {
 		t.Fatal("Execute() error = nil, want command not found")
 	}
@@ -226,7 +226,7 @@ func TestExecute_fanOut(t *testing.T) {
 			calls := mockCountingEngine(t)
 
 			opts := &Options{Output: common.JSON}
-			if err := Execute("test", tt.profiles, tt.regions, map[string][]string{}, opts); err != nil {
+			if _, err := Execute("test", tt.profiles, tt.regions, map[string][]string{}, opts); err != nil {
 				t.Fatalf("Execute() error = %v, want nil", err)
 			}
 			if *calls != tt.wantCalls {
@@ -319,7 +319,7 @@ func TestExecute_timeoutReachesSearch(t *testing.T) {
 			captureStdout(t)
 
 			opts := &Options{Output: common.JSON, Timeout: tt.timeout}
-			if err := Execute("test", []string{"p1", "p2"}, []string{"r1", "r2"}, map[string][]string{}, opts); err != nil {
+			if _, err := Execute("test", []string{"p1", "p2"}, []string{"r1", "r2"}, map[string][]string{}, opts); err != nil {
 				t.Fatalf("Execute() error = %v", err)
 			}
 			if len(deadlines) != 4 {
@@ -334,16 +334,17 @@ func TestExecute_timeoutReachesSearch(t *testing.T) {
 	}
 }
 
-// TestExecute_timeout checks that the finished result sets are printed as they are, and that a
+// TestExecute_timeout checks that the finished result sets are printed as they are, that a
 // search still running at the deadline is printed as timed out, without rows, whether it honors
-// the context or ignores it.
+// the context or ignores it, and that the summary counts each result set once.
 func TestExecute_timeout(t *testing.T) {
 	hang := make(chan struct{})
 	t.Cleanup(func() { close(hang) })
 	ctxErr := make(chan error, 1)
 
 	mockTimedEngine(t, map[string]func(context.Context, *timedResults){
-		"fast": func(_ context.Context, r *timedResults) { r.Data = append(r.Data, "row-1") },
+		"fast":  func(_ context.Context, r *timedResults) { r.Data = append(r.Data, "row-1", "row-2") },
+		"empty": func(_ context.Context, _ *timedResults) {},
 		"failed": func(_ context.Context, r *timedResults) {
 			r.Errors = append(r.Errors, "error describing instances: AccessDenied")
 		},
@@ -363,9 +364,21 @@ func TestExecute_timeout(t *testing.T) {
 	out := captureStdout(t)
 
 	opts := &Options{Output: common.JSON, Timeout: 100 * time.Millisecond}
-	profiles := []string{"fast", "failed", "cut-short", "hung"}
-	if err := Execute("test", profiles, []string{"us-east-1"}, map[string][]string{}, opts); err != nil {
+	profiles := []string{"fast", "empty", "failed", "cut-short", "hung"}
+	summary, err := Execute("test", profiles, []string{"us-east-1"}, map[string][]string{}, opts)
+	if err != nil {
 		t.Fatalf("Execute() error = %v, want nil", err)
+	}
+
+	wantSummary := Summary{
+		Profiles: 5, Regions: 1, Searches: 5, Concurrency: 5,
+		WithResults: 1, Empty: 1, Errors: 1, TimedOut: 2, Resources: 2,
+	}
+	if summary != wantSummary {
+		t.Errorf("Execute() summary = %+v, want %+v", summary, wantSummary)
+	}
+	if got := summary.Failed(); got != 3 {
+		t.Errorf("Summary.Failed() = %d, want 3", got)
 	}
 
 	if err := <-ctxErr; !errors.Is(err, context.DeadlineExceeded) {
@@ -373,7 +386,8 @@ func TestExecute_timeout(t *testing.T) {
 	}
 	timedOut := []string{"search timed out after 100ms; raise --timeout, or set it to 0 to disable it"}
 	want := map[string]printedSet{
-		"fast": {Profile: "fast", Region: "us-east-1", Data: []string{"row-1"}},
+		// "empty" is not printed: the run does not set ShowEmpty.
+		"fast": {Profile: "fast", Region: "us-east-1", Data: []string{"row-1", "row-2"}},
 		"failed": {
 			Profile: "failed", Region: "us-east-1", Data: []string{},
 			Errors: []string{"error describing instances: AccessDenied"},
@@ -399,7 +413,7 @@ func TestExecute_loggedOutProfile(t *testing.T) {
 
 	opts := &Options{Output: common.JSON}
 	profiles := []string{"logged-in-1", "expired", "logged-in-2"}
-	if err := Execute("test", profiles, []string{"us-east-1"}, map[string][]string{}, opts); err != nil {
+	if _, err := Execute("test", profiles, []string{"us-east-1"}, map[string][]string{}, opts); err != nil {
 		t.Fatalf("Execute() error = %v, want nil", err)
 	}
 
@@ -488,7 +502,7 @@ func TestExecute_concurrency(t *testing.T) {
 			}
 
 			opts := &Options{Output: common.JSON, Concurrency: tt.concurrency}
-			if err := Execute("test", profiles, regions, map[string][]string{}, opts); err != nil {
+			if _, err := Execute("test", profiles, regions, map[string][]string{}, opts); err != nil {
 				t.Fatalf("Execute() error = %v, want nil", err)
 			}
 			if probe.max != tt.wantMax {
@@ -502,7 +516,7 @@ func TestExecute_concurrency(t *testing.T) {
 }
 
 // TestExecute_timeoutWhileWaiting checks that a search still waiting for a free slot at the
-// deadline is reported as not started, and never calls its Search.
+// deadline is reported as not started, never calls its Search, and counts as timed out.
 func TestExecute_timeoutWhileWaiting(t *testing.T) {
 	started := make(chan string, 2)
 	mockTimedEngine(t, map[string]func(context.Context, *timedResults){
@@ -516,9 +530,13 @@ func TestExecute_timeoutWhileWaiting(t *testing.T) {
 	out := captureStdout(t)
 
 	opts := &Options{Output: common.JSON, Concurrency: 1, Timeout: 50 * time.Millisecond}
-	err := Execute("test", []string{"first", "second"}, []string{"us-east-1"}, map[string][]string{}, opts)
+	summary, err := Execute("test", []string{"first", "second"}, []string{"us-east-1"}, map[string][]string{}, opts)
 	if err != nil {
 		t.Fatalf("Execute() error = %v, want nil", err)
+	}
+	// A search that did not start counts as timed out, like one cut short.
+	if summary.TimedOut != 2 || summary.Errors != 0 {
+		t.Errorf("Execute() summary = %+v, want TimedOut 2 and Errors 0", summary)
 	}
 	// Drained, not closed: a search returning at the deadline may still be sending.
 	var got []string

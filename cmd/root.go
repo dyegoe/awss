@@ -50,6 +50,7 @@ const (
 	labelTimeout        = "timeout"
 	labelConcurrency    = "concurrency"
 	labelAccounts       = "accounts"
+	labelStats          = "stats"
 
 	// defaultTimeout is generous so --profiles all over many regions is not cut short.
 	defaultTimeout = 5 * time.Minute
@@ -221,6 +222,9 @@ func initFlags() {
 			"that did not finish are reported as timed out; the others are printed. 0 disables it.")
 	rootCmd.PersistentFlags().Int(labelConcurrency, search.DefaultConcurrency,
 		"How many profile and region searches run at once. The others wait for a free slot.")
+	rootCmd.PersistentFlags().Bool(labelStats, false,
+		"Print the stats of the run on stderr after the results: elapsed time, peak memory, searches, "+
+			"resources found and AWS API calls.")
 }
 
 // initViper binds the flags to viper.
@@ -268,6 +272,9 @@ func initViper() error {
 	}
 	if err := viper.BindPFlag(labelConcurrency, rootCmd.PersistentFlags().Lookup(labelConcurrency)); err != nil {
 		return fmt.Errorf("error binding flag %s: %w", labelConcurrency, err)
+	}
+	if err := viper.BindPFlag(labelStats, rootCmd.PersistentFlags().Lookup(labelStats)); err != nil {
+		return fmt.Errorf("error binding flag %s: %w", labelStats, err)
 	}
 	viper.SetDefault(labelAllRegions, allRegionsDefault)
 
@@ -405,7 +412,9 @@ var executeSearch = search.Execute
 
 // runSearch is the common RunE body of every search subcommand.
 //
-// It validates the sort field, builds filters, and executes the search.
+// It validates the sort field, builds filters, and executes the search. After the results, it
+// writes on stderr a line when a search failed, and the stats of the run with --stats: stdout
+// stays only the results, so JSON output still parses. A failed search does not fail the command.
 func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStruct interface{}) error {
 	if err := search.CheckSortField(cmd.Name(), viper.GetString(spec.sortLabel)); err != nil {
 		return err
@@ -426,7 +435,8 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 		names = accountNames(cmd.ErrOrStderr())
 	}
 
-	return executeSearch(
+	start := time.Now()
+	summary, err := executeSearch(
 		cmd.Name(),
 		viper.GetStringSlice(labelProfiles),
 		viper.GetStringSlice(labelRegions),
@@ -446,6 +456,16 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 			Timeout:        viper.GetDuration(labelTimeout),
 		},
 	)
+	if err != nil {
+		return err
+	}
+
+	writeFailures(cmd.ErrOrStderr(), &summary)
+	if viper.GetBool(labelStats) {
+		st := collectStats(start, &summary)
+		writeStats(cmd.ErrOrStderr(), &st)
+	}
+	return nil
 }
 
 // accountNames returns the account names for the Owner column, keyed by account ID, from the
