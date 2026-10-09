@@ -133,6 +133,7 @@ func TestEngines_searchKeepsFilters(t *testing.T) {
 			"instance-id": {"i-1"}, "tag:Name": {"web-*"}, "tag": {"Env=prod:dev"},
 			"availability-zone": {"a", "b"}, "cidr": {"10.0.0.0/16"}, "vpc-id": {"vpc-1"},
 			"name": {"logs-*"}, "bucket": {"b1"}, "key": {"app/*"},
+			"engine": {"postgres"}, "engine-version": {"13*"}, "db-cluster-id": {"c1"}, "db-instance-id": {"db-1"},
 		}
 	}
 	for cmd, eng := range engines {
@@ -151,7 +152,7 @@ func TestEngines_searchKeepsFilters(t *testing.T) {
 
 // TestEngines_registeredCommands checks every built-in command has both a constructor and sort fields.
 func TestEngines_registeredCommands(t *testing.T) {
-	for _, cmd := range []string{"ec2", "eni", "ebs", "vpc", "subnet", "s3", "s3obj", "org"} {
+	for _, cmd := range []string{"ec2", "eni", "ebs", "vpc", "subnet", "s3", "s3obj", "org", "rds"} {
 		eng, ok := engines[cmd]
 		if !ok {
 			t.Errorf("engines[%q] missing", cmd)
