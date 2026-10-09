@@ -324,7 +324,8 @@ func TestAccountNames(t *testing.T) {
 	}
 }
 
-// TestNewClient checks that a profile missing from the AWS config file is an error before any call.
+// TestNewClient checks that a profile missing from the AWS config file is an error before any
+// call, and that the client tries a throttled call maxAttempts times.
 func TestNewClient(t *testing.T) {
 	empty := filepath.Join(t.TempDir(), "config")
 	if err := os.WriteFile(empty, nil, 0o600); err != nil {
@@ -336,8 +337,12 @@ func TestNewClient(t *testing.T) {
 	if _, err := newClient("awss-test-missing-profile"); err == nil {
 		t.Error("newClient(missing profile) error = nil, want an error")
 	}
-	if _, err := newClient(""); err != nil {
-		t.Errorf("newClient(default) error = %v, want nil", err)
+	client, err := newClient("")
+	if err != nil {
+		t.Fatalf("newClient(default) error = %v, want nil", err)
+	}
+	if got := client.(*organizations.Client).Options().Retryer.MaxAttempts(); got != maxAttempts {
+		t.Errorf("newClient() MaxAttempts = %d, want %d", got, maxAttempts)
 	}
 }
 
@@ -450,6 +455,7 @@ func TestResults_collect_tags(t *testing.T) {
 				tagErr: map[string]error{"2": accessDenied()},
 			}
 			r := New("org", Region, nil, "id", tt.showTags)
+			r.tagInterval = time.Millisecond
 			r.collect(context.Background(), client)
 
 			for i, row := range r.Data {
@@ -467,6 +473,44 @@ func TestResults_collect_tags(t *testing.T) {
 				if !strings.HasPrefix(r.Errors[i], want) {
 					t.Errorf("collect() error %d = %q, want prefix %q", i, r.Errors[i], want)
 				}
+			}
+		})
+	}
+}
+
+// TestResults_collectTags_pace checks that the tag calls start at most every tagInterval, and that
+// no new call starts once ctx ends.
+func TestResults_collectTags_pace(t *testing.T) {
+	tests := []struct {
+		name        string
+		interval    time.Duration
+		cancelled   bool
+		wantCalls   int
+		wantAtLeast time.Duration
+	}{
+		{name: "paced", interval: 30 * time.Millisecond, wantCalls: 4, wantAtLeast: 90 * time.Millisecond},
+		{name: "cancelled", interval: time.Hour, cancelled: true, wantCalls: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeOrg{}
+			r := New("org", Region, nil, "", true)
+			r.tagInterval = tt.interval
+			r.Data = []dataRow{{ID: "1"}, {ID: "2"}, {ID: "3"}, {ID: "4"}}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.cancelled {
+				cancel()
+			}
+
+			start := time.Now()
+			r.collectTags(ctx, client)
+
+			if client.tagCall != tt.wantCalls {
+				t.Errorf("collectTags() calls = %d, want %d", client.tagCall, tt.wantCalls)
+			}
+			if got := time.Since(start); got < tt.wantAtLeast {
+				t.Errorf("collectTags() took %s, want at least %s", got, tt.wantAtLeast)
 			}
 		})
 	}

@@ -217,8 +217,11 @@ awss org --profiles org-management --show-tags-keys Owner,CostCenter
 
 `ListAccounts` has no server-side filter, so `--statuses` is matched by awss after the listing.
 Account tags need one `ListTagsForResource` call per account (there is no batch call), so they
-are fetched only with `--show-tags` or `--show-tags-keys`, at most 5 at a time; this also adds
-the `tags` field to JSON output. An account whose tags cannot be read shows its error and no tags.
+are fetched only with `--show-tags` or `--show-tags-keys`; this also adds the `tags` field to
+JSON output. AWS allows 10 such calls per second per account and 12 for the whole organization,
+shared with every other caller, so awss paces them at 5 per second (about 30 seconds for 150
+accounts) and retries a throttled call up to 10 times. An account whose tags still cannot be read
+shows its error and no tags.
 
 - **Permission:** the profile must be allowed to call `organizations:ListAccounts`, and
   `organizations:ListTagsForResource` for tags: the management account or a delegated

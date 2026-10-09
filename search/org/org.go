@@ -26,10 +26,12 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dyegoe/awss/common"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/service/organizations"
 	"github.com/aws/aws-sdk-go-v2/service/organizations/types"
 )
@@ -43,9 +45,18 @@ const Region = "global"
 // the EC2 Describe* calls.
 const pageSize int32 = 20
 
-// tagWorkers caps the ListTagsForResource calls running at the same time. Organizations has low
-// API quotas, so it stays below the s3 tag workers.
+// tagWorkers caps the ListTagsForResource calls running at the same time.
 const tagWorkers = 5
+
+// tagInterval paces the ListTagsForResource calls: one starts at most every tagInterval, 5 per
+// second. AWS allows 10 per second per account (burst 15) and 12 per second for the whole
+// organization, shared with every other caller, so awss keeps to half of it.
+const tagInterval = 200 * time.Millisecond
+
+// maxAttempts is how many times the Organizations client tries a call. Its quotas are low and
+// shared across the organization, so a throttled call waits and retries, with the SDK's backoff,
+// longer than the SDK's default of 3 attempts.
+const maxAttempts = 10
 
 // FilterKeyStatus is the filter key of the statuses to keep. ListAccounts has no server-side
 // filter, so the statuses are matched client-side.
@@ -66,6 +77,9 @@ type Results struct {
 
 	// ShowTags fetches the tags of each account found (one API call per account).
 	ShowTags bool `json:"-"`
+
+	// tagInterval is the least time between two ListTagsForResource calls; tests shorten it.
+	tagInterval time.Duration
 }
 
 // dataRow represents one account of the organization.
@@ -93,8 +107,9 @@ type dataRow struct {
 // the search always calls the global endpoint.
 func New(profile, region string, filters map[string][]string, sortField string, showTags bool) *Results {
 	return &Results{
-		Filters:  filters,
-		ShowTags: showTags,
+		Filters:     filters,
+		ShowTags:    showTags,
+		tagInterval: tagInterval,
 		BaseResults: common.BaseResults{
 			Profile:   profile,
 			Region:    region,
@@ -119,7 +134,9 @@ var newClient = func(profile string) (orgAPI, error) {
 	if err != nil {
 		return nil, err
 	}
-	return organizations.NewFromConfig(cfg), nil
+	return organizations.NewFromConfig(cfg, func(o *organizations.Options) {
+		o.Retryer = retry.AddWithMaxAttempts(o.Retryer, maxAttempts)
+	}), nil
 }
 
 // Search lists the accounts of the organization. A missing permission, or an account that is
@@ -197,14 +214,20 @@ func CheckStatuses(statuses []string) error {
 	return nil
 }
 
-// collectTags fills the Tags of every row, running at most tagWorkers ListTagsForResource calls
-// at once. A failure is reported per account and leaves that row without tags.
+// collectTags fills the Tags of every row: one ListTagsForResource call starts at most every
+// r.tagInterval, and at most tagWorkers run at once. A failure is reported per account and leaves
+// that row without tags. When ctx ends, no new call starts.
 func (r *Results) collectTags(ctx context.Context, client organizations.ListTagsForResourceAPIClient) {
 	errs := make([]error, len(r.Data))
 	sem := make(chan struct{}, tagWorkers)
 	var wg sync.WaitGroup
+	pace := time.NewTicker(r.tagInterval)
+	defer pace.Stop()
 
 	for i := range r.Data {
+		if i > 0 && !wait(ctx, pace.C) {
+			break
+		}
 		sem <- struct{}{}
 		wg.Go(func() {
 			defer func() { <-sem }()
@@ -218,6 +241,16 @@ func (r *Results) collectTags(ctx context.Context, client organizations.ListTags
 		if err != nil {
 			r.Errors = append(r.Errors, err.Error())
 		}
+	}
+}
+
+// wait waits for the next tick, and reports false when ctx ends first.
+func wait(ctx context.Context, tick <-chan time.Time) bool {
+	select {
+	case <-tick:
+		return true
+	case <-ctx.Done():
+		return false
 	}
 }
 
