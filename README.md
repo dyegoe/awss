@@ -16,7 +16,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Timeout: `--timeout 90s` (default `5m`, `0` disables it); see [Common behavior](#common-behavior)
 - Concurrency: `--concurrency 8` (default `32`), how many profile and region searches run at once
 - Run stats: `--stats` prints elapsed time, peak memory, search counts and AWS API calls on stderr; see [Run report and stats](#run-report-and-stats)
-- Account names next to owner account IDs, from the `accounts` map of the config file; see [Account names](#account-names)
+- Account names next to owner account IDs, from the `accounts` map of the config file or, with `--org-profile`, from AWS Organizations; see [Account names](#account-names)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
 
@@ -200,6 +200,42 @@ There is no `--all`. Listing every bucket of every account is an inventory job, 
 costs up to `--max-keys` / 1000 calls; use S3 Inventory with Athena, or S3 Storage Lens, for it
 ([#152](https://github.com/dyegoe/awss/issues/152)).
 
+#### Organization accounts (`awss org`)
+
+Lists the accounts of the AWS Organization: ID, name, email, status and the date each account
+joined.
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--statuses` | `-s` | Keep the accounts with these statuses: `active`, `suspended`, `pending-activation`, `pending-closure`, `closed` (any case; `PENDING_CLOSURE` works too) |
+
+```bash
+awss org --profiles org-management
+awss org --profiles org-management --statuses suspended,pending-closure
+awss org --profiles org-management --show-tags-keys Owner,CostCenter
+```
+
+`ListAccounts` has no server-side filter, so `--statuses` is matched by awss after the listing.
+Account tags need one `ListTagsForResource` call per account (there is no batch call), so they
+are fetched only with `--show-tags` or `--show-tags-keys`; this also adds the `tags` field to
+JSON output. AWS allows 10 such calls per second per account and 12 for the whole organization,
+shared with every other caller, so awss paces them at 5 per second (about 30 seconds for 150
+accounts) and retries a throttled call up to 10 times. An account whose tags still cannot be read
+shows its error and no tags.
+
+- **Permission:** the profile must be allowed to call `organizations:ListAccounts`, and
+  `organizations:ListTagsForResource` for tags: the management account or a delegated
+  administrator. A profile without it prints the
+  `AccessDeniedException` (or `AWSOrganizationsNotInUseException`) in its result set, never an
+  empty list.
+- **One profile:** Organizations is global and one call lists the whole organization, so `org`
+  takes exactly one profile (`--profiles`, or the default resolution). Several profiles, or
+  `--profiles all` with more than one, is an error before any call.
+- **No region:** `--regions` is ignored; the result set shows the region `global`.
+- `--output`, `--show-empty`, `--timeout` and `--stats` work as for the other commands.
+
+Sort by: `--sort id|name|email|status|joined` (default: `name`)
+
 ### Common behavior
 
 - Filters can be combined: `awss ec2 -n '*' -s running -z a,b`
@@ -273,6 +309,19 @@ accounts:
 - An account not in the map leaves **Owner** empty. Profile names of the AWS config file are not
   used: a profile name such as `admins-network-prd` names a role in an account, not the account.
 
+**Names from AWS Organizations (opt-in).** `--org-profile <profile>`, or `org-profile:` in the
+config file, makes `vpc`, `subnet` and `eni` call `organizations:ListAccounts` once per run with
+that profile and name every account of the organization:
+
+```bash
+awss subnet --all --profiles member-account --org-profile org-management
+```
+
+- The `accounts` map wins: the organization only names the accounts the map does not.
+- It is off by default: it adds a call and needs a permission most users do not have.
+- If the call fails, the run goes on with the names of the `accounts` map, and one warning goes to
+  stderr. The search results are unaffected. The call is bounded by `--timeout`.
+
 ## Installation
 
 Download the binary for your platform (Linux and macOS, amd64 and arm64) from the
@@ -342,6 +391,7 @@ timeout: 5m           # --timeout; a duration with a unit (90s, 5m), 0 disables 
 concurrency: 32       # --concurrency; profile and region searches running at once, 1 or more
 stats: false          # --stats; print the run stats on stderr after the results
 accounts: {}          # account ID -> name for the Owner column; see Account names
+org-profile: ""       # --org-profile; profile that lists the organization's account names (opt-in)
 show:
   empty: false        # --show-empty
   tags: false         # --show-tags

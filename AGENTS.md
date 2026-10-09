@@ -10,14 +10,14 @@ and do not add a tool-specific copy such as `.github/copilot-instructions.md`.
 
 ## Project overview
 
-**awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs, subnets, S3 buckets and objects) in parallel
+**awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs, subnets, S3 buckets and objects, Organization accounts) in parallel
 across multiple profiles and regions. It wraps AWS SDK Go v2 and uses Cobra + Viper for CLI wiring.
 
 **Module:** `github.com/dyegoe/awss`
 **Go version:** the project follows the latest Go release. The `go` directive in `go.mod` is the
 single source: CI and the release builds read it. When Go is upgraded locally, bump the directive
 in the same PR (`go mod edit -go=<version>`). Do not hardcode the version in docs.
-**Key dependencies:** cobra, viper, aws-sdk-go-v2 (config, ec2, s3), go-pretty, ini.v1
+**Key dependencies:** cobra, viper, aws-sdk-go-v2 (config, ec2, s3, organizations), go-pretty, ini.v1
 
 ### Package layout
 
@@ -32,6 +32,7 @@ search/vpc/          — VPC search logic and result type
 search/subnet/       — Subnet search logic, result type, and InCIDRs (overlapping subnets) lookup
 search/s3/           — S3 bucket search (per region, client-side name matching)
 search/s3obj/        — S3 object (key) search inside given buckets, capped by --max-keys
+search/org/          — AWS Organization accounts (one profile, global), and their names for --org-profile
 internal/testconv/   — checks the test conventions of every package (run by its own test in CI)
 internal/nesting/    — checks the nesting depth of every function (run by its own test in CI)
 scripts/             — coverage.awk: the per-package coverage and test-file check of make test
@@ -241,7 +242,7 @@ A justified suppression names the linter and the reason:
 <type>(<scope>): <short description>
 
 Types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test
-Scope: cmd, common, search, search/<resource> (ec2, eni, ebs, vpc, subnet, s3, s3obj), release
+Scope: cmd, common, search, search/<resource> (ec2, eni, ebs, vpc, subnet, s3, s3obj, org), release
 
 Reference the issue in the body or title, e.g. "(#82)". `feat` bumps the minor version and `fix`
 the patch version on release (release-please), so pick the type by what the user sees.
