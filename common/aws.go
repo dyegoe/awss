@@ -42,6 +42,8 @@ const DefaultRegion = "us-east-1"
 var ErrNoAZSelected = fmt.Errorf("no availability zone selected")
 
 // AwsConfig returns a AWS config for the specific profile and region.
+//
+// Every client built from it counts its calls in APICalls.
 func AwsConfig(profile, region string) (aws.Config, error) {
 	cfg, err := config.LoadDefaultConfig(
 		context.Background(),
@@ -51,6 +53,7 @@ func AwsConfig(profile, region string) (aws.Config, error) {
 	if err != nil {
 		return cfg, fmt.Errorf("loading the AWS config of profile %q in %s: %w", profile, region, err)
 	}
+	cfg.APIOptions = append(cfg.APIOptions, APICalls.AddTo)
 	return cfg, nil
 }
 

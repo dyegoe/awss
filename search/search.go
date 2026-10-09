@@ -166,7 +166,54 @@ var engines = map[string]engine{
 	},
 }
 
-// Execute executes the search command.
+// Summary counts how a run went. Every result set is counted once, in the first of these that
+// applies: TimedOut, Errors, WithResults, Empty.
+type Summary struct {
+	// Profiles and Regions are how many profiles and regions the run searched.
+	Profiles, Regions int
+
+	// Searches is how many profile and region searches the run made: Profiles x Regions.
+	Searches int
+
+	// Concurrency is how many searches ran at once.
+	Concurrency int
+
+	// WithResults is the result sets with at least one row and no error.
+	WithResults int
+
+	// Empty is the result sets with no row and no error.
+	Empty int
+
+	// Errors is the result sets with an error, other than the timed-out ones.
+	Errors int
+
+	// TimedOut is the result sets that timed out or did not start before the deadline.
+	TimedOut int
+
+	// Resources is the rows of every result set that did not time out.
+	Resources int
+}
+
+// Failed returns how many searches failed: the ones with an error and the timed-out ones.
+func (s *Summary) Failed() int { return s.Errors + s.TimedOut }
+
+// add counts one result set.
+func (s *Summary) add(r common.Results, timedOut bool) {
+	switch {
+	case timedOut:
+		s.TimedOut++
+		return
+	case len(r.GetErrors()) > 0:
+		s.Errors++
+	case r.Len() > 0:
+		s.WithResults++
+	default:
+		s.Empty++
+	}
+	s.Resources += r.Len()
+}
+
+// Execute executes the search command and returns how the run went.
 //
 // It searches for the given command in the given profiles and regions, in parallel: at most
 // opts.Concurrency searches run at once, the others wait for a free slot without calling AWS.
@@ -175,13 +222,16 @@ var engines = map[string]engine{
 // When opts.Timeout is set, a profile and region still searching or still waiting at the deadline
 // is reported as timed out in its own result set; the result sets that finished are printed as
 // usual.
-func Execute(cmd string, profiles, regions []string, filters map[string][]string, opts *Options) error {
+func Execute(cmd string, profiles, regions []string, filters map[string][]string, opts *Options) (Summary, error) {
 	eng, ok := engines[cmd]
 	if !ok {
-		return fmt.Errorf("command %s not found", cmd)
+		return Summary{}, fmt.Errorf("command %s not found", cmd)
 	}
 
 	workers := workerCount(opts.Concurrency, len(profiles)*len(regions))
+	summary := Summary{
+		Profiles: len(profiles), Regions: len(regions), Searches: len(profiles) * len(regions), Concurrency: workers,
+	}
 
 	// The buffer matches the workers, so the finished result sets held in memory scale with the
 	// concurrency, not with profiles x regions: a worker waits while the printer is behind.
@@ -196,11 +246,17 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 
 	targets := make(chan target)
 
+	var mu sync.Mutex
 	wg := sync.WaitGroup{}
 	for range workers {
 		wg.Go(func() {
 			for t := range targets {
-				resultsChan <- searchOne(ctx, eng, t.profile, t.region, filters, opts)
+				r, timedOut := searchOne(ctx, eng, t.profile, t.region, filters, opts)
+				// Counted before it is sent: once printed, the result set belongs to the printer.
+				mu.Lock()
+				summary.add(r, timedOut)
+				mu.Unlock()
+				resultsChan <- r
 			}
 		})
 	}
@@ -217,7 +273,7 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 	<-done
 	close(done)
 
-	return nil
+	return summary, nil
 }
 
 // target is one profile and region to search.
@@ -245,7 +301,8 @@ func withTimeout(ctx context.Context, d time.Duration) (context.Context, context
 	return context.WithTimeout(ctx, d)
 }
 
-// searchOne runs the search of one profile and region and returns its result set.
+// searchOne runs the search of one profile and region and returns its result set, and whether it
+// timed out.
 //
 // When the search has not returned by the deadline of ctx, it returns a new, empty result set
 // holding only a timed-out error instead: the rows of a search cut short may be incomplete.
@@ -253,11 +310,11 @@ func withTimeout(ctx context.Context, d time.Duration) (context.Context, context
 // A search that ignores ctx is left running; its result set is never read again.
 func searchOne(
 	ctx context.Context, eng engine, profile, region string, filters map[string][]string, opts *Options,
-) common.Results {
+) (common.Results, bool) {
 	// The deadline passed while this search waited for a free slot: do not start it.
 	if ctx.Err() != nil {
 		return timedOut(eng, profile, region, filters, opts, fmt.Sprintf(
-			"search did not start before the %s timeout; raise --timeout or --concurrency", opts.Timeout))
+			"search did not start before the %s timeout; raise --timeout or --concurrency", opts.Timeout)), true
 	}
 
 	r := eng.new(profile, region, filters, opts)
@@ -271,21 +328,21 @@ func searchOne(
 	select {
 	case ok := <-inTime:
 		if ok {
-			return r
+			return r, false
 		}
 	case <-ctx.Done():
 		// The search may have returned in time just as the deadline hit.
 		select {
 		case ok := <-inTime:
 			if ok {
-				return r
+				return r, false
 			}
 		default:
 		}
 	}
 
 	return timedOut(eng, profile, region, filters, opts, fmt.Sprintf(
-		"search timed out after %s; raise --timeout, or set it to 0 to disable it", opts.Timeout))
+		"search timed out after %s; raise --timeout, or set it to 0 to disable it", opts.Timeout)), true
 }
 
 // timedOut returns a new, empty result set of profile and region holding only msg as its error.

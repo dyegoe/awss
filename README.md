@@ -15,6 +15,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Restrict which tag keys are shown in table output: `--show-tags-keys Name,Environment` (implies `--show-tags`)
 - Timeout: `--timeout 90s` (default `5m`, `0` disables it); see [Common behavior](#common-behavior)
 - Concurrency: `--concurrency 8` (default `32`), how many profile and region searches run at once
+- Run stats: `--stats` prints elapsed time, peak memory, search counts and AWS API calls on stderr; see [Run report and stats](#run-report-and-stats)
 - Account names next to owner account IDs, from the `accounts` map of the config file; see [Account names](#account-names)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
@@ -218,6 +219,40 @@ costs up to `--max-keys` / 1000 calls; use S3 Inventory with Athena, or S3 Stora
   `search did not start before the <duration> timeout`; raise `--timeout` or `--concurrency`.
   The value must be 1 or more. Set it in the config file with `concurrency:`.
 
+### Run report and stats
+
+When at least one search failed, awss prints one line on stderr after the results:
+
+```text
+awss: 3 of 2,550 searches failed (2 errors, 1 timed out); see the result sets marked with errors
+```
+
+"Errors" counts the result sets with an error (an expired SSO session, `AccessDenied`, ...);
+"timed out" counts the ones that hit `--timeout`, including those that did not start. A clean run
+prints nothing extra. The line goes to stderr, so `--output json` on stdout still parses with
+`jq`, and the command still exits 0.
+
+`--stats` (or `stats: true` in the config file) adds a summary on stderr after the results:
+
+```text
+awss stats
+  elapsed        1.97s
+  peak memory    146 MB
+  profiles       150   regions 17   searches 2,550 (concurrency 32)
+  searches       2,512 with results, 35 empty, 2 failed, 1 timed out
+  resources      48,213
+  API calls      2,904 (61 retries, 12 throttled)
+```
+
+- **peak memory** is the most memory the OS charged the process (`getrusage` max RSS), on Linux
+  and macOS; `n/a` elsewhere.
+- **searches** counts each profile and region once: `failed` has an error, `timed out` hit
+  `--timeout`.
+- **resources** is the rows found by the searches that did not time out.
+- **API calls** counts every AWS operation called, one per call (each page of a paginated
+  search is a call); **retries** are the attempts beyond the first, and **throttled** the attempts
+  AWS answered with a throttling error.
+
 ### Account names
 
 `vpc`, `subnet` and `eni` show an **Owner** column (JSON `owner_name`, sort field `owner-name`)
@@ -305,6 +340,7 @@ regions:
 output: table
 timeout: 5m           # --timeout; a duration with a unit (90s, 5m), 0 disables it
 concurrency: 32       # --concurrency; profile and region searches running at once, 1 or more
+stats: false          # --stats; print the run stats on stderr after the results
 accounts: {}          # account ID -> name for the Owner column; see Account names
 show:
   empty: false        # --show-empty
@@ -402,6 +438,9 @@ awss --regions all s3obj -b my-logs -K 'logs/2024-01/*.gz' --sort size
 
 # JSON output for scripting
 awss ec2 --all --output json
+
+# Every profile and region, with the run stats on stderr and the JSON results in a file
+awss ec2 --all --profiles all --regions all --output json --stats > instances.json
 ```
 
 ## Contributing

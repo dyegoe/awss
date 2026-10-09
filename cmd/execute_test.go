@@ -50,6 +50,12 @@ type searchCall struct {
 // was set once appends on the next parse, and Changed stays true.
 func resetCLI(t *testing.T, searchErr error) *[]searchCall {
 	t.Helper()
+	return resetCLIWithSummary(t, searchErr, search.Summary{})
+}
+
+// resetCLIWithSummary is resetCLI with a recorder that returns summary as the outcome of the run.
+func resetCLIWithSummary(t *testing.T, searchErr error, summary search.Summary) *[]searchCall {
+	t.Helper()
 
 	// No config file, profile or region from the machine running the tests.
 	t.Setenv("HOME", t.TempDir())
@@ -70,9 +76,11 @@ func resetCLI(t *testing.T, searchErr error) *[]searchCall {
 
 	calls := &[]searchCall{}
 	old := executeSearch
-	executeSearch = func(cmd string, profiles, regions []string, filters map[string][]string, opts *search.Options) error {
+	executeSearch = func(
+		cmd string, profiles, regions []string, filters map[string][]string, opts *search.Options,
+	) (search.Summary, error) {
 		*calls = append(*calls, searchCall{cmd: cmd, profiles: profiles, regions: regions, filters: filters, opts: *opts})
-		return searchErr
+		return summary, searchErr
 	}
 	t.Cleanup(func() {
 		executeSearch = old
