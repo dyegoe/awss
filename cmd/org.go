@@ -29,7 +29,22 @@ import (
 	"github.com/spf13/viper"
 )
 
-const labelOrgSort = "org.sort"
+const (
+	labelOrgSort = "org.sort"
+
+	flagStatuses = "statuses"
+)
+
+// orgFilters represents the filters for the org command. ListAccounts has no server-side filter,
+// so search/org matches them client-side.
+type orgFilters struct {
+	Statuses []string `filter:"status"`
+}
+
+var orgF = orgFilters{}
+
+// orgFilterFlags lists the org filter flag names.
+var orgFilterFlags = []string{flagStatuses}
 
 // orgCmd represents the org command.
 var orgCmd = &cobra.Command{
@@ -44,6 +59,12 @@ empty list.
 
 Organizations is a global service and one call lists the whole organization, so org takes
 exactly one profile (--profiles, or the default resolution) and ignores --regions.
+
+Filter by status with --statuses, for example:
+	awss org --statuses active,pending-closure
+
+Account tags need one API call per account, so they are fetched only with --show-tags or
+--show-tags-keys.
 `,
 	Args: cobra.NoArgs,
 	RunE: orgRunE,
@@ -55,14 +76,21 @@ func orgRunE(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("org lists one organization: pass one profile with --profiles, not %d (%s)",
 			len(profiles), strings.Join(profiles, ","))
 	}
+	if err := searchOrg.CheckStatuses(orgF.Statuses); err != nil {
+		return err
+	}
 	viper.Set(labelRegions, []string{searchOrg.Region})
 
-	return runSearch(cmd, &cmdSpec{sortLabel: labelOrgSort, noFilters: true}, nil, nil, nil)
+	return runSearch(cmd, &cmdSpec{
+		sortLabel: labelOrgSort, filterFlags: orgFilterFlags, optionalFilters: true,
+	}, nil, nil, orgF)
 }
 
 func orgInitFlags() {
 	rootCmd.AddCommand(orgCmd)
 
+	orgCmd.Flags().StringSliceVarP(&orgF.Statuses, flagStatuses, "s", []string{},
+		"Keep the accounts with these statuses: "+strings.Join(searchOrg.StatusNames(), ", ")+". `active,suspended`")
 	orgCmd.Flags().String(flagSort, "name", sortHelp("org", "accounts", "name"))
 }
 

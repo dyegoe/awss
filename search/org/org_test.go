@@ -23,7 +23,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,11 +35,38 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-// fakeOrg is a fake Organizations client: it returns one page per call and records the inputs.
+// fakeOrg is a fake Organizations client: it returns one page of accounts per call and records
+// the inputs. tags holds the tags of each account ID, in two pages; tagErr fails those of an ID.
 type fakeOrg struct {
 	pages  [][]types.Account
 	err    error
 	inputs []*organizations.ListAccountsInput
+
+	mu      sync.Mutex
+	tags    map[string][]types.Tag
+	tagErr  map[string]error
+	tagCall int
+}
+
+func (f *fakeOrg) ListTagsForResource(
+	_ context.Context, in *organizations.ListTagsForResourceInput, _ ...func(*organizations.Options),
+) (*organizations.ListTagsForResourceOutput, error) {
+	f.mu.Lock()
+	f.tagCall++
+	f.mu.Unlock()
+	id := aws.ToString(in.ResourceId)
+	if err := f.tagErr[id]; err != nil {
+		return nil, err
+	}
+	tags := f.tags[id]
+	// The first page holds the first tag; the token asks for the rest.
+	if in.NextToken == nil && len(tags) > 1 {
+		return &organizations.ListTagsForResourceOutput{Tags: tags[:1], NextToken: aws.String("rest")}, nil
+	}
+	if in.NextToken != nil {
+		return &organizations.ListTagsForResourceOutput{Tags: tags[1:]}, nil
+	}
+	return &organizations.ListTagsForResourceOutput{Tags: tags}, nil
 }
 
 func (f *fakeOrg) ListAccounts(
@@ -72,11 +101,16 @@ func accessDenied() error {
 }
 
 // mockClient makes newClient return client, or err, for the duration of the test.
-func mockClient(t *testing.T, client organizations.ListAccountsAPIClient, err error) {
+func mockClient(t *testing.T, client *fakeOrg, err error) {
 	t.Helper()
 	old := newClient
 	t.Cleanup(func() { newClient = old })
-	newClient = func(string) (organizations.ListAccountsAPIClient, error) { return client, err }
+	newClient = func(string) (orgAPI, error) {
+		if client == nil {
+			return nil, err
+		}
+		return client, err
+	}
 }
 
 // TestResults_collect checks the rows of every page, the sort, and that a failed call is an
@@ -114,7 +148,7 @@ func TestResults_collect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := New("org", Region, tt.sortField)
+			r := New("org", Region, nil, tt.sortField, false)
 			r.collect(context.Background(), tt.client)
 
 			var got []string
@@ -182,7 +216,7 @@ func TestParseAccount(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := parseAccount(&tt.account); got != tt.want {
+			if got := parseAccount(&tt.account); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseAccount() = %+v, want %+v", got, tt.want)
 			}
 		})
@@ -207,7 +241,7 @@ func TestGetSortFields(t *testing.T) {
 
 // TestResults_accessors checks Len and the BaseResults getters.
 func TestResults_accessors(t *testing.T) {
-	r := New("org", Region, "id")
+	r := New("org", Region, nil, "id", false)
 	r.Data = []dataRow{{ID: "1"}, {ID: "2"}}
 	r.AddError("e")
 	if got := r.Len(); got != 2 {
@@ -219,8 +253,8 @@ func TestResults_accessors(t *testing.T) {
 	if got := r.GetErrors(); !reflect.DeepEqual(got, []string{"e"}) {
 		t.Errorf("GetErrors() = %q, want [e]", got)
 	}
-	if got := len(r.GetHeaders()); got != 5 {
-		t.Errorf("len(GetHeaders()) = %d, want 5", got)
+	if got := len(r.GetHeaders()); got != 6 {
+		t.Errorf("len(GetHeaders()) = %d, want 6", got)
 	}
 	if got := len(r.GetRows()); got != 2 {
 		t.Errorf("len(GetRows()) = %d, want 2", got)
@@ -243,7 +277,7 @@ func TestResults_Search(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient(t, tt.client, tt.clientErr)
-			r := New("org", Region, "")
+			r := New("org", Region, nil, "", false)
 			r.Search(context.Background())
 			if r.Len() != tt.wantLen {
 				t.Errorf("Search() rows = %d, want %d", r.Len(), tt.wantLen)
@@ -304,5 +338,136 @@ func TestNewClient(t *testing.T) {
 	}
 	if _, err := newClient(""); err != nil {
 		t.Errorf("newClient(default) error = %v, want nil", err)
+	}
+}
+
+// suspended returns a suspended account.
+func suspended(id string) types.Account {
+	a := account(id, "old-"+id)
+	a.State = types.AccountStateSuspended
+	return a
+}
+
+// TestResults_collect_statuses checks that the status filter keeps the accounts of the given
+// statuses, written in any case and with dashes or underscores.
+func TestResults_collect_statuses(t *testing.T) {
+	tests := []struct {
+		name     string
+		statuses []string
+		want     []string
+	}{
+		{name: "no filter keeps every account", want: []string{"1", "2", "3", "4"}},
+		{name: "active", statuses: []string{"active"}, want: []string{"1", "3"}},
+		{name: "suspended in upper case", statuses: []string{"SUSPENDED"}, want: []string{"2"}},
+		{name: "several statuses", statuses: []string{"suspended", "active"}, want: []string{"1", "2", "3"}},
+		{name: "pending-closure matches PENDING_CLOSURE", statuses: []string{"pending-closure"}, want: []string{"4"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pending := account("4", "closing")
+			pending.State = types.AccountStatePendingClosure
+			client := &fakeOrg{pages: [][]types.Account{{account("1", "a"), suspended("2"), account("3", "c"), pending}}}
+			filters := map[string][]string{}
+			if tt.statuses != nil {
+				filters[FilterKeyStatus] = tt.statuses
+			}
+			r := New("org", Region, filters, "id", false)
+			r.collect(context.Background(), client)
+
+			var got []string
+			for _, row := range r.Data {
+				got = append(got, row.ID)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("collect(statuses %v) IDs = %v, want %v", tt.statuses, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestCheckStatuses checks that known statuses pass in any form and an unknown one is an error
+// that lists the valid ones.
+func TestCheckStatuses(t *testing.T) {
+	tests := []struct {
+		name     string
+		statuses []string
+		wantErr  string
+	}{
+		{name: "none", statuses: nil},
+		{name: "known, any form", statuses: []string{"active", "SUSPENDED", "pending-closure", "PENDING_ACTIVATION"}},
+		{
+			name: "unknown", statuses: []string{"active", "deleted"},
+			wantErr: "invalid status: deleted. Valid statuses are: active,",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := CheckStatuses(tt.statuses)
+			if tt.wantErr == "" && err != nil || tt.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErr)) {
+				t.Errorf("CheckStatuses(%v) error = %v, want %q", tt.statuses, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestStatusNames checks that the statuses are listed in CLI form.
+func TestStatusNames(t *testing.T) {
+	got := StatusNames()
+	for _, want := range []string{"active", "pending-closure", "suspended"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("StatusNames() = %v, want it to contain %q", got, want)
+		}
+	}
+}
+
+// TestResults_collect_tags checks that tags are fetched only with ShowTags, across pages, and
+// that a failed call is an error of that account only.
+func TestResults_collect_tags(t *testing.T) {
+	tag := func(k, v string) types.Tag { return types.Tag{Key: aws.String(k), Value: aws.String(v)} }
+	tests := []struct {
+		name       string
+		showTags   bool
+		wantTags   []map[string]string
+		wantErrors []string
+		wantCalls  int
+	}{
+		{name: "without ShowTags, no call", wantTags: []map[string]string{nil, nil, nil}},
+		{
+			name: "with ShowTags", showTags: true, wantCalls: 4,
+			wantTags: []map[string]string{
+				{"Env": "prd", "Team": "net"}, nil, {},
+			},
+			wantErrors: []string{"error getting tags of account 2: "},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeOrg{
+				pages: [][]types.Account{{account("1", "a"), account("2", "b"), account("3", "c")}},
+				tags: map[string][]types.Tag{
+					"1": {tag("Env", "prd"), tag("Team", "net"), {Value: aws.String("no-key")}},
+				},
+				tagErr: map[string]error{"2": accessDenied()},
+			}
+			r := New("org", Region, nil, "id", tt.showTags)
+			r.collect(context.Background(), client)
+
+			for i, row := range r.Data {
+				if !reflect.DeepEqual(row.Tags, tt.wantTags[i]) {
+					t.Errorf("collect() tags of %s = %v, want %v", row.ID, row.Tags, tt.wantTags[i])
+				}
+			}
+			if client.tagCall != tt.wantCalls {
+				t.Errorf("ListTagsForResource calls = %d, want %d", client.tagCall, tt.wantCalls)
+			}
+			if len(r.Errors) != len(tt.wantErrors) {
+				t.Fatalf("collect() errors = %q, want %d", r.Errors, len(tt.wantErrors))
+			}
+			for i, want := range tt.wantErrors {
+				if !strings.HasPrefix(r.Errors[i], want) {
+					t.Errorf("collect() error %d = %q, want prefix %q", i, r.Errors[i], want)
+				}
+			}
+		})
 	}
 }

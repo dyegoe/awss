@@ -29,22 +29,37 @@ import (
 // orgAwsConfig is an AWS config file with two profiles.
 const orgAwsConfig = "[profile org]\nregion = us-east-1\n[profile member]\nregion = us-east-1\n"
 
+// orgCase is one table entry of TestExecute_org.
+type orgCase struct {
+	name         string
+	args         []string
+	wantProfiles []string
+	wantSort     string
+	wantFilters  map[string][]string
+	wantShowTags bool
+	wantErr      string
+}
+
 // TestExecute_org checks that org searches one profile in the global region, whatever --regions
-// says, and refuses several profiles before any search.
+// says, passes the status filter and the tags flags, and refuses several profiles or an unknown
+// status before any search.
 func TestExecute_org(t *testing.T) {
-	tests := []struct {
-		name         string
-		args         []string
-		wantProfiles []string
-		wantSort     string
-		wantErr      string
-	}{
+	tests := []orgCase{
 		{name: "default profile", args: []string{"org"}, wantProfiles: []string{""}, wantSort: "name"},
+		{
+			name: "statuses", args: []string{"org", "-s", "active,pending-closure"}, wantProfiles: []string{""},
+			wantSort: "name", wantFilters: map[string][]string{"status": {"active", "pending-closure"}},
+		},
+		{
+			name: "tags keys imply tags", args: []string{"org", "--show-tags-keys", "Env"}, wantProfiles: []string{""},
+			wantSort: "name", wantShowTags: true,
+		},
 		{
 			name: "one profile, regions ignored, sort", args: []string{"org", "--profiles", "org", "--regions",
 				"eu-west-1,us-east-2", "--sort", "joined"},
 			wantProfiles: []string{"org"}, wantSort: "joined",
 		},
+		{name: "unknown status", args: []string{"org", "--statuses", "deleted"}, wantErr: "invalid status: deleted"},
 		{name: "two profiles", args: []string{"org", "--profiles", "org,member"}, wantErr: "not 2 (org,member)"},
 		{name: "all profiles", args: []string{"org", "--profiles", "all"}, wantErr: "pass one profile"},
 		{name: "bad sort field", args: []string{"org", "--sort", "owner"}, wantErr: "owner"},
@@ -56,28 +71,42 @@ func TestExecute_org(t *testing.T) {
 
 			_, err := runCLI(t, tt.args...)
 
-			if tt.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
-					t.Errorf("Execute(%v) error = %v, want it to contain %q", tt.args, err, tt.wantErr)
-				}
-				if len(*calls) != 0 {
-					t.Errorf("Execute(%v) searches run = %d, want 0", tt.args, len(*calls))
-				}
+			if tt.wantErr == "" {
+				checkOrgSearch(t, &tt, err, *calls)
 				return
 			}
-			if err != nil {
-				t.Fatalf("Execute(%v) error = %v", tt.args, err)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("Execute(%v) error = %v, want it to contain %q", tt.args, err, tt.wantErr)
 			}
-			if len(*calls) != 1 {
-				t.Fatalf("Execute(%v) searches run = %d, want 1", tt.args, len(*calls))
-			}
-			got := (*calls)[0]
-			if got.cmd != "org" || !reflect.DeepEqual(got.profiles, tt.wantProfiles) ||
-				!reflect.DeepEqual(got.regions, []string{searchOrg.Region}) || got.opts.SortField != tt.wantSort {
-				t.Errorf("Execute(%v) searched %s %v %v sort %q, want org %v [%s] sort %q", tt.args,
-					got.cmd, got.profiles, got.regions, got.opts.SortField, tt.wantProfiles, searchOrg.Region, tt.wantSort)
+			if len(*calls) != 0 {
+				t.Errorf("Execute(%v) searches run = %d, want 0", tt.args, len(*calls))
 			}
 		})
+	}
+}
+
+// checkOrgSearch checks that a run of tt succeeded with one org search as tt wants.
+func checkOrgSearch(t *testing.T, tt *orgCase, err error, calls []searchCall) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("Execute(%v) error = %v", tt.args, err)
+	}
+	if len(calls) != 1 {
+		t.Fatalf("Execute(%v) searches run = %d, want 1", tt.args, len(calls))
+	}
+	got := calls[0]
+	wantFilters := tt.wantFilters
+	if wantFilters == nil {
+		wantFilters = map[string][]string{}
+	}
+	if !reflect.DeepEqual(got.filters, wantFilters) || got.opts.ShowTags != tt.wantShowTags {
+		t.Errorf("Execute(%v) filters %v show tags %v, want %v %v", tt.args,
+			got.filters, got.opts.ShowTags, wantFilters, tt.wantShowTags)
+	}
+	if got.cmd != "org" || !reflect.DeepEqual(got.profiles, tt.wantProfiles) ||
+		!reflect.DeepEqual(got.regions, []string{searchOrg.Region}) || got.opts.SortField != tt.wantSort {
+		t.Errorf("Execute(%v) searched %s %v %v sort %q, want org %v [%s] sort %q", tt.args,
+			got.cmd, got.profiles, got.regions, got.opts.SortField, tt.wantProfiles, searchOrg.Region, tt.wantSort)
 	}
 }
 

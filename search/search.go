@@ -167,8 +167,8 @@ var engines = map[string]engine{
 	},
 	// org lists one organization: the command passes one profile and the region searchOrg.Region.
 	"org": {
-		new: func(profile, region string, _ map[string][]string, opts *Options) common.Results {
-			return searchOrg.New(profile, region, opts.SortField)
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
+			return searchOrg.New(profile, region, filters, opts.SortField, opts.ShowTags)
 		},
 		sortFields:     searchOrg.GetSortFields,
 		sortFieldNames: searchOrg.SortFieldNames,

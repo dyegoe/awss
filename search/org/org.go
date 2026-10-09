@@ -23,6 +23,9 @@ package org
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
+	"sync"
 
 	"github.com/dyegoe/awss/common"
 
@@ -40,6 +43,14 @@ const Region = "global"
 // the EC2 Describe* calls.
 const pageSize int32 = 20
 
+// tagWorkers caps the ListTagsForResource calls running at the same time. Organizations has low
+// API quotas, so it stays below the s3 tag workers.
+const tagWorkers = 5
+
+// FilterKeyStatus is the filter key of the statuses to keep. ListAccounts has no server-side
+// filter, so the statuses are matched client-side.
+const FilterKeyStatus = "status"
+
 // joinedLayout formats the date an account joined the organization: it sorts as text.
 const joinedLayout = "2006-01-02"
 
@@ -49,6 +60,12 @@ type Results struct {
 
 	// Data contains the accounts found.
 	Data []dataRow `json:"data"`
+
+	// Filters is a map of strings used to search: only FilterKeyStatus is used.
+	Filters map[string][]string `json:"-"`
+
+	// ShowTags fetches the tags of each account found (one API call per account).
+	ShowTags bool `json:"-"`
 }
 
 // dataRow represents one account of the organization.
@@ -67,12 +84,17 @@ type dataRow struct {
 
 	// Joined is the date the account joined the organization, as YYYY-MM-DD in UTC.
 	Joined string `json:"joined,omitempty" header:"Joined" sort:"joined"`
+
+	// Tags are the tags of the account, filled only when ShowTags is set.
+	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
 }
 
 // New initiates and returns a new instance of org results. region is kept for the output only:
 // the search always calls the global endpoint.
-func New(profile, region, sortField string) *Results {
+func New(profile, region string, filters map[string][]string, sortField string, showTags bool) *Results {
 	return &Results{
+		Filters:  filters,
+		ShowTags: showTags,
 		BaseResults: common.BaseResults{
 			Profile:   profile,
 			Region:    region,
@@ -83,9 +105,15 @@ func New(profile, region, sortField string) *Results {
 	}
 }
 
+// orgAPI is the part of the Organizations client used by the search.
+type orgAPI interface {
+	organizations.ListAccountsAPIClient
+	organizations.ListTagsForResourceAPIClient
+}
+
 // newClient builds the Organizations client of a profile. It is a variable so tests can replace
 // the AWS config with a fake client.
-var newClient = func(profile string) (organizations.ListAccountsAPIClient, error) {
+var newClient = func(profile string) (orgAPI, error) {
 	// The global endpoint of the aws partition is served from us-east-1.
 	cfg, err := common.AwsConfig(profile, common.DefaultRegion)
 	if err != nil {
@@ -105,15 +133,23 @@ func (r *Results) Search(ctx context.Context) {
 	r.collect(ctx, client)
 }
 
-// collect lists the accounts with client and sorts the rows.
-func (r *Results) collect(ctx context.Context, client organizations.ListAccountsAPIClient) {
+// collect lists the accounts with client, keeps those of the asked statuses, fetches their tags
+// with ShowTags and sorts the rows.
+func (r *Results) collect(ctx context.Context, client orgAPI) {
 	accounts, err := listAccounts(ctx, client)
 	if err != nil {
 		r.Errors = append(r.Errors, fmt.Sprintf("error with profile %q: %v", r.Profile, err))
 		return
 	}
+	statuses := r.statuses()
 	for i := range accounts {
-		r.Data = append(r.Data, parseAccount(&accounts[i]))
+		if row := parseAccount(&accounts[i]); len(statuses) == 0 || slices.Contains(statuses, row.Status) {
+			r.Data = append(r.Data, row)
+		}
+	}
+
+	if r.ShowTags {
+		r.collectTags(ctx, client)
 	}
 
 	if r.SortField == "" {
@@ -122,6 +158,88 @@ func (r *Results) collect(ctx context.Context, client organizations.ListAccounts
 	if err := r.sortResults(r.SortField); err != nil {
 		r.Errors = append(r.Errors, err.Error())
 	}
+}
+
+// statuses returns the statuses to keep, as AWS writes them: ACTIVE, PENDING_CLOSURE.
+func (r *Results) statuses() []string {
+	values := r.Filters[FilterKeyStatus]
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		out = append(out, NormalizeStatus(v))
+	}
+	return out
+}
+
+// NormalizeStatus writes a status as AWS does: active is ACTIVE, pending-closure is PENDING_CLOSURE.
+func NormalizeStatus(s string) string {
+	return strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(s), "-", "_"))
+}
+
+// StatusNames returns the known account statuses in CLI form, such as pending-closure.
+func StatusNames() []string {
+	var names []string
+	for _, s := range types.AccountState("").Values() {
+		names = append(names, strings.ToLower(strings.ReplaceAll(string(s), "_", "-")))
+	}
+	slices.Sort(names)
+	return names
+}
+
+// CheckStatuses returns an error naming the first status that is not a known account status.
+func CheckStatuses(statuses []string) error {
+	known := StatusNames()
+	for _, s := range statuses {
+		name := strings.ToLower(strings.ReplaceAll(NormalizeStatus(s), "_", "-"))
+		if !slices.Contains(known, name) {
+			return fmt.Errorf("invalid status: %s. Valid statuses are: %s", s, strings.Join(known, ", "))
+		}
+	}
+	return nil
+}
+
+// collectTags fills the Tags of every row, running at most tagWorkers ListTagsForResource calls
+// at once. A failure is reported per account and leaves that row without tags.
+func (r *Results) collectTags(ctx context.Context, client organizations.ListTagsForResourceAPIClient) {
+	errs := make([]error, len(r.Data))
+	sem := make(chan struct{}, tagWorkers)
+	var wg sync.WaitGroup
+
+	for i := range r.Data {
+		sem <- struct{}{}
+		wg.Go(func() {
+			defer func() { <-sem }()
+			r.Data[i].Tags, errs[i] = accountTags(ctx, client, r.Data[i].ID)
+		})
+	}
+	wg.Wait()
+
+	// Append in row order, so the errors are deterministic.
+	for _, err := range errs {
+		if err != nil {
+			r.Errors = append(r.Errors, err.Error())
+		}
+	}
+}
+
+// accountTags returns the tags of one account. An account without tags returns an empty map.
+func accountTags(
+	ctx context.Context, client organizations.ListTagsForResourceAPIClient, id string,
+) (map[string]string, error) {
+	tags := map[string]string{}
+	paginator := organizations.NewListTagsForResourcePaginator(client,
+		&organizations.ListTagsForResourceInput{ResourceId: aws.String(id)})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error getting tags of account %s: %w", id, err)
+		}
+		for _, t := range page.Tags {
+			if t.Key != nil {
+				tags[*t.Key] = aws.ToString(t.Value)
+			}
+		}
+	}
+	return tags, nil
 }
 
 // listAccounts returns every account of the organization, following every page.

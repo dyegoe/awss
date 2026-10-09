@@ -404,8 +404,19 @@ type cmdSpec struct {
 	// accountNames is true for the commands with an Owner column, which get the account names.
 	accountNames bool
 
-	// noFilters is true for a command that has no filter and no --all flag: it lists everything.
-	noFilters bool
+	// optionalFilters is true for a command without --all, such as org: without a filter flag it
+	// lists everything, as --all does.
+	optionalFilters bool
+}
+
+// anyChanged reports whether one of the flags was set on the command line.
+func anyChanged(cmd *cobra.Command, flags []string) bool {
+	for _, f := range flags {
+		if cmd.Flags().Changed(f) {
+			return true
+		}
+	}
+	return false
 }
 
 // boolLabel returns the viper bool at label, or false when label is empty.
@@ -434,10 +445,9 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 		return err
 	}
 
-	// A command without filters, such as org, lists everything, as --all does.
 	filters, err := buildFilters(
-		cmd, spec.noFilters || viper.GetBool(spec.allLabel), spec.filterFlags,
-		azs, tags, filterStruct,
+		cmd, viper.GetBool(spec.allLabel) || spec.optionalFilters && !anyChanged(cmd, spec.filterFlags),
+		spec.filterFlags, azs, tags, filterStruct,
 	)
 	if err != nil {
 		return err

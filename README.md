@@ -203,14 +203,26 @@ costs up to `--max-keys` / 1000 calls; use S3 Inventory with Athena, or S3 Stora
 #### Organization accounts (`awss org`)
 
 Lists the accounts of the AWS Organization: ID, name, email, status and the date each account
-joined. It has no filter flags.
+joined.
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--statuses` | `-s` | Keep the accounts with these statuses: `active`, `suspended`, `pending-activation`, `pending-closure`, `closed` (any case; `PENDING_CLOSURE` works too) |
 
 ```bash
 awss org --profiles org-management
+awss org --profiles org-management --statuses suspended,pending-closure
+awss org --profiles org-management --show-tags-keys Owner,CostCenter
 ```
 
-- **Permission:** the profile must be allowed to call `organizations:ListAccounts`: the
-  management account or a delegated administrator. A profile without it prints the
+`ListAccounts` has no server-side filter, so `--statuses` is matched by awss after the listing.
+Account tags need one `ListTagsForResource` call per account (there is no batch call), so they
+are fetched only with `--show-tags` or `--show-tags-keys`, at most 5 at a time; this also adds
+the `tags` field to JSON output. An account whose tags cannot be read shows its error and no tags.
+
+- **Permission:** the profile must be allowed to call `organizations:ListAccounts`, and
+  `organizations:ListTagsForResource` for tags: the management account or a delegated
+  administrator. A profile without it prints the
   `AccessDeniedException` (or `AWSOrganizationsNotInUseException`) in its result set, never an
   empty list.
 - **One profile:** Organizations is global and one call lists the whole organization, so `org`
