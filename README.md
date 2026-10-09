@@ -224,10 +224,16 @@ awss rds -e postgres -V '13*' --profiles all --regions all
 awss rds -c my-aurora-cluster
 ```
 
-Columns: ID, Engine, Version, Class, Status, Multi-AZ, AZ, Endpoint (`host:port`, empty while
-the instance is being created), VPC, Public, Encrypted, Cluster, Storage, Size (GiB), and Tags
-with `--show-tags` / `--show-tags-keys`. The tags come with the listing: no extra call. The
-endpoint is not a filter (AWS has none); find one with `--output json | jq`.
+Table columns: ID, Engine, Version, Class, Status, Multi-AZ, AZ, Cluster, and Tags with
+`--show-tags` / `--show-tags-keys` (the tags come with the listing: no extra call). The table
+stays about 120 characters wide, so these fields are in `--output json` only: `endpoint`
+(`host:port`, empty while the instance is being created), `vpc_id`, `publicly_accessible`,
+`encrypted`, `storage_type` and `storage_gib`. The endpoint is not a filter (AWS has none); find
+one with jq:
+
+```bash
+awss rds -a --output json | jq -r '.data[] | [.id, .endpoint] | @tsv'
+```
 
 Sort by: `--sort id|engine|version|class|status|az|vpc|cluster` (default: `id`). Versions sort
 by number: 8.0.39, 13.4, 13.15, 16.4.

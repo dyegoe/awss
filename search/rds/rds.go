@@ -60,6 +60,9 @@ type Results struct {
 }
 
 // dataRow represents a row of the RDS DB instances search results.
+//
+// The table shows only the fields with a `header` tag, to stay about 120 characters wide; the
+// others, such as the endpoint, are in the JSON output only.
 type dataRow struct {
 	// ID is the DB instance identifier.
 	ID string `json:"id,omitempty" header:"ID" sort:"id"`
@@ -82,26 +85,27 @@ type dataRow struct {
 	// AvailabilityZone is the AZ of the instance.
 	AvailabilityZone string `json:"az,omitempty" header:"AZ" sort:"az"`
 
-	// Endpoint is host:port, empty while the instance is being created.
-	Endpoint string `json:"endpoint,omitempty" header:"Endpoint"`
+	// Endpoint is host:port, empty while the instance is being created. JSON only: it is often
+	// 60 characters, too wide for the table.
+	Endpoint string `json:"endpoint,omitempty"`
 
 	// VpcID is the VPC of the instance's DB subnet group.
-	VpcID string `json:"vpc_id,omitempty" header:"VPC" sort:"vpc"`
+	VpcID string `json:"vpc_id,omitempty" sort:"vpc"`
 
 	// Public is "true" when the instance is publicly accessible.
-	Public string `json:"publicly_accessible,omitempty" header:"Public"`
+	Public string `json:"publicly_accessible,omitempty"`
 
 	// Encrypted is "true" when the storage is encrypted.
-	Encrypted string `json:"encrypted,omitempty" header:"Encrypted"`
+	Encrypted string `json:"encrypted,omitempty"`
 
 	// ClusterID is the Aurora or Multi-AZ DB cluster the instance belongs to.
 	ClusterID string `json:"cluster_id,omitempty" header:"Cluster" sort:"cluster"`
 
 	// StorageType is the storage type, such as gp3 or aurora.
-	StorageType string `json:"storage_type,omitempty" header:"Storage"`
+	StorageType string `json:"storage_type,omitempty"`
 
 	// StorageGiB is the allocated storage in GiB.
-	StorageGiB int32 `json:"storage_gib,omitempty" header:"Size (GiB)"`
+	StorageGiB int32 `json:"storage_gib,omitempty"`
 
 	// Tags are the tags of the instance.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`

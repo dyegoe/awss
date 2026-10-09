@@ -307,7 +307,7 @@ func TestGetSortFields(t *testing.T) {
 	}
 }
 
-// TestResults_accessors checks Len and the BaseResults getters.
+// TestResults_accessors checks Len, the BaseResults getters and the table headers.
 func TestResults_accessors(t *testing.T) {
 	r := New("default", "us-east-1", nil, "id", false)
 	r.Data = []dataRow{{ID: "a"}, {ID: "b"}}
@@ -321,8 +321,10 @@ func TestResults_accessors(t *testing.T) {
 	if got := r.GetErrors(); !reflect.DeepEqual(got, []string{"e"}) {
 		t.Errorf("GetErrors() = %q, want [e]", got)
 	}
-	if got := len(r.GetHeaders()); got != 15 {
-		t.Errorf("len(GetHeaders()) = %d, want 15", got)
+	// The table stays narrow: the endpoint, VPC, public, encryption and storage are JSON only.
+	wantHeaders := []interface{}{"ID", "Engine", "Version", "Class", "Status", "Multi-AZ", "AZ", "Cluster", "Tags"}
+	if got := r.GetHeaders(); !reflect.DeepEqual(got, wantHeaders) {
+		t.Errorf("GetHeaders() = %v, want %v", got, wantHeaders)
 	}
 	if got := len(r.GetRows()); got != 2 {
 		t.Errorf("len(GetRows()) = %d, want 2", got)
