@@ -35,6 +35,7 @@ import (
 	searchENI "github.com/dyegoe/awss/search/eni"
 	searchOrg "github.com/dyegoe/awss/search/org"
 	searchRDS "github.com/dyegoe/awss/search/rds"
+	searchRDSCluster "github.com/dyegoe/awss/search/rdscluster"
 	searchS3 "github.com/dyegoe/awss/search/s3"
 	searchS3obj "github.com/dyegoe/awss/search/s3obj"
 	searchSubnet "github.com/dyegoe/awss/search/subnet"
@@ -172,6 +173,13 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchRDS.GetSortFields,
 		sortFieldNames: searchRDS.SortFieldNames,
+	},
+	"rds-cluster": {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
+			return searchRDSCluster.New(profile, region, filters, opts.SortField, opts.Regex)
+		},
+		sortFields:     searchRDSCluster.GetSortFields,
+		sortFieldNames: searchRDSCluster.SortFieldNames,
 	},
 	// org lists one organization: the command passes one profile and the region searchOrg.Region.
 	"org": {
