@@ -20,6 +20,7 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/dyegoe/awss/common"
 	"github.com/dyegoe/awss/search"
+	searchOrg "github.com/dyegoe/awss/search/org"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -51,6 +53,7 @@ const (
 	labelConcurrency    = "concurrency"
 	labelAccounts       = "accounts"
 	labelStats          = "stats"
+	labelOrgProfile     = "org-profile"
 
 	// defaultTimeout is generous so --profiles all over many regions is not cut short.
 	defaultTimeout = 5 * time.Minute
@@ -115,6 +118,7 @@ var subcommands = []subcommand{
 	{subnetCmd, subnetInitFlags, subnetInitViper},
 	{s3Cmd, s3InitFlags, s3InitViper},
 	{s3objCmd, s3objInitFlags, s3objInitViper},
+	{orgCmd, orgInitFlags, orgInitViper},
 }
 
 // setup registers the global flags and every subcommand with its flags, then binds them to viper.
@@ -222,6 +226,10 @@ func initFlags() {
 			"that did not finish are reported as timed out; the others are printed. 0 disables it.")
 	rootCmd.PersistentFlags().Int(labelConcurrency, search.DefaultConcurrency,
 		"How many profile and region searches run at once. The others wait for a free slot.")
+	rootCmd.PersistentFlags().String(labelOrgProfile, "",
+		"Add the account names of the AWS Organization to the Owner column of vpc, subnet and eni, "+
+			"listed with this `profile` (it needs organizations:ListAccounts). The accounts map of the "+
+			"config file wins. Off by default.")
 	rootCmd.PersistentFlags().Bool(labelStats, false,
 		"Print the stats of the run on stderr after the results: elapsed time, peak memory, searches, "+
 			"resources found and AWS API calls.")
@@ -275,6 +283,9 @@ func initViper() error {
 	}
 	if err := viper.BindPFlag(labelStats, rootCmd.PersistentFlags().Lookup(labelStats)); err != nil {
 		return fmt.Errorf("error binding flag %s: %w", labelStats, err)
+	}
+	if err := viper.BindPFlag(labelOrgProfile, rootCmd.PersistentFlags().Lookup(labelOrgProfile)); err != nil {
+		return fmt.Errorf("error binding flag %s: %w", labelOrgProfile, err)
 	}
 	viper.SetDefault(labelAllRegions, allRegionsDefault)
 
@@ -392,6 +403,9 @@ type cmdSpec struct {
 
 	// accountNames is true for the commands with an Owner column, which get the account names.
 	accountNames bool
+
+	// noFilters is true for a command that has no filter and no --all flag: it lists everything.
+	noFilters bool
 }
 
 // boolLabel returns the viper bool at label, or false when label is empty.
@@ -420,8 +434,9 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 		return err
 	}
 
+	// A command without filters, such as org, lists everything, as --all does.
 	filters, err := buildFilters(
-		cmd, viper.GetBool(spec.allLabel), spec.filterFlags,
+		cmd, spec.noFilters || viper.GetBool(spec.allLabel), spec.filterFlags,
 		azs, tags, filterStruct,
 	)
 	if err != nil {
@@ -432,7 +447,7 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 
 	var names map[string]string
 	if spec.accountNames {
-		names = accountNames(cmd.ErrOrStderr())
+		names = accountNames(cmd.Context(), cmd.ErrOrStderr())
 	}
 
 	start := time.Now()
@@ -468,18 +483,51 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 	return nil
 }
 
-// accountNames returns the account names for the Owner column, keyed by account ID, from the
-// accounts map of the awss config file.
+// accountNames returns the account names for the Owner column, keyed by account ID: from the
+// accounts map of the awss config file, then, with --org-profile, from the AWS Organization for
+// the accounts the map does not name.
 //
-// Account names are optional, so nothing here fails the run: an unusable entry is one warning on
-// w. It returns nil when no name was found.
-func accountNames(w io.Writer) map[string]string {
+// Account names are optional, so nothing here fails the run: an unusable entry, or a failed
+// organization call, is one warning on w. It returns nil when no name was found.
+func accountNames(ctx context.Context, w io.Writer) map[string]string {
 	names, warnings := common.ConfiguredAccountNames(viper.Get(labelAccounts))
 	for _, warning := range warnings {
 		fmt.Fprintf(w, "awss: warning: %s\n", warning)
 	}
+
+	if profile := viper.GetString(labelOrgProfile); profile != "" {
+		addOrgAccountNames(ctx, w, profile, names)
+	}
+
 	if len(names) == 0 {
 		return nil
 	}
 	return names
+}
+
+// orgAccountNames lists the account names of the organization. It is a variable so tests can
+// replace the AWS call.
+var orgAccountNames = searchOrg.AccountNames
+
+// addOrgAccountNames adds to names the organization's account names, listed with profile, for
+// the accounts names does not have yet. A failed call is one warning on w: the run goes on with
+// the names it has. The call is bounded by --timeout.
+func addOrgAccountNames(ctx context.Context, w io.Writer, profile string, names map[string]string) {
+	if timeout := viper.GetDuration(labelTimeout); timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	org, err := orgAccountNames(ctx, profile)
+	if err != nil {
+		fmt.Fprintf(w, "awss: warning: no account names from the organization (--%s %s): %v\n",
+			labelOrgProfile, profile, err)
+		return
+	}
+	for id, name := range org {
+		if _, ok := names[id]; !ok {
+			names[id] = name
+		}
+	}
 }
