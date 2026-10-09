@@ -3,11 +3,12 @@ module github.com/dyegoe/awss
 go 1.27.1
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.46.0
+	github.com/aws/aws-sdk-go-v2 v1.47.2
 	github.com/aws/aws-sdk-go-v2/config v1.32.13
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.296.1
+	github.com/aws/aws-sdk-go-v2/service/organizations v1.61.2
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.112.0
-	github.com/aws/smithy-go v1.28.1
+	github.com/aws/smithy-go v1.28.4
 	github.com/jedib0t/go-pretty/v6 v6.7.8
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
@@ -19,8 +20,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.13 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.21 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.2 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.2 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.5 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.5 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.6 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.19 // indirect
