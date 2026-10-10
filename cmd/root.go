@@ -120,6 +120,7 @@ var subcommands = []subcommand{
 	{s3objCmd, s3objInitFlags, s3objInitViper},
 	{orgCmd, orgInitFlags, orgInitViper},
 	{rdsCmd, rdsInitFlags, rdsInitViper},
+	{rdsClusterCmd, rdsClusterInitFlags, rdsClusterInitViper},
 }
 
 // setup registers the global flags and every subcommand with its flags, then binds them to viper.

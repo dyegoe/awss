@@ -238,6 +238,40 @@ awss rds -a --output json | jq -r '.data[] | [.id, .endpoint] | @tsv'
 Sort by: `--sort id|engine|version|class|status|az|vpc|cluster` (default: `id`). Versions sort
 by number: 8.0.39, 13.4, 13.15, 16.4.
 
+#### RDS DB clusters (`awss rds-cluster`)
+
+Searches RDS DB clusters: Aurora, and Multi-AZ DB clusters. `DescribeDBClusters` filters only by
+identifier and engine; awss matches the other filters on the results, with the same syntax and
+rules as `awss rds`.
+
+| Flag | Short | Matched by | Description |
+| --- | --- | --- | --- |
+| `--all` | `-a` | | Search all DB clusters (no filters) |
+| `--ids` | `-i` | AWS | DB cluster identifiers |
+| `--engines` | `-e` | AWS | Engines: `aurora-postgresql`, `aurora-mysql`, `postgres`, `mysql` |
+| `--names` | `-n` | awss | Identifier patterns: globs, or Go regular expressions with `--regex` |
+| `--engine-versions` | `-V` | awss | Engine version globs: `'8.0.*'` |
+| `--tags` | `-t` | awss | `Key=Value1:Value2,Other=Value`: every key must match (AND), the values of one key are alternatives (OR), values accept globs |
+
+```bash
+# Every Aurora PostgreSQL cluster, everywhere
+awss rds-cluster -e aurora-postgresql --profiles all --regions all
+
+# Then the instances of one of them
+awss rds -c my-aurora-cluster
+```
+
+Table columns: ID, Engine, Version, Status, Members (`1 writer, 2 readers`), VPC, and Tags with
+`--show-tags` / `--show-tags-keys` (no extra call). These fields are in `--output json` only, to
+keep the table narrow: `writer_endpoint`, `reader_endpoint`, `port`, `members` (`[{id, writer}]`),
+`multi_az`, `subnet_group`, `encrypted` and `deletion_protection`.
+
+The VPC comes from the cluster's DB subnet group: one paginated `DescribeDBSubnetGroups` call per
+profile and region, only when clusters were found. If that call fails, the clusters are still
+listed with the error and an empty VPC.
+
+Sort by: `--sort id|engine|version|status|vpc` (default: `id`).
+
 #### Organization accounts (`awss org`)
 
 Lists the accounts of the AWS Organization: ID, name, email, status and the date each account
