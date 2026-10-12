@@ -31,6 +31,7 @@ const (
 	keyCtrlC   = "ctrl+c"
 	keyEsc     = "esc"
 	keyEnter   = "enter"
+	keyBack    = "backspace"
 	keyFilter  = "/"
 	keyCommand = ":"
 	keyDetails = "d"
@@ -96,9 +97,14 @@ func (m *Model) openInput(md mode, prompt, value string) tea.Cmd {
 	return m.input.Focus()
 }
 
-// onInputKey handles a key press on the input line. The filter applies as you type.
+// onInputKey handles a key press on the input line. The filter applies as you type. Backspace on
+// an empty line closes it, as esc does.
 func (m *Model) onInputKey(k tea.KeyPressMsg) tea.Cmd {
-	switch k.String() {
+	key := k.String()
+	if key == keyBack && m.input.Value() == "" {
+		key = keyEsc
+	}
+	switch key {
 	case keyEsc:
 		if m.mode == modeFilter {
 			m.query = ""

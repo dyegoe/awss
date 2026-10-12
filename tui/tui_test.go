@@ -180,6 +180,8 @@ func keyMsg(k string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyEnter}
 	case keyEsc:
 		return tea.KeyPressMsg{Code: tea.KeyEscape}
+	case keyBack:
+		return tea.KeyPressMsg{Code: tea.KeyBackspace}
 	case keyCtrlC:
 		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	case "down":
@@ -208,7 +210,7 @@ func isQuit(cmd tea.Cmd) bool {
 
 // TestModel_onKey_keyNames checks that the test key presses read as the key names onKey matches.
 func TestModel_onKey_keyNames(t *testing.T) {
-	for _, k := range []string{keyEnter, keyEsc, keyCtrlC, keyFilter, keyDetails} {
+	for _, k := range []string{keyEnter, keyEsc, keyBack, keyCtrlC, keyFilter, keyDetails} {
 		if got := keyMsg(k).String(); got != k {
 			t.Errorf("keyMsg(%q).String() = %q, want %q", k, got, k)
 		}
@@ -433,6 +435,58 @@ func TestModel_command(t *testing.T) {
 				t.Errorf("message = %q, want it to contain %q", m.message, tt.wantMessage)
 			}
 		})
+	}
+}
+
+// TestModel_onInputKey_backspace checks that backspace edits the input line, and closes it once
+// it is empty, clearing the filter; the footer then shows the help, not the prompt.
+func TestModel_onInputKey_backspace(t *testing.T) {
+	tests := []struct {
+		name   string
+		open   string
+		typed  string
+		backs  int
+		wantMd mode
+	}{
+		{name: "filter edited", open: keyFilter, typed: "web", backs: 2, wantMd: modeFilter},
+		{name: "filter emptied stays open", open: keyFilter, typed: "web", backs: 3, wantMd: modeFilter},
+		{name: "filter closed", open: keyFilter, typed: "web", backs: 4, wantMd: modeTable},
+		{name: "command closed", open: keyCommand, typed: "v", backs: 2, wantMd: modeTable},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := loaded(t)
+			press(m, tt.open)
+			typeText(m, tt.typed)
+			for range tt.backs {
+				press(m, keyBack)
+			}
+			if m.mode != tt.wantMd {
+				t.Fatalf("mode = %v, want %v", m.mode, tt.wantMd)
+			}
+			if tt.wantMd != modeTable {
+				return
+			}
+			if m.query != "" || len(m.table.Rows()) != 3 {
+				t.Errorf("query, rows = %q, %d, want \"\", 3", m.query, len(m.table.Rows()))
+			}
+			if footer := m.footer(); !strings.Contains(footer, "[/] filter") {
+				t.Errorf("footer() = %q, want the help", footer)
+			}
+		})
+	}
+}
+
+// TestModel_footer checks the hints of the input lines.
+func TestModel_footer(t *testing.T) {
+	m := loaded(t)
+	press(m, keyFilter)
+	if got := m.footer(); !strings.Contains(got, "[enter] keep") {
+		t.Errorf("filter footer() = %q, want the filter hints", got)
+	}
+	press(m, keyEsc, keyCommand)
+	if got := m.footer(); !strings.Contains(got, "ec2 vpc · [enter] switch") {
+		t.Errorf("command footer() = %q, want the resources and hints", got)
 	}
 }
 

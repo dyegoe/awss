@@ -70,6 +70,9 @@ const (
 	// maxColumnWidth caps a column, so one long value does not push the others off the screen.
 	maxColumnWidth = 40
 
+	// inputWidth is the widest the input box of the filter and the commands gets.
+	inputWidth = 40
+
 	// chromeLines are the lines around the table: the title and the footer.
 	chromeLines = 2
 )
@@ -264,5 +267,6 @@ func (m *Model) resize(width, height int) {
 	m.refresh()
 	m.pager.SetWidth(width)
 	m.pager.SetHeight(max(height-chromeLines, 1))
-	m.input.SetWidth(max(width-2, 1))
+	// The input box leaves room for the hints that follow it on the footer.
+	m.input.SetWidth(max(min(inputWidth, width/2), 1))
 }

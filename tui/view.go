@@ -28,8 +28,10 @@ import (
 
 // Help lines of the footer.
 const (
-	tableHelp = "/ filter (~ fuzzy)  : resource  d details  e errors  r refresh  esc clear  q quit"
-	pagerHelp = "↑/↓ scroll  esc back"
+	tableHelp  = "[/] filter  [:] resource  [d] details  [e] errors  [r] refresh  [esc] clear filter  [q] quit"
+	filterHelp = "words must all appear, ~word fuzzy · [enter] keep · [esc] clear"
+	cmdHelp    = "%s · [enter] switch · [esc] cancel"
+	pagerHelp  = "[↑/↓] scroll  [esc] back"
 )
 
 var (
@@ -106,8 +108,10 @@ func (m *Model) title() string {
 // footer returns the bottom line: the input line, a message or the help.
 func (m *Model) footer() string {
 	switch {
-	case m.mode == modeFilter || m.mode == modeCommand:
-		return m.input.View()
+	case m.mode == modeFilter:
+		return m.input.View() + "   " + helpStyle.Render(filterHelp)
+	case m.mode == modeCommand:
+		return m.input.View() + "   " + helpStyle.Render(fmt.Sprintf(cmdHelp, strings.Join(m.cfg.Resources, " ")))
 	case m.message != "":
 		return m.message
 	default:
