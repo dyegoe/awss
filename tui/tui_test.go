@@ -422,10 +422,14 @@ func TestModel_command(t *testing.T) {
 			typeText(m, tt.command)
 			cmd := press(m, keyEnter)
 
-			if got := isQuit(cmd); got != tt.wantQuit {
-				t.Fatalf("quit = %v, want %v", got, tt.wantQuit)
-			}
-			if !tt.wantQuit {
+			// Only the quit and load commands run: a notice returns its timer, which would wait and
+			// clear the notice the case checks.
+			switch {
+			case tt.wantQuit:
+				if !isQuit(cmd) {
+					t.Fatalf("command %q does not quit", tt.command)
+				}
+			case tt.wantMessage == "":
 				run(t, m, cmd)
 			}
 			if m.resource != tt.wantResource || len(m.items) != tt.wantRows {
@@ -545,6 +549,29 @@ func TestModel_errors(t *testing.T) {
 	press(m, keyErrors)
 	if m.mode != modeTable || !strings.Contains(m.View().Content, "no errors") {
 		t.Errorf("after e with no errors: mode = %v, view:\n%s", m.mode, m.View().Content)
+	}
+}
+
+// TestModel_notify checks that a notice clears itself when its timer fires, and that the timer of
+// an older notice leaves a newer one in place.
+func TestModel_notify(t *testing.T) {
+	m := loaded(t)
+	m.errs = nil
+
+	cmd := press(m, keyErrors)
+	if cmd == nil || m.message != "no errors" {
+		t.Fatalf("after e: cmd, message = %v, %q, want a timer, \"no errors\"", cmd, m.message)
+	}
+	old := m.noticeID
+	m.notify("newer")
+
+	m.Update(clearNoticeMsg{id: old})
+	if m.message != "newer" {
+		t.Errorf("message after the older timer = %q, want %q", m.message, "newer")
+	}
+	m.Update(clearNoticeMsg{id: m.noticeID})
+	if m.message != "" || !strings.Contains(m.footer(), "</>") {
+		t.Errorf("after the timer: message, footer = %q, %q, want \"\", the help", m.message, m.footer())
 	}
 }
 

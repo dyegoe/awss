@@ -70,6 +70,9 @@ const (
 	// maxColumnWidth caps a column, so one long value does not push the others off the screen.
 	maxColumnWidth = 40
 
+	// noticeTTL is how long a notice, such as "no errors", stays in place of the help.
+	noticeTTL = 3 * time.Second
+
 	// inputWidth is the widest the input box of the filter and the commands gets.
 	inputWidth = 40
 
@@ -91,6 +94,9 @@ type loadErrMsg struct {
 	gen int
 	err error
 }
+
+// clearNoticeMsg clears the notice numbered id, if it is still the one shown.
+type clearNoticeMsg struct{ id int }
 
 // Model is the state of the TUI. It implements tea.Model.
 type Model struct {
@@ -117,6 +123,9 @@ type Model struct {
 	mode    mode
 	query   string
 	message string
+
+	// noticeID numbers the notices, so the timer of an older one does not clear a newer one.
+	noticeID int
 
 	table  table.Model
 	input  textinput.Model
@@ -178,6 +187,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case loadErrMsg:
 		if msg.gen == m.gen && msg.err != nil {
 			m.errs = append(m.errs, msg.err.Error())
+		}
+	case clearNoticeMsg:
+		if msg.id == m.noticeID {
+			m.message = ""
 		}
 	case tea.KeyPressMsg:
 		return m.onKey(msg)

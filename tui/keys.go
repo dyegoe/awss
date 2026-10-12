@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -74,7 +75,7 @@ func (m *Model) onTableKey(k tea.KeyPressMsg) tea.Cmd {
 	case keyDetails, keyEnter:
 		m.openDetails()
 	case keyErrors:
-		m.openErrors()
+		return m.openErrors()
 	case keyRefresh:
 		return m.load(m.resource)
 	case keyEsc:
@@ -147,8 +148,7 @@ func (m *Model) runCommand(cmd string) tea.Cmd {
 		m.query = ""
 		return m.load(cmd)
 	default:
-		m.message = fmt.Sprintf("unknown resource %q: use one of %s", cmd, strings.Join(m.cfg.Resources, ", "))
-		return nil
+		return m.notify(fmt.Sprintf("unknown resource %q: use one of %s", cmd, strings.Join(m.cfg.Resources, ", ")))
 	}
 }
 
@@ -187,13 +187,22 @@ func (m *Model) openDetails() {
 	m.openPager(modeDetails, fmt.Sprintf("profile: %s\nregion:  %s\n\n%s", it.profile, it.region, body))
 }
 
-// openErrors shows the errors of the failed searches.
-func (m *Model) openErrors() {
+// openErrors shows the errors of the failed searches, or a notice when there are none.
+func (m *Model) openErrors() tea.Cmd {
 	if len(m.errs) == 0 {
-		m.message = "no errors"
-		return
+		return m.notify("no errors")
 	}
 	m.openPager(modeErrors, strings.Join(m.errs, "\n"))
+	return nil
+}
+
+// notify shows text in place of the help, and returns the command that clears it after
+// noticeTTL. A newer notice is not cleared by the timer of an older one.
+func (m *Model) notify(text string) tea.Cmd {
+	m.noticeID++
+	m.message = text
+	id := m.noticeID
+	return tea.Tick(noticeTTL, func(time.Time) tea.Msg { return clearNoticeMsg{id: id} })
 }
 
 // openPager shows content in the scrollable pager, from the top.
