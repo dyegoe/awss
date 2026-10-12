@@ -399,6 +399,22 @@ awss subnet --all --profiles member-account --org-profile org-management
 Download the binary for your platform (Linux and macOS, amd64 and arm64) from the
 [releases](https://github.com/dyegoe/awss/releases) page and put it on your `PATH`.
 
+Each release has an `awss-<version>-checksums.txt` with the SHA-256 of every archive. Check the
+archive you downloaded before you extract it:
+
+```bash
+VERSION=v0.17.0   # the release you downloaded
+
+# Linux
+sha256sum -c --ignore-missing "awss-${VERSION}-checksums.txt"
+
+# macOS (Apple silicon; use darwin-amd64 on Intel)
+grep "awss-${VERSION}-darwin-arm64.tar.gz" "awss-${VERSION}-checksums.txt" | shasum -a 256 -c -
+```
+
+Both print `OK` for a good archive. Releases up to v0.16.0 have a `.md5` file per archive
+instead, holding only the hash.
+
 Or install with Go (the version reported by `awss --version` will be `dev`):
 
 ```bash

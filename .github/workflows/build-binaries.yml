@@ -7,6 +7,10 @@ on:
         required: true
         type: string
 
+# The jobs only attach files to the release.
+permissions:
+  contents: write
+
 jobs:
   releases-matrix:
     name: Release binaries
@@ -29,3 +33,38 @@ jobs:
           binary_name: "awss"
           release_tag: ${{ inputs.tag_name }}
           ldflags: "-X github.com/dyegoe/awss/cmd.version=${{ inputs.tag_name }}"
+          # The action writes a bare hash that md5sum -c cannot read; the checksums job below
+          # publishes one standard SHA-256 file instead.
+          md5sum: false
+
+  # One checksums file per release, in the "<sha256>  <file>" format of sha256sum -c.
+  checksums:
+    name: Release checksums
+    needs: releases-matrix
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag_name }}
+    steps:
+      - name: Download the archives
+        run: gh release download "$TAG" --pattern 'awss-*.tar.gz' --dir dist
+      - name: Check that every platform was built
+        working-directory: dist
+        # Keep this list in step with the matrix above.
+        run: |
+          missing=0
+          for platform in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            archive="awss-${TAG}-${platform}.tar.gz"
+            if [ ! -f "$archive" ]; then
+              echo "::error::missing release archive $archive"
+              missing=1
+            fi
+          done
+          exit "$missing"
+      - name: Write and attach the checksums
+        working-directory: dist
+        run: |
+          sha256sum awss-*.tar.gz > "awss-${TAG}-checksums.txt"
+          cat "awss-${TAG}-checksums.txt"
+          gh release upload "$TAG" "awss-${TAG}-checksums.txt" --clobber
