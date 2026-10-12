@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.16.0](https://github.com/dyegoe/awss/compare/v0.15.0...v0.16.0) (2026-10-10)
+
+
+### Features
+
+* **search/org:** list the accounts of the AWS Organization, and --org-profile account names ([#186](https://github.com/dyegoe/awss/issues/186)) ([#195](https://github.com/dyegoe/awss/issues/195)) ([21ed3fe](https://github.com/dyegoe/awss/commit/21ed3fe9993843041bc4c742348985e539358e67))
+* **search/rdscluster:** search RDS DB clusters ([#188](https://github.com/dyegoe/awss/issues/188)) ([#197](https://github.com/dyegoe/awss/issues/197)) ([6bbc0dc](https://github.com/dyegoe/awss/commit/6bbc0dc154eab46f4cfd079fce578ee645b7eddb))
+* **search/rds:** search RDS DB instances ([#187](https://github.com/dyegoe/awss/issues/187)) ([#196](https://github.com/dyegoe/awss/issues/196)) ([60b5a46](https://github.com/dyegoe/awss/commit/60b5a460145899935c4500976d4efeaec3d86ae3))
+* **search:** report failed searches after every run, and run stats with --stats ([#185](https://github.com/dyegoe/awss/issues/185)) ([#194](https://github.com/dyegoe/awss/issues/194)) ([9046c68](https://github.com/dyegoe/awss/commit/9046c689299f46601b84c62b8573f440641962bb))
+* **search:** show account names from the accounts map next to the Owner ID ([#184](https://github.com/dyegoe/awss/issues/184)) ([#193](https://github.com/dyegoe/awss/issues/193)) ([0c8d4f9](https://github.com/dyegoe/awss/commit/0c8d4f9f114f503550ddae763d6e61da8fdaa422))
+
+
+### Bug Fixes
+
+* **common:** skip EC2 tags with a nil key and use the SDK's string helpers ([#183](https://github.com/dyegoe/awss/issues/183)) ([#191](https://github.com/dyegoe/awss/issues/191)) ([55921b1](https://github.com/dyegoe/awss/commit/55921b1af2e2487f71dd2349271c3d7a0bfe89e2))
+
 ## [0.15.0](https://github.com/dyegoe/awss/compare/v0.14.0...v0.15.0) (2026-10-08)
 
 
