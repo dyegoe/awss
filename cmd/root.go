@@ -121,6 +121,7 @@ var subcommands = []subcommand{
 	{orgCmd, orgInitFlags, orgInitViper},
 	{rdsCmd, rdsInitFlags, rdsInitViper},
 	{rdsClusterCmd, rdsClusterInitFlags, rdsClusterInitViper},
+	{tuiCmd, tuiInitFlags, tuiInitViper},
 }
 
 // setup registers the global flags and every subcommand with its flags, then binds them to viper.

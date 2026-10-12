@@ -248,6 +248,36 @@ func (s *Summary) add(r common.Results, timedOut bool) {
 // is reported as timed out in its own result set; the result sets that finished are printed as
 // usual.
 func Execute(cmd string, profiles, regions []string, filters map[string][]string, opts *Options) (Summary, error) {
+	if _, ok := engines[cmd]; !ok {
+		return Summary{}, fmt.Errorf("command %s not found", cmd)
+	}
+
+	// The buffer matches the workers, so the finished result sets held in memory scale with the
+	// concurrency, not with profiles x regions: a worker waits while the printer is behind.
+	resultsChan := make(chan common.Results, workerCount(opts.Concurrency, len(profiles)*len(regions)))
+
+	done := make(chan bool)
+
+	go common.PrintResults(stdout, resultsChan, done, opts.Output, opts.ShowEmpty, opts.ShowTags, opts.TagsKeys)
+
+	summary, err := Stream(context.Background(), cmd, profiles, regions, filters, opts, resultsChan)
+	<-done
+	close(done)
+
+	return summary, err
+}
+
+// Stream runs the searches of Execute, but sends every result set to out instead of printing it.
+// It closes out when every search has finished, and returns how the run went.
+//
+// Cancelling ctx stops the run: the searches still waiting do not start, and the ones running are
+// reported as timed out. Every result set is still sent, so the reader must drain out.
+func Stream(
+	ctx context.Context, cmd string, profiles, regions []string, filters map[string][]string, opts *Options,
+	out chan<- common.Results,
+) (Summary, error) {
+	defer close(out)
+
 	eng, ok := engines[cmd]
 	if !ok {
 		return Summary{}, fmt.Errorf("command %s not found", cmd)
@@ -258,15 +288,7 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 		Profiles: len(profiles), Regions: len(regions), Searches: len(profiles) * len(regions), Concurrency: workers,
 	}
 
-	// The buffer matches the workers, so the finished result sets held in memory scale with the
-	// concurrency, not with profiles x regions: a worker waits while the printer is behind.
-	resultsChan := make(chan common.Results, workers)
-
-	done := make(chan bool)
-
-	go common.PrintResults(stdout, resultsChan, done, opts.Output, opts.ShowEmpty, opts.ShowTags, opts.TagsKeys)
-
-	ctx, cancel := withTimeout(context.Background(), opts.Timeout)
+	ctx, cancel := withTimeout(ctx, opts.Timeout)
 	defer cancel()
 
 	targets := make(chan target)
@@ -277,11 +299,11 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 		wg.Go(func() {
 			for t := range targets {
 				r, timedOut := searchOne(ctx, eng, t.profile, t.region, filters, opts)
-				// Counted before it is sent: once printed, the result set belongs to the printer.
+				// Counted before it is sent: once sent, the result set belongs to the reader.
 				mu.Lock()
 				summary.add(r, timedOut)
 				mu.Unlock()
-				resultsChan <- r
+				out <- r
 			}
 		})
 	}
@@ -294,9 +316,6 @@ func Execute(cmd string, profiles, regions []string, filters map[string][]string
 	close(targets)
 
 	wg.Wait()
-	close(resultsChan)
-	<-done
-	close(done)
 
 	return summary, nil
 }

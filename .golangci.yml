@@ -50,6 +50,10 @@ linters:
             - github.com/jedib0t/go-pretty/v6/text
             - golang.org/x/term
             - gopkg.in/ini.v1
+            - charm.land/bubbletea/v2
+            - charm.land/bubbles/v2/
+            - charm.land/lipgloss/v2
+            - github.com/sahilm/fuzzy
     dupl:
       threshold: 100
     forbidigo:
