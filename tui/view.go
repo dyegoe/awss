@@ -28,7 +28,7 @@ import (
 
 // Help lines of the footer.
 const (
-	tableHelp = "/ filter  : resource  d details  e errors  r refresh  esc clear  q quit"
+	tableHelp = "/ filter (~ fuzzy)  : resource  d details  e errors  r refresh  esc clear  q quit"
 	pagerHelp = "↑/↓ scroll  esc back"
 )
 

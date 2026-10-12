@@ -61,8 +61,8 @@ Browse resources in an interactive terminal UI, in the style of k9s (experimenta
 It loads every resource of the type across the profiles and regions, with no filter, keeps them in
 memory and filters them as you type. The resource defaults to ec2.
 
-Keys: / fuzzy filter, : switch resource (e.g. :eni), d details, e errors, r refresh,
-esc clear the filter, q quit.
+Keys: / filter (words that must all appear; ~word matches fuzzily), : switch resource (e.g. :eni),
+d details, e errors, r refresh, esc clear the filter, q quit.
 `,
 	Hidden:    true,
 	Args:      cobra.MatchAll(cobra.MaximumNArgs(1), cobra.OnlyValidArgs),

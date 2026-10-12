@@ -239,7 +239,7 @@ func TestNewItem(t *testing.T) {
 				Size: 8, Tags: map[string]string{"b": "2", "a": "1"}, Inner: "hidden",
 			},
 			wantCells: []string{"i-1", "web", "10.0.0.1, 10.0.0.2", "Kind: primary", "8"},
-			wantWords: []string{"p", "r", "i-1", "web", "10.0.0.1", "10.0.0.2", "Kind: primary", "8", "a=1", "b=2"},
+			wantWords: []string{"p", "r", "i-1", "web", "10.0.0.1", "10.0.0.2", "kind: primary", "8", "a=1", "b=2"},
 		},
 		{
 			name:      "pointer to a row",
@@ -267,26 +267,32 @@ func TestNewItem(t *testing.T) {
 	}
 }
 
-// TestMatch checks the filter: every item for an empty query, fuzzy and case-insensitive terms
-// that must all match, the best match first, and no match across two words.
+// TestMatch checks the filter: every item for an empty query, case-insensitive text terms that
+// must all match, fuzzy terms with ~, and no match across two words or on letters spread through
+// a long value.
 func TestMatch(t *testing.T) {
 	items := []item{
 		{words: []string{"prod", "eu-west-1", "web-1"}},
 		{words: []string{"prod", "eu-west-1", "db-1"}},
 		{words: []string{"dev", "us-east-1", "web-dev"}},
+		{words: []string{"dev", "eu-west-1", "shared-elk1", "aws:autoscaling:groupname=shared-elk"}},
 	}
 	tests := []struct {
 		name  string
 		query string
 		want  []int
 	}{
-		{name: "empty query", query: "  ", want: []int{0, 1, 2}},
-		{name: "one term", query: "web", want: []int{0, 2}},
-		{name: "fuzzy", query: "wbdv", want: []int{2}},
+		{name: "empty query", query: "  ", want: []int{0, 1, 2, 3}},
+		{name: "text", query: "web", want: []int{0, 2}},
 		{name: "case insensitive", query: "DB", want: []int{1}},
 		{name: "every term", query: "web prod", want: []int{0}},
-		{name: "best first", query: "web-d", want: []int{2}},
-		{name: "not across two words", query: "westdb", want: []int{}},
+		{name: "part of a value", query: "elk", want: []int{3}},
+		{name: "text not spread through a value", query: "stag", want: []int{}},
+		{name: "fuzzy", query: "~wbdv", want: []int{2}},
+		{name: "fuzzy spread through a value", query: "~stag", want: []int{3}},
+		{name: "fuzzy and text", query: "~wbdv dev", want: []int{2}},
+		{name: "lone prefix is text", query: "~", want: []int{}},
+		{name: "not across two words", query: "~westdb", want: []int{}},
 		{name: "no match", query: "zzz", want: []int{}},
 	}
 	for _, tt := range tests {

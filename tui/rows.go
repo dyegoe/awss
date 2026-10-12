@@ -41,8 +41,8 @@ type item struct {
 	// row is the result row, shown as JSON by the details view.
 	row interface{}
 
-	// words are the values the filter matches: profile, region and every value of the row, each
-	// slice element and tag on its own, so a match never runs across two values.
+	// words are the values the filter matches, in lower case: profile, region and every value of
+	// the row, each slice element and tag on its own, so a match never runs across two values.
 	words []string
 }
 
@@ -59,13 +59,16 @@ func columns(headers []interface{}) []string {
 
 // newItem builds the item of a result row from its fields with a `header` tag.
 func newItem(profile, region string, row interface{}) item {
-	it := item{profile: profile, region: region, row: row, words: []string{profile, region}}
+	it := item{
+		profile: profile, region: region, row: row,
+		words: []string{strings.ToLower(profile), strings.ToLower(region)},
+	}
 
 	v := reflect.Indirect(reflect.ValueOf(row))
 	if v.Kind() != reflect.Struct {
 		s := fmt.Sprint(row)
 		it.cells = []string{s}
-		it.words = append(it.words, s)
+		it.words = append(it.words, strings.ToLower(s))
 		return it
 	}
 
@@ -75,7 +78,9 @@ func newItem(profile, region string, row interface{}) item {
 			continue
 		}
 		w := fieldWords(v.Field(i))
-		it.words = append(it.words, w...)
+		for _, word := range w {
+			it.words = append(it.words, strings.ToLower(word))
+		}
 		if header != tagsHeader {
 			it.cells = append(it.cells, strings.Join(w, ", "))
 		}
@@ -120,14 +125,20 @@ func structText(f reflect.Value) string {
 	return strings.Join(parts, ", ")
 }
 
+// fuzzyPrefix marks a filter term matched fuzzily instead of as text.
+const fuzzyPrefix = "~"
+
 // hit is an item that matches the filter, and how well.
 type hit struct{ index, score int }
 
 // match returns the indexes of the items that match query, the best match first.
 //
-// query is space-separated terms, and an item matches when every term fuzzy-matches one of its
-// words: "web prod" finds the web servers of the prod profile. An empty query matches every item,
-// in their order.
+// query is space-separated terms, and an item matches when every term matches one of its words,
+// ignoring case: "web prod" finds the web servers of the prod profile. A term matches a word that
+// contains it, or, with the ~ prefix, a word that has its letters in order (~wbdv finds web-dev).
+// The items matched by a fuzzy term come first, by the score of the fuzzy package (it favours
+// letters after a separator such as -); the others keep their order. An empty query
+// matches every item, in their order.
 func match(items []item, query string) []int {
 	terms := strings.Fields(query)
 	if len(terms) == 0 {
@@ -153,12 +164,20 @@ func match(items []item, query string) []int {
 	return idx
 }
 
-// matchScore returns the sum of the best score of each term in words, and false when a term
-// matches none of them.
+// matchScore returns the sum of the scores of the terms in words, and false when a term matches
+// none of them. A text match scores 0, a fuzzy match its best fuzzy score.
 func matchScore(words, terms []string) (int, bool) {
 	total := 0
 	for _, term := range terms {
-		matches := fuzzy.Find(term, words)
+		term = strings.ToLower(term)
+		pattern, isFuzzy := strings.CutPrefix(term, fuzzyPrefix)
+		if !isFuzzy || pattern == "" {
+			if !slices.ContainsFunc(words, func(w string) bool { return strings.Contains(w, term) }) {
+				return 0, false
+			}
+			continue
+		}
+		matches := fuzzy.Find(pattern, words)
 		if len(matches) == 0 {
 			return 0, false
 		}
