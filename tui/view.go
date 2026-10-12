@@ -26,18 +26,38 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// Help lines of the footer.
-const (
-	tableHelp  = "[/] filter  [:] resource  [d] details  [e] errors  [r] refresh  [esc] clear filter  [q] quit"
-	filterHelp = "words must all appear, ~word fuzzy · [enter] keep · [esc] clear"
-	cmdHelp    = "%s · [enter] switch · [esc] cancel"
-	pagerHelp  = "[↑/↓] scroll  [esc] back"
+// binding is a key and what it does, as the footer shows it.
+type binding struct{ key, label string }
+
+// Help lines of the footer, in the style of k9s: <key> label.
+var (
+	tableHelp = []binding{
+		{keyFilter, "filter"}, {keyCommand, "resource"}, {keyDetails, "details"}, {keyErrors, "errors"},
+		{keyRefresh, "refresh"},
+		{keyEsc, "clear filter"}, {keyQuit, "quit"},
+	}
+	filterHelp = []binding{{keyEnter, "keep"}, {keyEsc, "clear"}, {"~word", "fuzzy"}}
+	cmdHelp    = []binding{{keyEnter, "switch"}, {keyEsc, "cancel"}}
+	pagerHelp  = []binding{{"↑/↓", "scroll"}, {keyEsc, "back"}}
 )
 
+// Colours are ANSI ones, so they follow the theme of the terminal, light or dark.
 var (
-	titleStyle = lipgloss.NewStyle().Bold(true)
-	helpStyle  = lipgloss.NewStyle().Faint(true)
+	titleStyle  = lipgloss.NewStyle().Bold(true)
+	keyStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Cyan)
+	labelStyle  = lipgloss.NewStyle().Faint(true)
+	promptStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Yellow)
+	separator   = labelStyle.Render(" │ ")
 )
+
+// helpLine renders bindings as "<key> label", separated by a bar.
+func helpLine(bindings []binding) string {
+	parts := make([]string, len(bindings))
+	for i, b := range bindings {
+		parts[i] = keyStyle.Render("<"+b.key+">") + " " + labelStyle.Render(b.label)
+	}
+	return strings.Join(parts, separator)
+}
 
 // refresh applies the filter and puts the matching items in the table.
 func (m *Model) refresh() {
@@ -78,7 +98,7 @@ func tableColumns(headers []string, rows []table.Row) []table.Column {
 func (m *Model) render() string {
 	switch m.mode {
 	case modeDetails, modeErrors:
-		return lipgloss.JoinVertical(lipgloss.Left, m.title(), m.pager.View(), helpStyle.Render(pagerHelp))
+		return lipgloss.JoinVertical(lipgloss.Left, m.title(), m.pager.View(), helpLine(pagerHelp))
 	default:
 		return lipgloss.JoinVertical(lipgloss.Left, m.title(), m.table.View(), m.footer())
 	}
@@ -109,12 +129,13 @@ func (m *Model) title() string {
 func (m *Model) footer() string {
 	switch {
 	case m.mode == modeFilter:
-		return m.input.View() + "   " + helpStyle.Render(filterHelp)
+		return m.input.View() + separator + helpLine(filterHelp)
 	case m.mode == modeCommand:
-		return m.input.View() + "   " + helpStyle.Render(fmt.Sprintf(cmdHelp, strings.Join(m.cfg.Resources, " ")))
+		return m.input.View() + separator + labelStyle.Render(strings.Join(m.cfg.Resources, " ")) +
+			separator + helpLine(cmdHelp)
 	case m.message != "":
 		return m.message
 	default:
-		return helpStyle.Render(tableHelp)
+		return helpLine(tableHelp)
 	}
 }

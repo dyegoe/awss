@@ -470,7 +470,7 @@ func TestModel_onInputKey_backspace(t *testing.T) {
 			if m.query != "" || len(m.table.Rows()) != 3 {
 				t.Errorf("query, rows = %q, %d, want \"\", 3", m.query, len(m.table.Rows()))
 			}
-			if footer := m.footer(); !strings.Contains(footer, "[/] filter") {
+			if footer := m.footer(); !strings.Contains(footer, "</>") {
 				t.Errorf("footer() = %q, want the help", footer)
 			}
 		})
@@ -481,11 +481,11 @@ func TestModel_onInputKey_backspace(t *testing.T) {
 func TestModel_footer(t *testing.T) {
 	m := loaded(t)
 	press(m, keyFilter)
-	if got := m.footer(); !strings.Contains(got, "[enter] keep") {
+	if got := m.footer(); !strings.Contains(got, "<enter>") {
 		t.Errorf("filter footer() = %q, want the filter hints", got)
 	}
 	press(m, keyEsc, keyCommand)
-	if got := m.footer(); !strings.Contains(got, "ec2 vpc · [enter] switch") {
+	if got := m.footer(); !strings.Contains(got, "ec2 vpc") {
 		t.Errorf("command footer() = %q, want the resources and hints", got)
 	}
 }

@@ -91,7 +91,7 @@ func (m *Model) onTableKey(k tea.KeyPressMsg) tea.Cmd {
 // openInput shows the input line with prompt and value, for the filter or a command.
 func (m *Model) openInput(md mode, prompt, value string) tea.Cmd {
 	m.mode = md
-	m.input.Prompt = prompt
+	m.input.Prompt = promptStyle.Render(prompt)
 	m.input.SetValue(value)
 	m.input.CursorEnd()
 	return m.input.Focus()
