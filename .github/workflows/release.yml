@@ -4,6 +4,10 @@ on:
     types:
       - published
 
+# The reusable workflow attaches the binaries and checksums to the release.
+permissions:
+  contents: write
+
 jobs:
   build-binaries:
     uses: ./.github/workflows/build-binaries.yml
