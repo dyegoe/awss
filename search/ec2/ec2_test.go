@@ -26,6 +26,7 @@ import (
 	"net"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 )
 
 // TestNew tests the New function.
@@ -926,5 +928,94 @@ func TestResults_Search_earlyErrors(t *testing.T) {
 				t.Errorf("Errors = %q, want one error starting with %q", r.Errors, tt.wantPrefix)
 			}
 		})
+	}
+}
+
+// fakeMissingInstances answers DescribeInstances like AWS: it knows the IDs of exist, rejects a call
+// naming any other ID with the not-found error naming them, and records the IDs of every call.
+type fakeMissingInstances struct {
+	exist []string
+	asked [][]string
+}
+
+func (f *fakeMissingInstances) DescribeInstances(
+	_ context.Context, in *ec2.DescribeInstancesInput, _ ...func(*ec2.Options),
+) (*ec2.DescribeInstancesOutput, error) {
+	f.asked = append(f.asked, in.InstanceIds)
+	var found []types.Instance
+	var missing []string
+	for _, id := range in.InstanceIds {
+		if !slices.Contains(f.exist, id) {
+			missing = append(missing, id)
+			continue
+		}
+		found = append(found, types.Instance{InstanceId: aws.String(id)})
+	}
+	if len(missing) > 0 {
+		return nil, &smithy.GenericAPIError{
+			Code:    errCodeInstanceNotFound,
+			Message: fmt.Sprintf("The instance ID '%s' does not exist", strings.Join(missing, ", ")),
+		}
+	}
+	out := &ec2.DescribeInstancesOutput{}
+	out.Reservations = []types.Reservation{{Instances: found}}
+	return out, nil
+}
+
+// TestResults_collect_missingIDs tests that IDs not in the account or region are dropped and
+// asked again, with no error (#200).
+func TestResults_collect_missingIDs(t *testing.T) {
+	tests := []struct {
+		name      string
+		ids       []string
+		exist     []string
+		wantIDs   []string
+		wantAsked [][]string
+	}{
+		{
+			name: "missing IDs are dropped", ids: []string{"i-1", "i-2", "i-3"}, exist: []string{"i-2"},
+			wantIDs: []string{"i-2"}, wantAsked: [][]string{{"i-1", "i-2", "i-3"}, {"i-2"}},
+		},
+		{
+			name: "every ID missing is an empty result", ids: []string{"i-1"},
+			wantIDs: []string{}, wantAsked: [][]string{{"i-1"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeMissingInstances{exist: tt.exist}
+			input := &ec2.DescribeInstancesInput{InstanceIds: tt.ids}
+			r := New("default", "us-east-1", nil, "id")
+
+			r.collect(context.Background(), client, input, nil)
+
+			got := []string{}
+			for i := range r.Data {
+				got = append(got, r.Data[i].InstanceID)
+			}
+			if !reflect.DeepEqual(got, tt.wantIDs) || len(r.Errors) > 0 {
+				t.Errorf("collect(%v) rows = %v, errors = %q; want %v, no errors", tt.ids, got, r.Errors, tt.wantIDs)
+			}
+			if !reflect.DeepEqual(client.asked, tt.wantAsked) {
+				t.Errorf("collect(%v) asked %v, want %v", tt.ids, client.asked, tt.wantAsked)
+			}
+		})
+	}
+}
+
+// TestInstanceNames_otherAccount tests that an instance AWS does not find, such as one of another
+// account behind an interface in a shared subnet, gets no name and no error (#200).
+func TestInstanceNames_otherAccount(t *testing.T) {
+	client := &fakeMissingInstances{exist: []string{"i-1"}}
+
+	got, err := InstanceNames(context.Background(), client, []string{"i-2", "i-1", "i-2"})
+	if err != nil {
+		t.Fatalf("InstanceNames() error = %v", err)
+	}
+	if want := map[string]string{"i-1": ""}; !reflect.DeepEqual(got, want) {
+		t.Errorf("InstanceNames() = %v, want %v", got, want)
+	}
+	if want := [][]string{{"i-1", "i-2"}, {"i-1"}}; !reflect.DeepEqual(client.asked, want) {
+		t.Errorf("InstanceNames() asked %v, want %v", client.asked, want)
 	}
 }

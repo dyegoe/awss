@@ -137,18 +137,26 @@ func (r *Results) collect(ctx context.Context, client ec2.DescribeVpcsAPIClient,
 		paged.MaxResults = aws.Int32(pageSize)
 	}
 
-	paginator := ec2.NewDescribeVpcsPaginator(client, &paged)
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			r.Errors = append(r.Errors, fmt.Sprintf("error describing vpcs: %v", err))
-			return
+	// A VPC ID that is not in this account or region is dropped, not reported.
+	err := common.DescribeByIDs(paged.VpcIds, errCodeVpcNotFound, func(ids []string) error {
+		paged.VpcIds = ids
+		paginator := ec2.NewDescribeVpcsPaginator(client, &paged)
+		for paginator.HasMorePages() {
+			page, err := paginator.NextPage(ctx)
+			if err != nil {
+				return fmt.Errorf("error describing vpcs: %w", err)
+			}
+			for i := range page.Vpcs {
+				row := parseVpc(&page.Vpcs[i])
+				row.OwnerName = r.AccountNames[row.OwnerID]
+				r.Data = append(r.Data, row)
+			}
 		}
-		for i := range page.Vpcs {
-			row := parseVpc(&page.Vpcs[i])
-			row.OwnerName = r.AccountNames[row.OwnerID]
-			r.Data = append(r.Data, row)
-		}
+		return nil
+	})
+	if err != nil {
+		r.Errors = append(r.Errors, err.Error())
+		return
 	}
 
 	if r.SortField == "" {
@@ -158,6 +166,9 @@ func (r *Results) collect(ctx context.Context, client ec2.DescribeVpcsAPIClient,
 		r.Errors = append(r.Errors, err.Error())
 	}
 }
+
+// errCodeVpcNotFound is the EC2 error code returned when an asked VPC ID does not exist.
+const errCodeVpcNotFound = "InvalidVpcID.NotFound"
 
 // parseVpc converts a single Vpc into a dataRow.
 func parseVpc(vpc *types.Vpc) dataRow {

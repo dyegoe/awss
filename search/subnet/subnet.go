@@ -145,18 +145,26 @@ func (r *Results) collect(ctx context.Context, client ec2.DescribeSubnetsAPIClie
 		paged.MaxResults = aws.Int32(pageSize)
 	}
 
-	paginator := ec2.NewDescribeSubnetsPaginator(client, &paged)
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			r.Errors = append(r.Errors, fmt.Sprintf("error describing subnets: %v", err))
-			return
+	// A subnet ID that is not in this account or region is dropped, not reported.
+	err := common.DescribeByIDs(paged.SubnetIds, errCodeSubnetNotFound, func(ids []string) error {
+		paged.SubnetIds = ids
+		paginator := ec2.NewDescribeSubnetsPaginator(client, &paged)
+		for paginator.HasMorePages() {
+			page, err := paginator.NextPage(ctx)
+			if err != nil {
+				return fmt.Errorf("error describing subnets: %w", err)
+			}
+			for i := range page.Subnets {
+				row := parseSubnet(&page.Subnets[i])
+				row.OwnerName = r.AccountNames[row.OwnerID]
+				r.Data = append(r.Data, row)
+			}
 		}
-		for i := range page.Subnets {
-			row := parseSubnet(&page.Subnets[i])
-			row.OwnerName = r.AccountNames[row.OwnerID]
-			r.Data = append(r.Data, row)
-		}
+		return nil
+	})
+	if err != nil {
+		r.Errors = append(r.Errors, err.Error())
+		return
 	}
 
 	if r.SortField == "" {
@@ -166,6 +174,9 @@ func (r *Results) collect(ctx context.Context, client ec2.DescribeSubnetsAPIClie
 		r.Errors = append(r.Errors, err.Error())
 	}
 }
+
+// errCodeSubnetNotFound is the EC2 error code returned when an asked subnet ID does not exist.
+const errCodeSubnetNotFound = "InvalidSubnetID.NotFound"
 
 // parseSubnet converts a single Subnet into a dataRow.
 func parseSubnet(subnet *types.Subnet) dataRow {

@@ -350,7 +350,7 @@ func bindFlags(cmd *cobra.Command, keys map[string]string) error {
 // sortHelp builds the --sort help text of a command from its registered sort fields,
 // so the help never drifts from the struct tags.
 func sortHelp(cmd, what, def string) string {
-	return fmt.Sprintf("Sort %s by %s. `%s`", what, common.StringSliceToString(search.SortFieldNames(cmd), ", "), def)
+	return fmt.Sprintf("Sort %s by %s. %#q", what, common.StringSliceToString(search.SortFieldNames(cmd), ", "), def)
 }
 
 // buildFilters validates and builds the filter map for a subcommand.

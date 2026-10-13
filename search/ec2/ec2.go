@@ -163,19 +163,41 @@ func (r *Results) collect(
 		paged.MaxResults = aws.Int32(pageSize)
 	}
 
-	paginator := ec2.NewDescribeInstancesPaginator(client, &paged)
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			r.Errors = append(r.Errors, fmt.Sprintf("error describing instances: %v", err))
-			return
-		}
-		r.collectInstances(page.Reservations, nets)
+	// An instance ID that is not in this account or region is dropped, not reported.
+	err := common.DescribeByIDs(paged.InstanceIds, errCodeInstanceNotFound, func(ids []string) error {
+		paged.InstanceIds = ids
+		return describeInstances(ctx, client, &paged, "error describing instances", func(reservations []types.Reservation) {
+			r.collectInstances(reservations, nets)
+		})
+	})
+	if err != nil {
+		r.Errors = append(r.Errors, err.Error())
+		return
 	}
 
 	if err := r.sortResults(r.SortField); err != nil {
 		r.Errors = append(r.Errors, err.Error())
 	}
+}
+
+// errCodeInstanceNotFound is the EC2 error code returned when an asked instance ID does not exist.
+const errCodeInstanceNotFound = "InvalidInstanceID.NotFound"
+
+// describeInstances follows every page of DescribeInstances and passes the reservations of each
+// page to keep. A failed page is returned wrapped with errMsg.
+func describeInstances(
+	ctx context.Context, client ec2.DescribeInstancesAPIClient, input *ec2.DescribeInstancesInput,
+	errMsg string, keep func([]types.Reservation),
+) error {
+	paginator := ec2.NewDescribeInstancesPaginator(client, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("%s: %w", errMsg, err)
+		}
+		keep(page.Reservations)
+	}
+	return nil
 }
 
 // collectInstances appends the instances of the reservations to r.Data.
@@ -386,18 +408,21 @@ func InstanceNames(
 
 	ids := slices.Clone(instanceIDs)
 	slices.Sort(ids)
-	input := &ec2.DescribeInstancesInput{InstanceIds: slices.Compact(ids)}
-	paginator := ec2.NewDescribeInstancesPaginator(client, input)
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("error searching instance names: %w", err)
-		}
-		for _, res := range page.Reservations {
+	keep := func(reservations []types.Reservation) {
+		for _, res := range reservations {
 			for i := range res.Instances {
 				names[aws.ToString(res.Instances[i].InstanceId)] = common.TagName(res.Instances[i].Tags)
 			}
 		}
+	}
+	// An instance of another account (an interface in a shared subnet) is not found: its name
+	// stays empty.
+	err := common.DescribeByIDs(slices.Compact(ids), errCodeInstanceNotFound, func(ids []string) error {
+		input := &ec2.DescribeInstancesInput{InstanceIds: ids}
+		return describeInstances(ctx, client, input, "error searching instance names", keep)
+	})
+	if err != nil {
+		return nil, err
 	}
 	return names, nil
 }
