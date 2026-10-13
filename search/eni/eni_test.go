@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -33,6 +34,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 )
 
 // TestNew tests the New function.
@@ -715,6 +717,84 @@ func TestResults_collect_ownerNames(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("OwnerName of the rows = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// fakeMissingNetworkInterfaces answers DescribeNetworkInterfaces like AWS: it knows the IDs of exist, rejects a call
+// naming any other ID with the not-found error naming them, and records the IDs of every call.
+type fakeMissingNetworkInterfaces struct {
+	exist []string
+	asked [][]string
+}
+
+func (f *fakeMissingNetworkInterfaces) DescribeNetworkInterfaces(
+	_ context.Context, in *ec2.DescribeNetworkInterfacesInput, _ ...func(*ec2.Options),
+) (*ec2.DescribeNetworkInterfacesOutput, error) {
+	f.asked = append(f.asked, in.NetworkInterfaceIds)
+	var found []types.NetworkInterface
+	var missing []string
+	for _, id := range in.NetworkInterfaceIds {
+		if !slices.Contains(f.exist, id) {
+			missing = append(missing, id)
+			continue
+		}
+		found = append(found, iface(id, ""))
+	}
+	if len(missing) > 0 {
+		return nil, &smithy.GenericAPIError{
+			Code:    errCodeENINotFound,
+			Message: fmt.Sprintf("The networkInterface ID '%s' does not exist", strings.Join(missing, ", ")),
+		}
+	}
+	out := &ec2.DescribeNetworkInterfacesOutput{}
+	out.NetworkInterfaces = found
+	return out, nil
+}
+
+func (f *fakeMissingNetworkInterfaces) DescribeInstances(
+	context.Context, *ec2.DescribeInstancesInput, ...func(*ec2.Options),
+) (*ec2.DescribeInstancesOutput, error) {
+	return &ec2.DescribeInstancesOutput{}, nil
+}
+
+// TestResults_collect_missingIDs tests that IDs not in the account or region are dropped and
+// asked again, with no error (#200).
+func TestResults_collect_missingIDs(t *testing.T) {
+	tests := []struct {
+		name      string
+		ids       []string
+		exist     []string
+		wantIDs   []string
+		wantAsked [][]string
+	}{
+		{
+			name: "missing IDs are dropped", ids: []string{"eni-1", "eni-2", "eni-3"}, exist: []string{"eni-2"},
+			wantIDs: []string{"eni-2"}, wantAsked: [][]string{{"eni-1", "eni-2", "eni-3"}, {"eni-2"}},
+		},
+		{
+			name: "every ID missing is an empty result", ids: []string{"eni-1"},
+			wantIDs: []string{}, wantAsked: [][]string{{"eni-1"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeMissingNetworkInterfaces{exist: tt.exist}
+			input := &ec2.DescribeNetworkInterfacesInput{NetworkInterfaceIds: tt.ids}
+			r := New("default", "us-east-1", nil, "", true)
+
+			r.collect(context.Background(), client, input)
+
+			got := []string{}
+			for i := range r.Data {
+				got = append(got, r.Data[i].InterfaceInfo.NetworkInterfaceID)
+			}
+			if !reflect.DeepEqual(got, tt.wantIDs) || len(r.Errors) > 0 {
+				t.Errorf("collect(%v) rows = %v, errors = %q; want %v, no errors", tt.ids, got, r.Errors, tt.wantIDs)
+			}
+			if !reflect.DeepEqual(client.asked, tt.wantAsked) {
+				t.Errorf("collect(%v) asked %v, want %v", tt.ids, client.asked, tt.wantAsked)
 			}
 		})
 	}

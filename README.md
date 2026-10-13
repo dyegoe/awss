@@ -340,6 +340,11 @@ awss: 3 of 2,550 searches failed (2 errors, 1 timed out); see the result sets ma
 prints nothing extra. The line goes to stderr, so `--output json` on stdout still parses with
 `jq`, and the command still exits 0.
 
+An ID that is not in a profile or region is not an error. When `ec2`, `eni`, `ebs`, `vpc` or
+`subnet` search by ID (`--ids`), awss drops the IDs AWS reports as not found
+(`InvalidInstanceID.NotFound`, ...) and asks again for the rest, so a set where none of them
+exist is counted as empty.
+
 `--stats` (or `stats: true` in the config file) adds a summary on stderr after the results:
 
 ```text
