@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.16.1](https://github.com/dyegoe/awss/compare/v0.16.0...v0.16.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* **search:** drop IDs AWS reports as not found and ask again ([#200](https://github.com/dyegoe/awss/issues/200)) ([#203](https://github.com/dyegoe/awss/issues/203)) ([885a076](https://github.com/dyegoe/awss/commit/885a0764efe066cc5fd4f485c52661bbee650406))
+
 ## [0.16.0](https://github.com/dyegoe/awss/compare/v0.15.0...v0.16.0) (2026-10-10)
 
 
