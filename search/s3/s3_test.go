@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -237,12 +238,33 @@ func TestResults_collectBuckets(t *testing.T) {
 	}
 }
 
-// TestResults_Search_invalidPattern checks an invalid pattern is reported without calling AWS.
-func TestResults_Search_invalidPattern(t *testing.T) {
-	r := New("default", "us-east-1", map[string][]string{FilterKeyName: {"(unclosed"}}, "name", true, false)
-	r.Search(context.Background())
-	if len(r.Errors) != 1 || !strings.Contains(r.Errors[0], "invalid regular expression") {
-		t.Errorf("Search() Errors = %v, want one invalid regular expression error", r.Errors)
+// TestResults_Search_earlyErrors tests the errors Search reports before any S3 call.
+func TestResults_Search_earlyErrors(t *testing.T) {
+	// An empty AWS config file: the profile does not exist and nothing is read from the user's files.
+	empty := filepath.Join(t.TempDir(), "config")
+	t.Setenv("AWS_CONFIG_FILE", empty)
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", empty)
+
+	tests := []struct {
+		name    string
+		filters map[string][]string
+		want    string
+	}{
+		{
+			name:    "invalid pattern",
+			filters: map[string][]string{FilterKeyName: {"(unclosed"}},
+			want:    "invalid regular expression",
+		},
+		{name: "unknown profile", filters: map[string][]string{}, want: "error getting aws config:"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := New("awss-test-missing-profile", "us-east-1", tt.filters, "name", true, false)
+			r.Search(context.Background())
+			if len(r.Errors) != 1 || !strings.Contains(r.Errors[0], tt.want) {
+				t.Errorf("Search(%v) Errors = %q, want one error containing %q", tt.filters, r.Errors, tt.want)
+			}
+		})
 	}
 }
 

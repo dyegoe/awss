@@ -28,7 +28,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.13.1
+          version: v2.14.0
 
       # make test is the one test command (Makefile): race detector, random order and every test
       # twice (a failure prints the seed: rerun with -shuffle=<seed>), then a check that every
