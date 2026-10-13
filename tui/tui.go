@@ -234,9 +234,10 @@ func (m *Model) stop() {
 	go drain(m.ch)
 }
 
-// drain reads ch until it is closed.
+// drain reads ch until it is closed. Reading is the point: it unblocks the searches still
+// sending.
 func drain(ch <-chan common.Results) {
-	for range ch { //nolint:revive // reading is the point: it unblocks the searches still sending
+	for range ch {
 	}
 }
 
