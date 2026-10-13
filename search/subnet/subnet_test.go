@@ -23,6 +23,7 @@ import (
 	"net"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -31,6 +32,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 )
 
 // mockDataRow1 returns a new public subnet row.
@@ -595,6 +597,77 @@ func TestResults_collect_ownerNames(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("OwnerName of the rows = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// fakeMissingSubnets answers DescribeSubnets like AWS: it knows the IDs of exist, rejects a call
+// naming any other ID with the not-found error naming them, and records the IDs of every call.
+type fakeMissingSubnets struct {
+	exist []string
+	asked [][]string
+}
+
+func (f *fakeMissingSubnets) DescribeSubnets(
+	_ context.Context, in *ec2.DescribeSubnetsInput, _ ...func(*ec2.Options),
+) (*ec2.DescribeSubnetsOutput, error) {
+	f.asked = append(f.asked, in.SubnetIds)
+	var found []types.Subnet
+	var missing []string
+	for _, id := range in.SubnetIds {
+		if !slices.Contains(f.exist, id) {
+			missing = append(missing, id)
+			continue
+		}
+		found = append(found, subnet(id, "", ""))
+	}
+	if len(missing) > 0 {
+		return nil, &smithy.GenericAPIError{
+			Code: errCodeSubnetNotFound, Message: fmt.Sprintf("The subnet ID '%s' does not exist", strings.Join(missing, ", ")),
+		}
+	}
+	out := &ec2.DescribeSubnetsOutput{}
+	out.Subnets = found
+	return out, nil
+}
+
+// TestResults_collect_missingIDs tests that IDs not in the account or region are dropped and
+// asked again, with no error (#200).
+func TestResults_collect_missingIDs(t *testing.T) {
+	tests := []struct {
+		name      string
+		ids       []string
+		exist     []string
+		wantIDs   []string
+		wantAsked [][]string
+	}{
+		{
+			name: "missing IDs are dropped", ids: []string{"subnet-1", "subnet-2", "subnet-3"}, exist: []string{"subnet-2"},
+			wantIDs: []string{"subnet-2"}, wantAsked: [][]string{{"subnet-1", "subnet-2", "subnet-3"}, {"subnet-2"}},
+		},
+		{
+			name: "every ID missing is an empty result", ids: []string{"subnet-1"},
+			wantIDs: []string{}, wantAsked: [][]string{{"subnet-1"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeMissingSubnets{exist: tt.exist}
+			input := &ec2.DescribeSubnetsInput{SubnetIds: tt.ids}
+			r := New("default", "us-east-1", nil, "")
+
+			r.collect(context.Background(), client, input)
+
+			got := []string{}
+			for i := range r.Data {
+				got = append(got, r.Data[i].SubnetID)
+			}
+			if !reflect.DeepEqual(got, tt.wantIDs) || len(r.Errors) > 0 {
+				t.Errorf("collect(%v) rows = %v, errors = %q; want %v, no errors", tt.ids, got, r.Errors, tt.wantIDs)
+			}
+			if !reflect.DeepEqual(client.asked, tt.wantAsked) {
+				t.Errorf("collect(%v) asked %v, want %v", tt.ids, client.asked, tt.wantAsked)
 			}
 		})
 	}

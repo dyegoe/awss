@@ -154,19 +154,28 @@ func (r *Results) collectVolumeRows(
 		paged.MaxResults = aws.Int32(pageSize)
 	}
 
-	paginator := ec2.NewDescribeVolumesPaginator(client, &paged)
 	instanceIDSet := make(map[string]struct{})
-
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("error describing volumes: %w", err)
+	// A volume ID that is not in this account or region is dropped, not reported.
+	err := common.DescribeByIDs(paged.VolumeIds, errCodeVolumeNotFound, func(ids []string) error {
+		paged.VolumeIds = ids
+		paginator := ec2.NewDescribeVolumesPaginator(client, &paged)
+		for paginator.HasMorePages() {
+			page, err := paginator.NextPage(ctx)
+			if err != nil {
+				return fmt.Errorf("error describing volumes: %w", err)
+			}
+			r.appendVolumeRows(page.Volumes, instanceIDSet)
 		}
-		r.appendVolumeRows(page.Volumes, instanceIDSet)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-
 	return instanceIDSet, nil
 }
+
+// errCodeVolumeNotFound is the EC2 error code returned when an asked volume ID does not exist.
+const errCodeVolumeNotFound = "InvalidVolume.NotFound"
 
 func (r *Results) appendVolumeRows(volumes []types.Volume, instanceIDSet map[string]struct{}) {
 	for v := range volumes {

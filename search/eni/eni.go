@@ -185,22 +185,38 @@ func (r *Results) collectENIs(
 	}
 
 	var instanceIDs []string
-	paginator := ec2.NewDescribeNetworkInterfacesPaginator(client, &paged)
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("error describing network interfaces: %w", err)
-		}
-		for i := range page.NetworkInterfaces {
-			row := parseENIRow(&page.NetworkInterfaces[i])
-			row.InterfaceInfo.OwnerName = r.AccountNames[row.InterfaceInfo.OwnerID]
-			r.Data = append(r.Data, row)
-			if row.InterfaceInfo.InstanceID != "" {
-				instanceIDs = append(instanceIDs, row.InterfaceInfo.InstanceID)
+	// An interface ID that is not in this account or region is dropped, not reported.
+	err := common.DescribeByIDs(paged.NetworkInterfaceIds, errCodeENINotFound, func(ids []string) error {
+		paged.NetworkInterfaceIds = ids
+		paginator := ec2.NewDescribeNetworkInterfacesPaginator(client, &paged)
+		for paginator.HasMorePages() {
+			page, err := paginator.NextPage(ctx)
+			if err != nil {
+				return fmt.Errorf("error describing network interfaces: %w", err)
 			}
+			instanceIDs = append(instanceIDs, r.appendENIs(page.NetworkInterfaces)...)
+		}
+		return nil
+	})
+	return instanceIDs, err
+}
+
+// errCodeENINotFound is the EC2 error code returned when an asked interface ID does not exist.
+const errCodeENINotFound = "InvalidNetworkInterfaceID.NotFound"
+
+// appendENIs appends one row per network interface to r.Data and returns the IDs of the
+// instances they are attached to.
+func (r *Results) appendENIs(enis []types.NetworkInterface) []string {
+	var instanceIDs []string
+	for i := range enis {
+		row := parseENIRow(&enis[i])
+		row.InterfaceInfo.OwnerName = r.AccountNames[row.InterfaceInfo.OwnerID]
+		r.Data = append(r.Data, row)
+		if row.InterfaceInfo.InstanceID != "" {
+			instanceIDs = append(instanceIDs, row.InterfaceInfo.InstanceID)
 		}
 	}
-	return instanceIDs, nil
+	return instanceIDs
 }
 
 // enrichInstanceNames fills the instance name of every row attached to an instance.

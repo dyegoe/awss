@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -33,6 +34,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 )
 
 // TestNew tests the New function.
@@ -743,6 +745,83 @@ func TestResults_Search_earlyErrors(t *testing.T) {
 			r.Search(context.Background())
 			if len(r.Errors) != 1 || !strings.HasPrefix(r.Errors[0], tt.wantPrefix) {
 				t.Errorf("Errors = %q, want one error starting with %q", r.Errors, tt.wantPrefix)
+			}
+		})
+	}
+}
+
+// fakeMissingVolumes answers DescribeVolumes like AWS: it knows the IDs of exist, rejects a call
+// naming any other ID with the not-found error naming them, and records the IDs of every call.
+type fakeMissingVolumes struct {
+	exist []string
+	asked [][]string
+}
+
+func (f *fakeMissingVolumes) DescribeVolumes(
+	_ context.Context, in *ec2.DescribeVolumesInput, _ ...func(*ec2.Options),
+) (*ec2.DescribeVolumesOutput, error) {
+	f.asked = append(f.asked, in.VolumeIds)
+	var found []types.Volume
+	var missing []string
+	for _, id := range in.VolumeIds {
+		if !slices.Contains(f.exist, id) {
+			missing = append(missing, id)
+			continue
+		}
+		found = append(found, volume(id))
+	}
+	if len(missing) > 0 {
+		return nil, &smithy.GenericAPIError{
+			Code: errCodeVolumeNotFound, Message: fmt.Sprintf("The volume ID '%s' does not exist", strings.Join(missing, ", ")),
+		}
+	}
+	out := &ec2.DescribeVolumesOutput{}
+	out.Volumes = found
+	return out, nil
+}
+
+func (f *fakeMissingVolumes) DescribeInstances(
+	context.Context, *ec2.DescribeInstancesInput, ...func(*ec2.Options),
+) (*ec2.DescribeInstancesOutput, error) {
+	return &ec2.DescribeInstancesOutput{}, nil
+}
+
+// TestResults_collect_missingIDs tests that IDs not in the account or region are dropped and
+// asked again, with no error (#200).
+func TestResults_collect_missingIDs(t *testing.T) {
+	tests := []struct {
+		name      string
+		ids       []string
+		exist     []string
+		wantIDs   []string
+		wantAsked [][]string
+	}{
+		{
+			name: "missing IDs are dropped", ids: []string{"vol-1", "vol-2", "vol-3"}, exist: []string{"vol-2"},
+			wantIDs: []string{"vol-2"}, wantAsked: [][]string{{"vol-1", "vol-2", "vol-3"}, {"vol-2"}},
+		},
+		{
+			name: "every ID missing is an empty result", ids: []string{"vol-1"},
+			wantIDs: []string{}, wantAsked: [][]string{{"vol-1"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeMissingVolumes{exist: tt.exist}
+			input := &ec2.DescribeVolumesInput{VolumeIds: tt.ids}
+			r := New("default", "us-east-1", nil, "", true)
+
+			r.collect(context.Background(), client, input)
+
+			got := []string{}
+			for i := range r.Data {
+				got = append(got, r.Data[i].VolumeID)
+			}
+			if !reflect.DeepEqual(got, tt.wantIDs) || len(r.Errors) > 0 {
+				t.Errorf("collect(%v) rows = %v, errors = %q; want %v, no errors", tt.ids, got, r.Errors, tt.wantIDs)
+			}
+			if !reflect.DeepEqual(client.asked, tt.wantAsked) {
+				t.Errorf("collect(%v) asked %v, want %v", tt.ids, client.asked, tt.wantAsked)
 			}
 		})
 	}

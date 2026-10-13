@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 )
 
 // mockDataRow1 returns a new VPC row with two CIDR blocks.
@@ -487,6 +489,77 @@ func TestResults_collect_ownerNames(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("OwnerName of the rows = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// fakeMissingVpcs answers DescribeVpcs like AWS: it knows the IDs of exist, rejects a call
+// naming any other ID with the not-found error naming them, and records the IDs of every call.
+type fakeMissingVpcs struct {
+	exist []string
+	asked [][]string
+}
+
+func (f *fakeMissingVpcs) DescribeVpcs(
+	_ context.Context, in *ec2.DescribeVpcsInput, _ ...func(*ec2.Options),
+) (*ec2.DescribeVpcsOutput, error) {
+	f.asked = append(f.asked, in.VpcIds)
+	var found []types.Vpc
+	var missing []string
+	for _, id := range in.VpcIds {
+		if !slices.Contains(f.exist, id) {
+			missing = append(missing, id)
+			continue
+		}
+		found = append(found, vpc(id))
+	}
+	if len(missing) > 0 {
+		return nil, &smithy.GenericAPIError{
+			Code: errCodeVpcNotFound, Message: fmt.Sprintf("The vpc ID '%s' does not exist", strings.Join(missing, ", ")),
+		}
+	}
+	out := &ec2.DescribeVpcsOutput{}
+	out.Vpcs = found
+	return out, nil
+}
+
+// TestResults_collect_missingIDs tests that IDs not in the account or region are dropped and
+// asked again, with no error (#200).
+func TestResults_collect_missingIDs(t *testing.T) {
+	tests := []struct {
+		name      string
+		ids       []string
+		exist     []string
+		wantIDs   []string
+		wantAsked [][]string
+	}{
+		{
+			name: "missing IDs are dropped", ids: []string{"vpc-1", "vpc-2", "vpc-3"}, exist: []string{"vpc-2"},
+			wantIDs: []string{"vpc-2"}, wantAsked: [][]string{{"vpc-1", "vpc-2", "vpc-3"}, {"vpc-2"}},
+		},
+		{
+			name: "every ID missing is an empty result", ids: []string{"vpc-1"},
+			wantIDs: []string{}, wantAsked: [][]string{{"vpc-1"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeMissingVpcs{exist: tt.exist}
+			input := &ec2.DescribeVpcsInput{VpcIds: tt.ids}
+			r := New("default", "us-east-1", nil, "")
+
+			r.collect(context.Background(), client, input)
+
+			got := []string{}
+			for i := range r.Data {
+				got = append(got, r.Data[i].VpcID)
+			}
+			if !reflect.DeepEqual(got, tt.wantIDs) || len(r.Errors) > 0 {
+				t.Errorf("collect(%v) rows = %v, errors = %q; want %v, no errors", tt.ids, got, r.Errors, tt.wantIDs)
+			}
+			if !reflect.DeepEqual(client.asked, tt.wantAsked) {
+				t.Errorf("collect(%v) asked %v, want %v", tt.ids, client.asked, tt.wantAsked)
 			}
 		})
 	}
