@@ -133,6 +133,9 @@ func setup() error {
 	}
 	// After the subcommands are added, so they get it too. ResetFlags drops it, so every setup sets it.
 	rootCmd.SetGlobalNormalizationFunc(normalizeFlagName)
+	if err := registerCompletions(); err != nil {
+		return err
+	}
 
 	if err := initViper(); err != nil {
 		return err

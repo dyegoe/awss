@@ -31,6 +31,13 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 )
 
+// TestOutputNames checks the output formats, sorted.
+func TestOutputNames(t *testing.T) {
+	if got, want := OutputNames(), []string{JSON, JSONPretty, Table}; !reflect.DeepEqual(got, want) {
+		t.Errorf("OutputNames() = %v, want %v", got, want)
+	}
+}
+
 // TestValidOutputs tests the ValidOutputs function.
 func TestValidOutputs(t *testing.T) {
 	tests := []struct {
