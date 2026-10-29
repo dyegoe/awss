@@ -45,6 +45,17 @@ Sort by: `--sort id|name|type|az|state|private-ip|public-ip|enis|volumes` (defau
 
 The output also lists the EBS volumes attached to each instance.
 
+In `--output json` only:
+
+- `created`: an estimate of when the instance was created. EC2 has no creation time, so awss
+  takes the attach time of the primary network interface, which is attached at launch and can
+  never be detached. Without it, it takes the attach time of the root volume, which changes if
+  the root volume is replaced.
+- `launched`: the last start (`LaunchTime`). It changes on every stop and start, so it is not
+  the creation time.
+
+Both are RFC 3339 in UTC (`2021-06-02T14:10:55Z`).
+
 `--cidrs` finds the instances that have a private IP inside the range, on any network interface
 (primary or secondary, and secondary IPs of an interface count too). The range can be a subnet, a
 VPC CIDR block, primary or secondary, or any other IPv4 range, larger or smaller than a subnet.
