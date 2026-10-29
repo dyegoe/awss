@@ -50,15 +50,20 @@ var outputs = map[string]func(Results, bool, bool, []string) string{
 	Table:      toTable,
 }
 
+// OutputNames returns the output formats, sorted alphabetically.
+func OutputNames() []string {
+	var names []string
+	for k := range outputs {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // ValidOutputs returns the valid output formats and if the given output is valid.
 func ValidOutputs(o string) (string, bool) {
-	var valid []string
-	for k := range outputs {
-		valid = append(valid, k)
-	}
-	sort.Strings(valid)
 	_, ok := outputs[o]
-	return StringSliceToString(valid, ", "), ok
+	return StringSliceToString(OutputNames(), ", "), ok
 }
 
 // PrintResults prints the results in the given format.

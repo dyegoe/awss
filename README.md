@@ -18,6 +18,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Concurrency: `--concurrency 8` (default `32`), how many profile and region searches run at once
 - Run stats: `--stats` prints elapsed time, peak memory, search counts and AWS API calls on stderr; see [Run report and stats](#run-report-and-stats)
 - Account names next to owner account IDs, from the `accounts` map of the config file or, with `--org-profile`, from AWS Organizations; see [Account names](#account-names)
+- Shell completion of commands, flags and the values of `--sort`, `--output` and `org --statuses`; see [Shell completion](#shell-completion)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
 
@@ -649,6 +650,22 @@ awss ec2 --all --output json
 # Every profile and region, with the run stats on stderr and the JSON results in a file
 awss ec2 --all --profiles all --regions all --output json --stats > instances.json
 ```
+
+### Shell completion
+
+`awss completion zsh|bash|fish|powershell` prints a completion script. Besides commands and flag
+names, it completes the values of `--sort` (the sort fields of that command), `--output`
+(`json`, `json-pretty`, `table`) and `org --statuses`, one item after another in the comma list.
+
+```bash
+# zsh: load it in every new shell
+echo 'source <(awss completion zsh)' >> ~/.zshrc
+
+# bash (needs the bash-completion package)
+echo 'source <(awss completion bash)' >> ~/.bashrc
+```
+
+Then `awss rds --sort <TAB>` lists `az class cluster engine id status version vpc`.
 
 ## Contributing
 
