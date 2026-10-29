@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.18.0](https://github.com/dyegoe/awss/compare/v0.17.0...v0.18.0) (2026-10-29)
+
+
+### Features
+
+* **cmd:** accept --profile and --region as --profiles and --regions ([#215](https://github.com/dyegoe/awss/issues/215)) ([#216](https://github.com/dyegoe/awss/issues/216)) ([cc43e01](https://github.com/dyegoe/awss/commit/cc43e01a2139682ac2d70d55333849711e2a5389))
+* **search/cloudfront:** search CloudFront distributions ([#218](https://github.com/dyegoe/awss/issues/218)) ([#219](https://github.com/dyegoe/awss/issues/219)) ([7c9ea72](https://github.com/dyegoe/awss/commit/7c9ea726973b22e594eb836a4839e63a8fd4f7a6))
+
 ## [0.17.0](https://github.com/dyegoe/awss/compare/v0.16.1...v0.17.0) (2026-10-29)
 
 
