@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net"
 	"slices"
+	"time"
 
 	"github.com/dyegoe/awss/common"
 	searchSubnet "github.com/dyegoe/awss/search/subnet"
@@ -97,6 +98,14 @@ type dataRow struct {
 
 	// Volumes are the EBS volume IDs attached to the instance.
 	Volumes []string `json:"volumes,omitempty" header:"Volumes" sort:"volumes"`
+
+	// Created is an estimate of when the instance was created, in RFC 3339 UTC: EC2 has no
+	// creation time. See createdTime.
+	Created string `json:"created,omitempty"`
+
+	// Launched is the last start of the instance (LaunchTime), in RFC 3339 UTC. It moves on
+	// every stop and start.
+	Launched string `json:"launched,omitempty"`
 
 	// Tags are a map of the tags assigned to the instance.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
@@ -262,8 +271,41 @@ func parseInstance(inst *types.Instance) dataRow {
 		PublicIPAddress:   aws.ToString(inst.PublicIpAddress),
 		NetworkInterfaces: enis,
 		Volumes:           volumes,
+		Created:           formatTime(createdTime(inst)),
+		Launched:          formatTime(inst.LaunchTime),
 		Tags:              common.TagsToMap(inst.Tags),
 	}
+}
+
+// createdTime estimates when the instance was created, since EC2 has no creation time and
+// LaunchTime moves on every start.
+//
+// It returns the attach time of the primary ENI (network card 0, device index 0): it is attached
+// at launch and can never be detached. Without it, it returns the attach time of the root volume,
+// which moves only when the root volume is replaced. It returns nil when neither is known.
+func createdTime(inst *types.Instance) *time.Time {
+	for i := range inst.NetworkInterfaces {
+		att := inst.NetworkInterfaces[i].Attachment
+		if att != nil && aws.ToInt32(att.NetworkCardIndex) == 0 && aws.ToInt32(att.DeviceIndex) == 0 &&
+			att.AttachTime != nil {
+			return att.AttachTime
+		}
+	}
+	root := aws.ToString(inst.RootDeviceName)
+	for _, m := range inst.BlockDeviceMappings {
+		if root != "" && aws.ToString(m.DeviceName) == root && m.Ebs != nil && m.Ebs.AttachTime != nil {
+			return m.Ebs.AttachTime
+		}
+	}
+	return nil
+}
+
+// formatTime returns t in RFC 3339 UTC, or "" when t is nil.
+func formatTime(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
 }
 
 // parseVolumeIDs returns the EBS volume IDs from the instance block device mappings.

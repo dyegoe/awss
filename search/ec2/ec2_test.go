@@ -21,6 +21,7 @@ package ec2
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -29,6 +30,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dyegoe/awss/common"
 
@@ -433,6 +435,150 @@ func TestParseInstance_volumes(t *testing.T) {
 	}
 	if got.AvailabilityZone != "" || got.InstanceState != "" {
 		t.Errorf("nil Placement/State must yield empty strings, got az=%q state=%q", got.AvailabilityZone, got.InstanceState)
+	}
+}
+
+// eniAttachment returns an instance network interface attached at the given card and device
+// index and time.
+func eniAttachment(card, device int32, at *time.Time) types.InstanceNetworkInterface {
+	return types.InstanceNetworkInterface{Attachment: &types.InstanceNetworkInterfaceAttachment{
+		NetworkCardIndex: aws.Int32(card), DeviceIndex: aws.Int32(device), AttachTime: at,
+	}}
+}
+
+// rootVolume returns a block device mapping of an EBS volume attached at the given device and time.
+func rootVolume(device string, at *time.Time) types.InstanceBlockDeviceMapping {
+	return types.InstanceBlockDeviceMapping{
+		DeviceName: aws.String(device), Ebs: &types.EbsInstanceBlockDevice{AttachTime: at},
+	}
+}
+
+// TestCreatedTime checks the creation estimate: the primary ENI attach time, else the root
+// volume attach time, else nil.
+func TestCreatedTime(t *testing.T) {
+	primary := aws.Time(time.Date(2021, 6, 2, 14, 10, 55, 0, time.UTC))
+	secondary := aws.Time(time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC))
+	root := aws.Time(time.Date(2022, 5, 5, 5, 5, 5, 0, time.UTC))
+	tests := []struct {
+		name string
+		inst types.Instance
+		want *time.Time
+	}{
+		{
+			name: "primary ENI, listed after a secondary one",
+			inst: types.Instance{
+				NetworkInterfaces:   []types.InstanceNetworkInterface{eniAttachment(0, 1, secondary), eniAttachment(0, 0, primary)},
+				RootDeviceName:      aws.String("/dev/xvda"),
+				BlockDeviceMappings: []types.InstanceBlockDeviceMapping{rootVolume("/dev/xvda", root)},
+			},
+			want: primary,
+		},
+		{
+			name: "device index 0 on another network card is not the primary ENI",
+			inst: types.Instance{
+				NetworkInterfaces:   []types.InstanceNetworkInterface{eniAttachment(1, 0, secondary)},
+				RootDeviceName:      aws.String("/dev/xvda"),
+				BlockDeviceMappings: []types.InstanceBlockDeviceMapping{rootVolume("/dev/xvda", root)},
+			},
+			want: root,
+		},
+		{
+			name: "no ENI attach time: root volume, not a data volume",
+			inst: types.Instance{
+				NetworkInterfaces: []types.InstanceNetworkInterface{{}, eniAttachment(0, 0, nil)},
+				RootDeviceName:    aws.String("/dev/xvda"),
+				BlockDeviceMappings: []types.InstanceBlockDeviceMapping{
+					rootVolume("/dev/sdf", secondary), {DeviceName: aws.String("/dev/xvda")}, rootVolume("/dev/xvda", root),
+				},
+			},
+			want: root,
+		},
+		{
+			name: "no root device name",
+			inst: types.Instance{BlockDeviceMappings: []types.InstanceBlockDeviceMapping{rootVolume("", root)}},
+			want: nil,
+		},
+		{
+			name: "nothing known",
+			inst: types.Instance{},
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := createdTime(&tt.inst); got != tt.want {
+				t.Errorf("createdTime() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestParseInstance_times checks that created and launched are RFC 3339 in UTC, and empty
+// when unknown.
+func TestParseInstance_times(t *testing.T) {
+	cet := time.FixedZone("CET", 3600)
+	tests := []struct {
+		name         string
+		inst         types.Instance
+		wantCreated  string
+		wantLaunched string
+	}{
+		{
+			name: "both known",
+			inst: types.Instance{
+				NetworkInterfaces: []types.InstanceNetworkInterface{
+					eniAttachment(0, 0, aws.Time(time.Date(2021, 6, 2, 15, 10, 55, 0, cet))),
+				},
+				LaunchTime: aws.Time(time.Date(2026, 10, 28, 9, 0, 12, 0, cet)),
+			},
+			wantCreated:  "2021-06-02T14:10:55Z",
+			wantLaunched: "2026-10-28T08:00:12Z",
+		},
+		{name: "unknown", inst: types.Instance{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseInstance(&tt.inst)
+			if got.Created != tt.wantCreated || got.Launched != tt.wantLaunched {
+				t.Errorf("parseInstance() created, launched = %q, %q, want %q, %q",
+					got.Created, got.Launched, tt.wantCreated, tt.wantLaunched)
+			}
+		})
+	}
+}
+
+// TestDataRow_jsonKeys checks that created and launched are JSON keys, left out when empty, and
+// not table columns.
+func TestDataRow_jsonKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		row  dataRow
+		want bool
+	}{
+		{name: "set", row: dataRow{Created: "2021-06-02T14:10:55Z", Launched: "2026-10-28T08:00:12Z"}, want: true},
+		{name: "empty", row: dataRow{}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, err := json.Marshal(tt.row)
+			if err != nil {
+				t.Fatalf("json.Marshal() error = %v", err)
+			}
+			keys := map[string]any{}
+			if err := json.Unmarshal(b, &keys); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v", err)
+			}
+			for _, key := range []string{"created", "launched"} {
+				if _, got := keys[key]; got != tt.want {
+					t.Errorf("json.Marshal(%+v) has %q = %v, want %v", tt.row, key, got, tt.want)
+				}
+			}
+		})
+	}
+	for _, h := range common.Headers(dataRow{}) {
+		if h == "Created" || h == "Launched" {
+			t.Errorf("common.Headers(dataRow{}) has %q, want JSON only", h)
+		}
 	}
 }
 
