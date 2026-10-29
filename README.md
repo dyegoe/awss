@@ -228,7 +228,9 @@ Table columns: ID, Engine, Version, Class, Status, Multi-AZ, AZ, Cluster, and Ta
 `--show-tags` / `--show-tags-keys` (the tags come with the listing: no extra call). The table
 stays about 120 characters wide, so these fields are in `--output json` only: `endpoint`
 (`host:port`, empty while the instance is being created), `vpc_id`, `publicly_accessible`,
-`encrypted`, `storage_type` and `storage_gib`. The endpoint is not a filter (AWS has none); find
+`encrypted`, `storage_type`, `storage_gib`, `created` (the creation date, RFC 3339 in UTC, empty
+while the instance is being created) and `license_model` (such as `postgresql-license` or
+`license-included`). The endpoint is not a filter (AWS has none); find
 one with jq:
 
 ```bash

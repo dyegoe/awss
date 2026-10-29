@@ -18,12 +18,16 @@ package rds
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/dyegoe/awss/common"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -252,6 +256,8 @@ func TestParseInstance(t *testing.T) {
 	full.DBClusterIdentifier = aws.String("aurora")
 	full.StorageType = aws.String("aurora")
 	full.AllocatedStorage = aws.Int32(1)
+	full.InstanceCreateTime = aws.Time(time.Date(2024, 3, 12, 10, 41, 7, 0, time.FixedZone("CET", 3600)))
+	full.LicenseModel = aws.String("postgresql-license")
 	full.TagList = append(full.TagList, types.Tag{Value: aws.String("no-key")})
 
 	tests := []struct {
@@ -266,7 +272,8 @@ func TestParseInstance(t *testing.T) {
 				ID: "aurora-1", Engine: "aurora-postgresql", EngineVersion: "16.4", Class: "db.t4g.micro",
 				Status: "available", MultiAZ: "false", AvailabilityZone: "eu-west-1a",
 				Endpoint: "aurora-1.xyz.rds.amazonaws.com:5432", VpcID: "vpc-1", Public: "false", Encrypted: "true",
-				ClusterID: "aurora", StorageType: "aurora", StorageGiB: 1, Tags: map[string]string{"Env": "prod"},
+				ClusterID: "aurora", StorageType: "aurora", StorageGiB: 1, Created: "2024-03-12T09:41:07Z",
+				LicenseModel: "postgresql-license", Tags: map[string]string{"Env": "prod"},
 			},
 		},
 		{
@@ -286,6 +293,49 @@ func TestParseInstance(t *testing.T) {
 				t.Errorf("parseInstance() = %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestDataRow_jsonKeys checks that the creation date and the license model are JSON keys, left
+// out when empty, and not table columns.
+func TestDataRow_jsonKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		row  dataRow
+		want map[string]bool
+	}{
+		{
+			name: "set",
+			row:  dataRow{Created: "2024-03-12T09:41:07Z", LicenseModel: "license-included"},
+			want: map[string]bool{"created": true, "license_model": true},
+		},
+		{
+			name: "empty",
+			row:  dataRow{},
+			want: map[string]bool{"created": false, "license_model": false},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, err := json.Marshal(tt.row)
+			if err != nil {
+				t.Fatalf("json.Marshal() error = %v", err)
+			}
+			keys := map[string]any{}
+			if err := json.Unmarshal(b, &keys); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v", err)
+			}
+			for key, want := range tt.want {
+				if _, got := keys[key]; got != want {
+					t.Errorf("json.Marshal(%+v) has %q = %v, want %v", tt.row, key, got, want)
+				}
+			}
+		})
+	}
+	for _, h := range common.Headers(dataRow{}) {
+		if h == "Created" || h == "License Model" {
+			t.Errorf("common.Headers(dataRow{}) has %q, want JSON only", h)
+		}
 	}
 }
 

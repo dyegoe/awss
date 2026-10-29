@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/dyegoe/awss/common"
 
@@ -106,6 +107,13 @@ type dataRow struct {
 
 	// StorageGiB is the allocated storage in GiB.
 	StorageGiB int32 `json:"storage_gib,omitempty"`
+
+	// Created is when the instance was created, in RFC 3339 UTC so it sorts chronologically.
+	// Empty while the instance is being created.
+	Created string `json:"created,omitempty"`
+
+	// LicenseModel is the license model, such as postgresql-license or license-included.
+	LicenseModel string `json:"license_model,omitempty"`
 
 	// Tags are the tags of the instance.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
@@ -242,6 +250,7 @@ func parseInstance(db *types.DBInstance) dataRow {
 		ClusterID:        aws.ToString(db.DBClusterIdentifier),
 		StorageType:      aws.ToString(db.StorageType),
 		StorageGiB:       aws.ToInt32(db.AllocatedStorage),
+		LicenseModel:     aws.ToString(db.LicenseModel),
 		Tags:             TagsToMap(db.TagList),
 	}
 	if db.Endpoint != nil && db.Endpoint.Address != nil {
@@ -252,6 +261,9 @@ func parseInstance(db *types.DBInstance) dataRow {
 	}
 	if db.DBSubnetGroup != nil {
 		row.VpcID = aws.ToString(db.DBSubnetGroup.VpcId)
+	}
+	if db.InstanceCreateTime != nil {
+		row.Created = db.InstanceCreateTime.UTC().Format(time.RFC3339)
 	}
 	return row
 }
