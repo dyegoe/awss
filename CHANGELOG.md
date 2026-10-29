@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.19.0](https://github.com/dyegoe/awss/compare/v0.18.0...v0.19.0) (2026-10-29)
+
+
+### Features
+
+* **cmd:** complete the values of --sort, --output and org --statuses ([#222](https://github.com/dyegoe/awss/issues/222)) ([#223](https://github.com/dyegoe/awss/issues/223)) ([67cdfe6](https://github.com/dyegoe/awss/commit/67cdfe6eb8b23f480b7f697af764bb5c6e5ee111))
+
 ## [0.18.0](https://github.com/dyegoe/awss/compare/v0.17.0...v0.18.0) (2026-10-29)
 
 
