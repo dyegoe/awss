@@ -1,0 +1,52 @@
+# GoReleaser builds the release binaries and attaches them to the GitHub release that
+# release-please creates (release.yml). release-please owns the version, the tag, CHANGELOG.md and
+# the release notes; GoReleaser only adds the archives and the checksums.
+#
+# Try it locally, without publishing: goreleaser release --snapshot --clean
+version: 2
+
+project_name: awss
+
+builds:
+  - id: awss
+    binary: awss
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    # The version comes from the tag, never from the code (AGENTS.md).
+    ldflags:
+      - -s -w -X github.com/dyegoe/awss/cmd.version={{ .Tag }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: awss
+    formats:
+      - tar.gz
+    # The names of the releases up to v0.18.0: the README install steps and any script that
+    # downloads a release rely on them.
+    name_template: "awss-{{ .Tag }}-{{ .Os }}-{{ .Arch }}"
+    # The binary only, as before: GoReleaser adds the README and LICENSE by default.
+    files:
+      - none*
+
+checksum:
+  # One file in the "<sha256>  <file>" format of sha256sum -c (README, Installation).
+  name_template: "awss-{{ .Tag }}-checksums.txt"
+  algorithm: sha256
+
+# release-please writes the release notes and CHANGELOG.md.
+changelog:
+  disable: true
+
+release:
+  # Add the files to the release release-please created, keeping its notes. A rerun replaces
+  # the files.
+  mode: keep-existing
+  replace_existing_artifacts: true
