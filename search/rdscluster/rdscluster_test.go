@@ -18,13 +18,16 @@ package rdscluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/dyegoe/awss/common"
 	searchRDS "github.com/dyegoe/awss/search/rds"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -295,6 +298,7 @@ func TestParseCluster(t *testing.T) {
 	full.MultiAZ = aws.Bool(true)
 	full.StorageEncrypted = aws.Bool(true)
 	full.DeletionProtection = aws.Bool(false)
+	full.ClusterCreateTime = aws.Time(time.Date(2024, 3, 12, 10, 41, 7, 0, time.FixedZone("CET", 3600)))
 
 	tests := []struct {
 		name string
@@ -310,7 +314,7 @@ func TestParseCluster(t *testing.T) {
 				Members:        []member{{ID: "app-w", Writer: true}, {ID: "app-r0"}, {ID: "app-r1"}},
 				WriterEndpoint: "app.cluster-x.rds.amazonaws.com", ReaderEndpoint: "app.cluster-ro-x.rds.amazonaws.com",
 				Port: 5432, MultiAZ: "true", SubnetGroup: "sg-1", Encrypted: "true", DeletionProtection: "false",
-				Tags: map[string]string{"Env": "prod"},
+				Created: "2024-03-12T09:41:07Z", Tags: map[string]string{"Env": "prod"},
 			},
 		},
 		{
@@ -355,6 +359,39 @@ func TestMembersSummary(t *testing.T) {
 				t.Errorf("membersSummary(%d, %d) = %q, want %q", tt.writers, tt.readers, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestDataRow_jsonKeys checks that the creation date is a JSON key, left out when empty, and not
+// a table column.
+func TestDataRow_jsonKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		row  dataRow
+		want bool
+	}{
+		{name: "set", row: dataRow{Created: "2024-03-12T09:41:07Z"}, want: true},
+		{name: "empty", row: dataRow{}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, err := json.Marshal(tt.row)
+			if err != nil {
+				t.Fatalf("json.Marshal() error = %v", err)
+			}
+			keys := map[string]any{}
+			if err := json.Unmarshal(b, &keys); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v", err)
+			}
+			if _, got := keys["created"]; got != tt.want {
+				t.Errorf("json.Marshal(%+v) has \"created\" = %v, want %v", tt.row, got, tt.want)
+			}
+		})
+	}
+	for _, h := range common.Headers(dataRow{}) {
+		if h == "Created" {
+			t.Errorf("common.Headers(dataRow{}) has %q, want JSON only", h)
+		}
 	}
 }
 

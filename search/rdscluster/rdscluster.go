@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dyegoe/awss/common"
 	searchRDS "github.com/dyegoe/awss/search/rds"
@@ -111,6 +112,9 @@ type dataRow struct {
 
 	// DeletionProtection is "true" when the cluster cannot be deleted.
 	DeletionProtection string `json:"deletion_protection,omitempty"`
+
+	// Created is when the cluster was created, in RFC 3339 UTC so it sorts chronologically.
+	Created string `json:"created,omitempty"`
 
 	// Tags are the tags of the cluster.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
@@ -240,6 +244,9 @@ func parseCluster(c *types.DBCluster) dataRow {
 		}
 	}
 	row.MembersSummary = membersSummary(writers, readers)
+	if c.ClusterCreateTime != nil {
+		row.Created = c.ClusterCreateTime.UTC().Format(time.RFC3339)
+	}
 	return row
 }
 

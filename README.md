@@ -266,7 +266,8 @@ awss rds -c my-aurora-cluster
 Table columns: ID, Engine, Version, Status, Members (`1 writer, 2 readers`), VPC, and Tags with
 `--show-tags` / `--show-tags-keys` (no extra call). These fields are in `--output json` only, to
 keep the table narrow: `writer_endpoint`, `reader_endpoint`, `port`, `members` (`[{id, writer}]`),
-`multi_az`, `subnet_group`, `encrypted` and `deletion_protection`.
+`multi_az`, `subnet_group`, `encrypted`, `deletion_protection` and `created` (the creation date,
+RFC 3339 in UTC).
 
 The VPC comes from the cluster's DB subnet group: one paginated `DescribeDBSubnetGroups` call per
 profile and region, only when clusters were found. If that call fails, the clusters are still
