@@ -72,6 +72,29 @@ func TestInitConfig(t *testing.T) {
 	}
 }
 
+// TestNormalizeFlagName checks that the singular --profile and --region read as the plural, and
+// that other names, --org-profile among them, stay as they are.
+func TestNormalizeFlagName(t *testing.T) {
+	tests := []struct {
+		name string
+		flag string
+		want string
+	}{
+		{name: "profile", flag: "profile", want: "profiles"},
+		{name: "region", flag: "region", want: "regions"},
+		{name: "plural unchanged", flag: "profiles", want: "profiles"},
+		{name: "org-profile unchanged", flag: "org-profile", want: "org-profile"},
+		{name: "other flag unchanged", flag: "output", want: "output"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeFlagName(nil, tt.flag); string(got) != tt.want {
+				t.Errorf("normalizeFlagName(%q) = %q, want %q", tt.flag, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestParseTimeout tests parseTimeout with flag and config file values.
 func TestParseTimeout(t *testing.T) {
 	tests := []struct {

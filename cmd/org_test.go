@@ -59,9 +59,15 @@ func TestExecute_org(t *testing.T) {
 				"eu-west-1,us-east-2", "--sort", "joined"},
 			wantProfiles: []string{"org"}, wantSort: "joined",
 		},
+		{
+			name: "--profile is --profiles", args: []string{"org", "--profile", "org", "--region", "eu-west-1"},
+			wantProfiles: []string{"org"}, wantSort: "name",
+		},
 		{name: "unknown status", args: []string{"org", "--statuses", "deleted"}, wantErr: "invalid status: deleted"},
 		{name: "two profiles", args: []string{"org", "--profiles", "org,member"}, wantErr: "not 2 (org,member)"},
 		{name: "all profiles", args: []string{"org", "--profiles", "all"}, wantErr: "pass one profile"},
+		{name: "two profiles, singular and plural", args: []string{"org", "--profile", "org", "--profiles", "member"},
+			wantErr: "not 2 (org,member)"},
 		{name: "bad sort field", args: []string{"org", "--sort", "owner"}, wantErr: "owner"},
 	}
 	for _, tt := range tests {

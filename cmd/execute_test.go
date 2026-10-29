@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -241,6 +242,22 @@ func profileCases() []executeCase {
 			args: []string{"ec2", "--all", "--profiles", "all"}, config: "all-profiles: [prod]\n",
 			awsConfig: testAwsConfig, want: profilesCall("prod"),
 		},
+		{
+			name: "--profile is --profiles", args: []string{"ec2", "--all", "--profile", "dev,prod"},
+			awsConfig: testAwsConfig, want: profilesCall("dev", "prod"),
+		},
+		{
+			name: "--profile all", args: []string{"ec2", "--all", "--profile", "all"},
+			awsConfig: testAwsConfig, want: profilesCall("default", "dev", "prod"),
+		},
+		{
+			name: "--profile and --profiles add up", args: []string{"ec2", "--all", "--profile", "dev", "--profiles", "prod"},
+			awsConfig: testAwsConfig, want: profilesCall("dev", "prod"),
+		},
+		{
+			name: "--profile= form", args: []string{"ec2", "--all", "--profile=prod"},
+			awsConfig: testAwsConfig, want: profilesCall("prod"),
+		},
 	}
 }
 
@@ -274,6 +291,14 @@ func globalCases() []executeCase {
 			regionEnv: "eu-west-1",
 			want: searchCall{
 				cmd: "vpc", profiles: []string{""}, regions: []string{"eu-west-1"},
+				filters: map[string][]string{}, opts: defaultOpts("name"),
+			},
+		},
+		{
+			name: "--region is --regions",
+			args: []string{"vpc", "--all", "--region", "eu-west-1,us-east-2"},
+			want: searchCall{
+				cmd: "vpc", profiles: []string{""}, regions: []string{"eu-west-1", "us-east-2"},
 				filters: map[string][]string{}, opts: defaultOpts("name"),
 			},
 		},
@@ -463,6 +488,23 @@ func TestExecute_resetBetweenRuns(t *testing.T) {
 	}
 	if len(*calls) != 1 || !reflect.DeepEqual((*calls)[0], want) {
 		t.Errorf("second run searched with %+v, want %+v", *calls, want)
+	}
+}
+
+// TestExecute_helpListsPlural checks that --help lists --profiles and --regions, and not the
+// singular names they also accept.
+func TestExecute_helpListsPlural(t *testing.T) {
+	resetCLI(t, nil)
+	out, err := runCLI(t, "ec2", "--help")
+	if err != nil {
+		t.Fatalf("Execute(ec2 --help) error = %v", err)
+	}
+	for _, flag := range []string{"profiles", "regions", "profile", "region"} {
+		want := strings.HasSuffix(flag, "s")
+		// A flag line starts the line, so --org-profile and the help text naming --profile do not count.
+		if got := regexp.MustCompile(`(?m)^\s+(-\w, )?--` + flag + `\s`).MatchString(out); got != want {
+			t.Errorf("Execute(ec2 --help) lists --%s = %v, want %v", flag, got, want)
+		}
 	}
 }
 
