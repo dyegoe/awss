@@ -62,6 +62,37 @@ func TestMatcher_Match(t *testing.T) {
 	}
 }
 
+// TestMatcher_MatchAny checks that any matching value is enough, that no value does not match,
+// and that no pattern matches everything, even no values.
+func TestMatcher_MatchAny(t *testing.T) {
+	tests := []struct {
+		name     string
+		patterns []string
+		values   []string
+		want     bool
+	}{
+		{name: "no patterns, no values", patterns: nil, values: nil, want: true},
+		{name: "no patterns, values", patterns: nil, values: []string{"a"}, want: true},
+		{name: "patterns, no values", patterns: []string{"*.example.com"}, values: nil, want: false},
+		{
+			name: "second value matches", patterns: []string{"*.example.com"},
+			values: []string{"x.org", "www.example.com"}, want: true,
+		},
+		{name: "no value matches", patterns: []string{"*.example.com"}, values: []string{"x.org", "y.net"}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m, err := NewMatcher(tt.patterns, false)
+			if err != nil {
+				t.Fatalf("NewMatcher() error = %v", err)
+			}
+			if got := m.MatchAny(tt.values); got != tt.want {
+				t.Errorf("MatchAny(%q) = %v, want %v", tt.values, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestMatcher_Prefix checks the literal prefix sent to S3: the text before the first glob
 // metacharacter, or after ^ in a regex, and none when the patterns share no prefix.
 func TestMatcher_Prefix(t *testing.T) {

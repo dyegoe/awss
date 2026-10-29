@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/dyegoe/awss/common"
+	searchCloudFront "github.com/dyegoe/awss/search/cloudfront"
 	searchEBS "github.com/dyegoe/awss/search/ebs"
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
 	searchENI "github.com/dyegoe/awss/search/eni"
@@ -188,6 +189,14 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchOrg.GetSortFields,
 		sortFieldNames: searchOrg.SortFieldNames,
+	},
+	// cloudfront is global: the command passes the region searchCloudFront.Region.
+	"cloudfront": {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
+			return searchCloudFront.New(profile, region, filters, opts.SortField, opts.Regex, opts.ShowTags)
+		},
+		sortFields:     searchCloudFront.GetSortFields,
+		sortFieldNames: searchCloudFront.SortFieldNames,
 	},
 }
 
