@@ -152,6 +152,12 @@ pull request that closes it (`Closes #N`); never commit straight to `main`. Hist
 - The maintainer reviews and merges pull requests; agents open them and do not merge.
 - Pull requests are squash-merged, so release-please lists each change once in the changelog.
   A merge commit would list the same change twice.
+- Releases: release-please owns the release PR, the version, the tag, `CHANGELOG.md` and the
+  release notes. When the release is published, GoReleaser (`.goreleaser.yaml`, run by
+  `release.yml`) builds the binaries and attaches them with the checksums. The CI job
+  `check-release-config` checks the config and builds a snapshot on every pull request; the
+  GoReleaser version is pinned in both workflows. Try it locally with
+  `goreleaser release --snapshot --clean`.
 
 ### Changes that need a real AWS check
 

@@ -1,3 +1,5 @@
 .vscode/
 .awss*.yaml
 awss
+# GoReleaser output (goreleaser release --snapshot)
+dist/

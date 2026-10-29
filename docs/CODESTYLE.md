@@ -171,9 +171,8 @@ Build with:
 go build -ldflags="-X github.com/dyegoe/awss/cmd.version=$(git describe --tags --always)" .
 ```
 
-The Makefile and the release build (`.github/workflows/build-binaries.yml`, called by
-`release.yml`) inject the version; the
-CI smoke test builds with `-X …version=ci-test` and checks `awss --version` prints it.
+The Makefile and the release build (GoReleaser: `.goreleaser.yaml`, run by `release.yml`) inject
+the version; the CI smoke test builds with `-X …version=ci-test` and checks `awss --version` prints it.
 
 ---
 

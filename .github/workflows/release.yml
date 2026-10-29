@@ -4,12 +4,33 @@ on:
     types:
       - published
 
-# The reusable workflow attaches the binaries and checksums to the release.
+# GoReleaser attaches the binaries and checksums to the release that release-please created.
 permissions:
   contents: write
 
 jobs:
-  build-binaries:
-    uses: ./.github/workflows/build-binaries.yml
-    with:
-      tag_name: ${{ github.event.release.tag_name }}
+  goreleaser:
+    name: Release binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          # GoReleaser reads the tags.
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+
+      # .goreleaser.yaml: the platforms, the archive names, the checksums file. Keep the version
+      # in step with the check-release-config job of common.yml.
+      - name: Build and attach the binaries
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: v2.18.3
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -41,6 +41,50 @@ jobs:
           go build -ldflags="-X github.com/dyegoe/awss/cmd.version=ci-test" -o awss .
           ./awss --version | grep -q "ci-test"
 
+  # A broken .goreleaser.yaml fails the pull request, not the release.
+  check-release-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v4
+        with:
+          # GoReleaser names the archives after the last tag.
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+
+      # Keep the version in step with release.yml.
+      - name: Check the GoReleaser config
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: v2.18.3
+          args: check
+
+      - name: Build a snapshot release
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: v2.18.3
+          args: release --snapshot --clean
+
+      # The README install steps rely on these names and on the sha256sum -c format.
+      - name: Check the archive names and the checksums
+        working-directory: dist
+        run: |
+          tag=$(git describe --tags --abbrev=0)
+          missing=0
+          for platform in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            archive="awss-${tag}-${platform}.tar.gz"
+            if [ ! -f "$archive" ]; then
+              echo "::error::missing release archive $archive"
+              missing=1
+            fi
+          done
+          sha256sum -c "awss-${tag}-checksums.txt"
+          exit "$missing"
+
   check-commits:
     runs-on: ubuntu-latest
     steps:
