@@ -106,6 +106,8 @@ Filter by:
 
 Sort by: `--sort id|size|type|state|az|encrypted|instance-id|instance-name|device` (default: `id`)
 
+In `--output json` only: `created`, the creation date of the volume (RFC 3339 in UTC).
+
 Additional flags:
 
 - `--no-instance-name` -- skip instance name lookup for faster results

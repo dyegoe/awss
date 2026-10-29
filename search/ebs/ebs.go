@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/dyegoe/awss/common"
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
@@ -74,6 +75,9 @@ type dataRow struct {
 
 	// Device is the device name for the attachment.
 	Device string `json:"device,omitempty" header:"Device" sort:"device"`
+
+	// Created is when the volume was created, in RFC 3339 UTC so it sorts chronologically.
+	Created string `json:"created,omitempty"`
 
 	// Tags are the tags assigned to the volume.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
@@ -245,6 +249,9 @@ func parseVolume(vol *types.Volume) []dataRow {
 	}
 	if vol.Encrypted != nil {
 		base.Encrypted = strconv.FormatBool(*vol.Encrypted)
+	}
+	if vol.CreateTime != nil {
+		base.Created = vol.CreateTime.UTC().Format(time.RFC3339)
 	}
 	if len(vol.Attachments) == 0 {
 		return []dataRow{base}

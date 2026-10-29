@@ -21,6 +21,7 @@ package ebs
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -28,6 +29,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dyegoe/awss/common"
 
@@ -404,6 +406,7 @@ func parseVolumeBaseVol() types.Volume {
 		AvailabilityZone: strPtr("us-east-1a"),
 		Size:             &i,
 		Encrypted:        &b,
+		CreateTime:       aws.Time(time.Date(2024, 3, 12, 10, 41, 7, 0, time.FixedZone("CET", 3600))),
 	}
 }
 
@@ -411,7 +414,7 @@ func parseVolumeBaseRow() dataRow {
 	return dataRow{
 		VolumeID: "vol-abc123", VolumeType: "gp3", State: "in-use",
 		AvailabilityZone: "us-east-1a", Size: 50, Encrypted: "true",
-		Tags: map[string]string{},
+		Created: "2024-03-12T09:41:07Z", Tags: map[string]string{},
 	}
 }
 
@@ -462,6 +465,52 @@ func TestParseVolume_multiAttach(t *testing.T) {
 		want.InstanceID, want.Device = tc.id, tc.dev
 		if !reflect.DeepEqual(got[i], want) {
 			t.Errorf("parseVolume() row[%d]\n%#v\nwant\n%#v", i, got[i], want)
+		}
+	}
+}
+
+// TestParseVolume_nilCreateTime checks that a volume without a creation time has an empty created.
+func TestParseVolume_nilCreateTime(t *testing.T) {
+	vol := parseVolumeBaseVol()
+	vol.CreateTime = nil
+	got := parseVolume(&vol)
+	if len(got) != 1 {
+		t.Fatalf("parseVolume() len = %d, want 1", len(got))
+	}
+	if got[0].Created != "" {
+		t.Errorf("parseVolume() Created = %q, want \"\"", got[0].Created)
+	}
+}
+
+// TestDataRow_jsonKeys checks that the creation date is a JSON key, left out when empty, and not
+// a table column.
+func TestDataRow_jsonKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		row  dataRow
+		want bool
+	}{
+		{name: "set", row: dataRow{Created: "2024-03-12T09:41:07Z"}, want: true},
+		{name: "empty", row: dataRow{}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, err := json.Marshal(tt.row)
+			if err != nil {
+				t.Fatalf("json.Marshal() error = %v", err)
+			}
+			keys := map[string]any{}
+			if err := json.Unmarshal(b, &keys); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v", err)
+			}
+			if _, got := keys["created"]; got != tt.want {
+				t.Errorf("json.Marshal(%+v) has \"created\" = %v, want %v", tt.row, got, tt.want)
+			}
+		})
+	}
+	for _, h := range common.Headers(dataRow{}) {
+		if h == "Created" {
+			t.Errorf("common.Headers(dataRow{}) has %q, want JSON only", h)
 		}
 	}
 }
