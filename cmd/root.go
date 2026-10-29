@@ -33,6 +33,7 @@ import (
 	searchOrg "github.com/dyegoe/awss/search/org"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -129,6 +130,8 @@ func setup() error {
 	for _, sub := range subcommands {
 		sub.initFlags()
 	}
+	// After the subcommands are added, so they get it too. ResetFlags drops it, so every setup sets it.
+	rootCmd.SetGlobalNormalizationFunc(normalizeFlagName)
 
 	if err := initViper(); err != nil {
 		return err
@@ -139,6 +142,21 @@ func setup() error {
 		}
 	}
 	return nil
+}
+
+// flagAliases are the singular names accepted for plural flags, as the AWS CLI spells them.
+var flagAliases = map[string]string{
+	"profile": labelProfiles,
+	"region":  labelRegions,
+}
+
+// normalizeFlagName reads --profile as --profiles and --region as --regions: the same flag under
+// another name, so they behave alike and --help lists only the plural.
+func normalizeFlagName(_ *pflag.FlagSet, name string) pflag.NormalizedName {
+	if plural, ok := flagAliases[name]; ok {
+		return pflag.NormalizedName(plural)
+	}
+	return pflag.NormalizedName(name)
 }
 
 // persistentPreRun is executed before any command.
@@ -204,14 +222,14 @@ func initFlags() {
 	rootCmd.PersistentFlags().String(labelConfig, "",
 		"config file path (default is $HOME/.awss/config.yaml)")
 	rootCmd.PersistentFlags().StringSlice(labelProfiles, []string{},
-		"Select the profile from the AWS config file (AWS_CONFIG_FILE, or ~/.aws/config). You can pass "+
+		"Select the profile from the AWS config file (AWS_CONFIG_FILE, or ~/.aws/config). --profile works too. You can pass "+
 			"multiple profiles separated by comma. e.g. `profile1,profile2`. `all` uses the all-profiles list of "+
 			"the config file, or every profile in the AWS config file when that list is not set. "+
 			"If not set, falls back to the AWS SDK's default credential "+
 			"resolution (AWS_PROFILE, static env credentials, or the `default` profile).")
 	rootCmd.PersistentFlags().StringSlice(labelRegions, []string{},
 		fmt.Sprintf(
-			"Select a region to perform your API calls. You can pass multiple regions separated by comma. "+
+			"Select a region to perform your API calls. --region works too. You can pass multiple regions separated by comma. "+
 				"e.g. `region1,region2`. If not set, falls back to AWS_REGION/AWS_DEFAULT_REGION, or %s.",
 			common.DefaultRegion,
 		))

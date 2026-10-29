@@ -9,6 +9,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Parallel search across profiles and regions
 - Multiple AWS profiles: `--profiles default,dev` or `--profiles all` (scoped by `all-profiles` in the config file)
 - Multiple regions: `--regions us-east-1,eu-west-1` or `--regions all`
+- `--profile` and `--region` work too, as in the AWS CLI: they are the same flags as `--profiles` and `--regions`
 - Output formats: `--output table` (default), `--output json`, `--output json-pretty`
 - Show empty results: `--show-empty`
 - Show tags in table output: `--show-tags`

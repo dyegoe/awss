@@ -43,6 +43,7 @@ linters:
             - $gostd
             - github.com/dyegoe/awss/
             - github.com/spf13/cobra
+            - github.com/spf13/pflag
             - github.com/spf13/viper
             - github.com/aws/aws-sdk-go-v2/
             - github.com/aws/smithy-go
