@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.17.0](https://github.com/dyegoe/awss/compare/v0.16.1...v0.17.0) (2026-10-29)
+
+
+### Features
+
+* **search/ebs:** add volume creation date to the JSON output ([#207](https://github.com/dyegoe/awss/issues/207)) ([#211](https://github.com/dyegoe/awss/issues/211)) ([583424a](https://github.com/dyegoe/awss/commit/583424a404c2c7fa7c28fd2ba2434fdb00e0d329))
+* **search/ec2:** add an estimated creation date to the JSON output ([#208](https://github.com/dyegoe/awss/issues/208)) ([#212](https://github.com/dyegoe/awss/issues/212)) ([07ffb3b](https://github.com/dyegoe/awss/commit/07ffb3b660d4f7ea8e0551652dcf4d8d1559d4e3))
+* **search/rds:** add creation date and license model to the JSON output ([#205](https://github.com/dyegoe/awss/issues/205)) ([#209](https://github.com/dyegoe/awss/issues/209)) ([a224f00](https://github.com/dyegoe/awss/commit/a224f009dfa4072a8ccf3692f7529e3ca5da52b7))
+* **search/rdscluster:** add creation date to the JSON output ([#206](https://github.com/dyegoe/awss/issues/206)) ([#210](https://github.com/dyegoe/awss/issues/210)) ([2aff7db](https://github.com/dyegoe/awss/commit/2aff7db6d8bd288fee4f49edbf96a1ea12af87cd))
+
 ## [0.16.1](https://github.com/dyegoe/awss/compare/v0.16.0...v0.16.1) (2026-10-13)
 
 
