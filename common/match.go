@@ -73,6 +73,21 @@ func (m *Matcher) Match(value string) bool {
 	return false
 }
 
+// MatchAny reports whether any of values matches the patterns, for a resource with several names,
+// such as the aliases of a CloudFront distribution. An empty pattern set matches everything, even
+// no values.
+func (m *Matcher) MatchAny(values []string) bool {
+	if len(m.globs) == 0 && len(m.regexes) == 0 {
+		return true
+	}
+	for _, v := range values {
+		if m.Match(v) {
+			return true
+		}
+	}
+	return false
+}
+
 // Prefix returns the literal prefix every match must start with, or "" when there is none.
 //
 // It is only defined when the matcher has exactly one pattern, so callers can narrow a

@@ -325,6 +325,50 @@ shows its error and no tags.
 
 Sort by: `--sort id|name|email|status|joined` (default: `name`)
 
+#### CloudFront distributions (`awss cloudfront`)
+
+Lists the CloudFront distributions of each profile: ID, CloudFront domain, aliases (CNAMEs),
+origins, status and whether it is enabled.
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--all` | `-a` | Search all distributions (no filters) |
+| `--ids` | `-i` | Distribution IDs, exact |
+| `--domains` | `-d` | Aliases or the `*.cloudfront.net` domain: globs, or Go regular expressions with `--regex` |
+| `--origins` | `-O` | Origin domain names: globs, or regular expressions with `--regex` |
+| `--tags` | `-t` | Tags (`Key=Value1:Value2`); values accept globs |
+| `--regex` | | Treat `--domains` and `--origins` as regular expressions |
+
+```bash
+# Which distribution serves www.example.com, in any account
+awss cloudfront -d www.example.com --profiles all
+
+# Every distribution in front of an S3 bucket
+awss cloudfront -O '*.s3.amazonaws.com' --profiles all
+
+# Production distributions, with their tags
+awss cloudfront -t Env=prod --show-tags
+```
+
+`ListDistributions` cannot filter, so awss matches every filter on the results. Filters combine
+with AND.
+
+- **Global:** CloudFront is global, so `cloudfront` searches each profile once, in no region.
+  `--regions` is ignored; the result set shows the region `global`. Several profiles and
+  `--profiles all` work as for the other commands.
+- **Tags:** the listing has no tags; each distribution needs one `ListTagsForResource` call, so
+  they are fetched only with `--show-tags`, `--show-tags-keys` or `--tags`. awss paces them at 5
+  per second (AWS does not publish this quota) and retries a throttled call up to 10 times. The
+  tag calls run only for the distributions that passed the other filters. A distribution whose
+  tags cannot be read shows its error, and does not match `--tags`.
+- **JSON only:** `arn`, `comment`, `price_class`, `http_version`, `ipv6`, `web_acl_id`,
+  `certificate` (the ACM certificate ARN, or the IAM certificate ID; empty for the default
+  certificate), `staging` and `modified` (the last change, RFC 3339 in UTC). CloudFront returns
+  no creation time.
+- **Permission:** `cloudfront:ListDistributions`, and `cloudfront:ListTagsForResource` for tags.
+
+Sort by: `--sort id|domain|status|modified` (default: `id`)
+
 ### Common behavior
 
 - Filters can be combined: `awss ec2 -n '*' -s running -z a,b`
