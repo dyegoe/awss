@@ -78,7 +78,7 @@ This flag cannot be combined with other filters.
 // subnetFilterFlags lists all subnet filter flag names for mutual exclusivity with --all.
 var subnetFilterFlags = []string{
 	flagIDs, flagNames, flagTags, flagTagsKey, "vpc-ids", flagCIDRs,
-	flagAvailabilityZones, "states", "default-for-az", "public-ip-on-launch",
+	flagAvailabilityZones, flagStates, "default-for-az", "public-ip-on-launch",
 }
 
 func subnetRunE(cmd *cobra.Command, _ []string) error {
@@ -111,13 +111,14 @@ func subnetInitFlags() {
 	subnetCmd.Flags().StringSliceVarP(&subnetF.CIDRs, flagCIDRs, "c", []string{},
 		"Filter subnets by IPv4 CIDR block. Exact match. `10.0.1.0/24,10.0.2.0/24`")
 	subnetCmd.Flags().StringSliceVarP(&subnetF.AvailabilityZones, flagAvailabilityZones, "z", []string{},
-		"Filter subnets by availability zones. It will append to current region. `a,b`")
-	subnetCmd.Flags().StringSliceVarP(&subnetF.States, "states", "s", []string{},
-		"Filter subnets by state. `pending,available`")
+		listHelp("Filter subnets by availability zones, appended to the current region",
+			common.AvailabilityZoneLetters(), "a,b"))
+	subnetCmd.Flags().StringSliceVarP(&subnetF.States, flagStates, "s", []string{},
+		listHelp("Filter subnets by state", subnetStateNames(), "available"))
 	subnetCmd.Flags().StringSliceVarP(&subnetF.DefaultForAz, "default-for-az", "d", []string{},
-		"Filter subnets by whether they are the default subnet of their AZ. `true,false`")
+		listHelp("Filter subnets by whether they are the default subnet of their AZ", trueFalse(), "true"))
 	subnetCmd.Flags().StringSliceVarP(&subnetF.MapPublicIP, "public-ip-on-launch", "p", []string{},
-		"Filter subnets by whether instances get a public IP on launch. `true,false`")
+		listHelp("Filter subnets by whether instances get a public IP on launch", trueFalse(), "true"))
 	subnetCmd.Flags().String("sort", "name", sortHelp("subnet", "subnets", "name"))
 }
 

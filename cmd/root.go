@@ -68,6 +68,7 @@ const (
 	flagTags              = "tags"
 	flagTagsKey           = "tags-key"
 	flagAvailabilityZones = "availability-zones"
+	flagStates            = "states"
 )
 
 // version is overridden at build time via -ldflags.

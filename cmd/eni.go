@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/dyegoe/awss/common"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -102,7 +104,8 @@ func eniInitFlags() {
 	eniCmd.Flags().StringSliceVarP(&eniF.InstanceIDs, "instance-ids", "I", []string{},
 		"Filter ENIs by instance IDs. `i-1230456078901,i-1230456078902`")
 	eniCmd.Flags().StringSliceVarP(&eniF.AvailabilityZones, flagAvailabilityZones, "z", []string{},
-		"Filter ENIs by availability zones. It will append to current region. `a,b`")
+		listHelp("Filter ENIs by availability zones, appended to the current region",
+			common.AvailabilityZoneLetters(), "a,b"))
 	eniCmd.Flags().IPSliceVarP(&eniF.PrivateIPs, "private-ips", "p", []net.IP{},
 		"Filter ENIs by private IPs. `172.16.0.1,172.17.1.254`")
 	eniCmd.Flags().IPSliceVarP(&eniF.PublicIPs, "public-ips", "P", []net.IP{},

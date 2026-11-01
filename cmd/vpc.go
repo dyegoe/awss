@@ -80,7 +80,7 @@ This flag cannot be combined with other filters.
 // vpcFilterFlags lists all VPC filter flag names for mutual exclusivity with --all.
 var vpcFilterFlags = []string{
 	flagIDs, flagNames, flagTags, flagTagsKey, flagCIDRs,
-	"states", "default", "owner-ids",
+	flagStates, "default", "owner-ids",
 }
 
 func vpcRunE(cmd *cobra.Command, _ []string) error {
@@ -110,10 +110,10 @@ func vpcInitFlags() {
 		"Filter VPCs by tags key. `Key,Environment`")
 	vpcCmd.Flags().StringSliceVarP(&vpcF.CIDRs, flagCIDRs, "c", []string{},
 		"Filter VPCs by associated IPv4 CIDR blocks. Exact match. `10.0.0.0/16,10.1.0.0/16`")
-	vpcCmd.Flags().StringSliceVarP(&vpcF.States, "states", "s", []string{},
-		"Filter VPCs by state. `pending,available`")
+	vpcCmd.Flags().StringSliceVarP(&vpcF.States, flagStates, "s", []string{},
+		listHelp("Filter VPCs by state", vpcStateNames(), "available"))
 	vpcCmd.Flags().StringSliceVarP(&vpcF.IsDefault, "default", "d", []string{},
-		"Filter VPCs by whether they are the default VPC. `true,false`")
+		listHelp("Filter VPCs by whether they are the default VPC", trueFalse(), "true"))
 	vpcCmd.Flags().StringSliceVarP(&vpcF.OwnerIDs, "owner-ids", "o", []string{},
 		"Filter VPCs by owner account IDs. `123456789012`")
 	vpcCmd.Flags().String("sort", "name", sortHelp("vpc", "VPCs", "name"))

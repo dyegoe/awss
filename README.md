@@ -18,7 +18,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Concurrency: `--concurrency 8` (default `32`), how many profile and region searches run at once
 - Run stats: `--stats` prints elapsed time, peak memory, search counts and AWS API calls on stderr; see [Run report and stats](#run-report-and-stats)
 - Account names next to owner account IDs, from the `accounts` map of the config file or, with `--org-profile`, from AWS Organizations; see [Account names](#account-names)
-- Shell completion of commands, flags and the values of `--sort`, `--output` and `org --statuses`; see [Shell completion](#shell-completion)
+- Shell completion of commands, flags and the values of the flags that take a known list (sort fields, profiles, regions, states); see [Shell completion](#shell-completion)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
 
@@ -654,8 +654,24 @@ awss ec2 --all --profiles all --regions all --output json --stats > instances.js
 ### Shell completion
 
 `awss completion zsh|bash|fish|powershell` prints a completion script. Besides commands and flag
-names, it completes the values of `--sort` (the sort fields of that command), `--output`
-(`json`, `json-pretty`, `table`) and `org --statuses`, one item after another in the comma list.
+names, it completes the values of these flags, one item after another in a comma list:
+
+| Flag | Values |
+| --- | --- |
+| `--sort` | the sort fields of that command |
+| `--output` | `json`, `json-pretty`, `table` |
+| `--profiles`, `--org-profile` | the profiles of the AWS config file, and `all` for `--profiles` |
+| `--regions` | the `all-regions` list of the config file (or its default), and `all` |
+| `--config` | YAML file names |
+| `-z` / `--availability-zones` | the zone letters `a` to `f` |
+| `ec2 --instance-states` | the EC2 instance states, such as `running`, `stopped` |
+| `ebs --statuses`, `ebs --volume-types` | the EBS volume states and types |
+| `vpc --states`, `subnet --states` | the VPC and subnet states |
+| `ebs --encrypted`, `vpc --default`, `subnet --default-for-az`, `subnet --public-ip-on-launch` | `true`, `false` |
+| `org --statuses` | the account statuses |
+
+The other flags take free text (IDs, names, tags, CIDRs, numbers), and `<TAB>` after them offers
+nothing rather than file names. Completion never calls AWS.
 
 ```bash
 # zsh: load it in every new shell

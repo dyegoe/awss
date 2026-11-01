@@ -117,9 +117,10 @@ func ec2InitFlags() {
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.InstanceTypes, "instance-types", "T", []string{},
 		"Filter EC2 instances by instance type. `t2.micro,t2.small`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.AvailabilityZones, flagAvailabilityZones, "z", []string{},
-		"Filter EC2 instances by availability zones. It will append to current region. `a,b`")
+		listHelp("Filter EC2 instances by availability zones, appended to the current region",
+			common.AvailabilityZoneLetters(), "a,b"))
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.InstanceStates, "instance-states", "s", []string{},
-		"Filter EC2 instances by instance state. `running,stopped`")
+		listHelp("Filter EC2 instances by instance state", instanceStateNames(), "running,stopped"))
 	ec2Cmd.Flags().IPSliceVarP(&ec2F.PrivateIPs, "private-ips", "p", []net.IP{},
 		"Filter EC2 instances by private IPs. `172.16.0.1,172.17.1.254`")
 	ec2Cmd.Flags().IPSliceVarP(&ec2F.PublicIPs, "public-ips", "P", []net.IP{},

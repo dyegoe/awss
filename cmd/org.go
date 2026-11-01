@@ -90,7 +90,7 @@ func orgInitFlags() {
 	rootCmd.AddCommand(orgCmd)
 
 	orgCmd.Flags().StringSliceVarP(&orgF.Statuses, flagStatuses, "s", []string{},
-		"Keep the accounts with these statuses: "+strings.Join(searchOrg.StatusNames(), ", ")+". `active,suspended`")
+		listHelp("Keep the accounts with these statuses", searchOrg.StatusNames(), "active,suspended"))
 	orgCmd.Flags().String(flagSort, "name", sortHelp("org", "accounts", "name"))
 }
 
