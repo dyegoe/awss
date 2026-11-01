@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -111,6 +112,43 @@ func TestRegisterCompletions(t *testing.T) {
 				t.Errorf("complete(%v) directive = %d, want %d", tt.args, directive, tt.wantDirective)
 			}
 		})
+	}
+}
+
+// TestNoArgs checks that <TAB> after every search command offers no file names and shows the
+// Active Help hint to the flags, unless AWSS_ACTIVE_HELP or COBRA_ACTIVE_HELP turns it off.
+func TestNoArgs(t *testing.T) {
+	tests := []struct {
+		name     string
+		envVar   string
+		envValue string
+		wantHint bool
+	}{
+		{name: "hint on", envVar: "AWSS_ACTIVE_HELP", envValue: "", wantHint: true},
+		{name: "hint off for awss", envVar: "AWSS_ACTIVE_HELP", envValue: "0", wantHint: false},
+		{name: "hint off for every cobra tool", envVar: "COBRA_ACTIVE_HELP", envValue: "0", wantHint: false},
+	}
+	for _, tt := range tests {
+		for _, sub := range subcommands {
+			name := sub.cmd.Name()
+			t.Run(tt.name+"/"+name, func(t *testing.T) {
+				t.Setenv("AWSS_ACTIVE_HELP", "")
+				t.Setenv("COBRA_ACTIVE_HELP", "")
+				t.Setenv(tt.envVar, tt.envValue)
+				resetCLI(t, nil)
+				got, directive := complete(t, name, "")
+				want := []string{}
+				if tt.wantHint {
+					want = []string{"_activeHelp_ " + fmt.Sprintf(noArgsHint, name)}
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Errorf("complete(%s \"\") = %q, want %q", name, got, want)
+				}
+				if directive != cobra.ShellCompDirectiveNoFileComp {
+					t.Errorf("complete(%s \"\") directive = %d, want NoFileComp", name, directive)
+				}
+			})
+		}
 	}
 }
 

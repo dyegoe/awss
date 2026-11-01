@@ -31,8 +31,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// registerCompletions adds the shell completion of the flags whose values are a fixed list. The
-// values come from the lists awss validates against, so completion and validation cannot drift.
+// noArgsHint is the Active Help hint shown on <TAB> after a search command, which takes no
+// arguments: Cobra lists flag names only once a "-" is typed.
+const noArgsHint = "%s takes no arguments; type - and press TAB to see its flags"
+
+// registerCompletions adds the shell completion of the flags whose values are a fixed list, and
+// the no-arguments completion of every search command. The values come from the lists awss
+// validates against, so completion and validation cannot drift.
 //
 // Cobra keeps the completions by flag, and setup creates new flags every time, so every setup
 // registers them again.
@@ -42,6 +47,7 @@ func registerCompletions() error {
 	}
 	for _, sub := range subcommands {
 		name := sub.cmd.Name()
+		sub.cmd.ValidArgsFunction = noArgs
 		sortNames := func() []string { return search.SortFieldNames(name) }
 		if err := sub.cmd.RegisterFlagCompletionFunc(flagSort, fixedValues(sortNames)); err != nil {
 			return fmt.Errorf("registering the %s --%s completion: %w", name, flagSort, err)
@@ -51,6 +57,13 @@ func registerCompletions() error {
 		return fmt.Errorf("registering the org --%s completion: %w", flagStatuses, err)
 	}
 	return nil
+}
+
+// noArgs completes the positional arguments of a command that takes none: no file names, and an
+// Active Help hint that points to the flags. bash and zsh show it; Cobra drops it when
+// AWSS_ACTIVE_HELP or COBRA_ACTIVE_HELP is 0.
+func noArgs(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	return cobra.AppendActiveHelp(nil, fmt.Sprintf(noArgsHint, cmd.Name())), cobra.ShellCompDirectiveNoFileComp
 }
 
 // fixedValues completes a flag that takes one value of names. The shell keeps the values that

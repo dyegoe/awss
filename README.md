@@ -667,6 +667,11 @@ echo 'source <(awss completion bash)' >> ~/.bashrc
 
 Then `awss rds --sort <TAB>` lists `az class cluster engine id status version vpc`.
 
+The search commands take no arguments, only flags, and the shell lists flag names once a `-` is
+typed. So `awss ec2 <TAB>` offers no file names. In bash and zsh it shows a hint instead:
+`ec2 takes no arguments; type - and press TAB to see its flags`. Set `AWSS_ACTIVE_HELP=0` to
+hide the hint, or `COBRA_ACTIVE_HELP=0` to hide it for every Cobra-based tool.
+
 ## Contributing
 
 Contributions are welcome! For major changes, please open an issue first.
