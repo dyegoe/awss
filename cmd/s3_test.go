@@ -63,10 +63,10 @@ func TestBoolLabel(t *testing.T) {
 
 // TestSubcommands_rejectPositionalArgs checks a stray argument (e.g. a pattern given to --regex) fails loudly.
 func TestSubcommands_rejectPositionalArgs(t *testing.T) {
-	for _, c := range rootCmd.Commands() {
-		if c.Name() == "completion" || c.Name() == "help" {
-			continue
-		}
+	// The search commands only: Cobra adds its own completion, help and __complete commands to
+	// the root when a command runs, and they take arguments.
+	for _, sub := range subcommands {
+		c := sub.cmd
 		if err := c.ValidateArgs([]string{"^(prod|stag)-.*"}); err == nil {
 			t.Errorf("command %q accepts positional arguments, want cobra.NoArgs", c.Name())
 		}
