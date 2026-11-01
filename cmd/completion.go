@@ -28,35 +28,166 @@ import (
 	"github.com/dyegoe/awss/search"
 	searchOrg "github.com/dyegoe/awss/search/org"
 
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 // noArgsHint is the Active Help hint shown on <TAB> after a search command, which takes no
 // arguments: Cobra lists flag names only once a "-" is typed.
 const noArgsHint = "%s takes no arguments; type - and press TAB to see its flags"
 
-// registerCompletions adds the shell completion of the flags whose values are a fixed list, and
-// the no-arguments completion of every search command. The values come from the lists awss
-// validates against, so completion and validation cannot drift.
+// flagCompletions maps a flag name to the completion of its value.
+type flagCompletions map[string]cobra.CompletionFunc
+
+// registerCompletions adds the shell completion of every flag and the no-arguments completion
+// of every search command:
+//   - the flags of a known list complete its values. The values come from the lists awss
+//     validates against, or from the AWS SDK enums, so completion cannot drift;
+//   - --config completes YAML file names;
+//   - every other flag that takes a value completes nothing, so the shell offers no file names.
 //
 // Cobra keeps the completions by flag, and setup creates new flags every time, so every setup
 // registers them again.
 func registerCompletions() error {
-	if err := rootCmd.RegisterFlagCompletionFunc(labelOutput, fixedValues(common.OutputNames)); err != nil {
-		return fmt.Errorf("registering the --%s completion: %w", labelOutput, err)
+	if err := rootCmd.MarkPersistentFlagFilename(labelConfig, "yaml", "yml"); err != nil {
+		return fmt.Errorf("registering the --%s completion: %w", labelConfig, err)
+	}
+	if err := register(rootCmd, globalCompletions()); err != nil {
+		return err
+	}
+	if err := registerNoValues(rootCmd, rootCmd.PersistentFlags()); err != nil {
+		return err
 	}
 	for _, sub := range subcommands {
-		name := sub.cmd.Name()
 		sub.cmd.ValidArgsFunction = noArgs
-		sortNames := func() []string { return search.SortFieldNames(name) }
-		if err := sub.cmd.RegisterFlagCompletionFunc(flagSort, fixedValues(sortNames)); err != nil {
-			return fmt.Errorf("registering the %s --%s completion: %w", name, flagSort, err)
+		if err := register(sub.cmd, commandCompletions(sub.cmd)); err != nil {
+			return err
+		}
+		if err := registerNoValues(sub.cmd, sub.cmd.NonInheritedFlags()); err != nil {
+			return err
 		}
 	}
-	if err := orgCmd.RegisterFlagCompletionFunc(flagStatuses, listValues(searchOrg.StatusNames)); err != nil {
-		return fmt.Errorf("registering the org --%s completion: %w", flagStatuses, err)
+	return nil
+}
+
+// register adds the completions of comps to the flags of cmd.
+func register(cmd *cobra.Command, comps flagCompletions) error {
+	for name, fn := range comps {
+		if err := cmd.RegisterFlagCompletionFunc(name, fn); err != nil {
+			return fmt.Errorf("registering the %s --%s completion: %w", cmd.Name(), name, err)
+		}
 	}
 	return nil
+}
+
+// registerNoValues adds a completion with no values, and no file names, to every flag of flags
+// that takes a value and has no completion yet. --config keeps its file name completion.
+func registerNoValues(cmd *cobra.Command, flags *pflag.FlagSet) error {
+	var err error
+	flags.VisitAll(func(f *pflag.Flag) {
+		if err != nil || f.Value.Type() == "bool" || f.Name == labelConfig {
+			return
+		}
+		if _, ok := cmd.GetFlagCompletionFunc(f.Name); ok {
+			return
+		}
+		if regErr := cmd.RegisterFlagCompletionFunc(f.Name, cobra.NoFileCompletions); regErr != nil {
+			err = fmt.Errorf("registering the %s --%s completion: %w", cmd.Name(), f.Name, regErr)
+		}
+	})
+	return err
+}
+
+// globalCompletions returns the completions of the global flags.
+func globalCompletions() flagCompletions {
+	return flagCompletions{
+		labelOutput:     fixedValues(common.OutputNames),
+		labelProfiles:   allOrList(awsProfiles),
+		labelOrgProfile: fixedValues(awsProfiles),
+		labelRegions:    regionValues,
+	}
+}
+
+// commandCompletions returns the completions of the flags of a search command: --sort, the
+// availability zones when the command has them, and the flags of a fixed list.
+func commandCompletions(cmd *cobra.Command) flagCompletions {
+	name := cmd.Name()
+	comps := flagCompletions{
+		flagSort: fixedValues(func() []string { return search.SortFieldNames(name) }),
+	}
+	if cmd.Flags().Lookup(flagAvailabilityZones) != nil {
+		comps[flagAvailabilityZones] = listValues(common.AvailabilityZoneLetters)
+	}
+	for flag, values := range fixedLists()[name] {
+		comps[flag] = listValues(values)
+	}
+	return comps
+}
+
+// fixedLists returns, by command and flag, the values of the flags that take a fixed list.
+func fixedLists() map[string]map[string]func() []string {
+	trueFalse := func() []string { return []string{"true", "false"} }
+	return map[string]map[string]func() []string{
+		"ec2": {"instance-states": enumNames(ec2types.InstanceStateName("").Values)},
+		"ebs": {
+			flagStatuses:   enumNames(ec2types.VolumeState("").Values),
+			"volume-types": enumNames(ec2types.VolumeType("").Values),
+			"encrypted":    trueFalse,
+		},
+		"vpc": {flagStates: enumNames(ec2types.VpcState("").Values), "default": trueFalse},
+		"subnet": {
+			flagStates:            enumNames(ec2types.SubnetState("").Values),
+			"default-for-az":      trueFalse,
+			"public-ip-on-launch": trueFalse,
+		},
+		"org": {flagStatuses: searchOrg.StatusNames},
+	}
+}
+
+// enumNames returns the values of an AWS SDK enum as strings.
+func enumNames[T ~string](values func() []T) func() []string {
+	return func() []string {
+		var names []string
+		for _, v := range values() {
+			names = append(names, string(v))
+		}
+		return names
+	}
+}
+
+// awsProfiles returns the profiles of the AWS config file. Completion has no way to report an
+// error, so an unreadable file offers no profiles.
+func awsProfiles() []string {
+	profiles, err := common.GetAwsProfiles()
+	if err != nil {
+		return nil
+	}
+	return profiles
+}
+
+// regionValues completes --regions with the all-regions list: the one of the config file, read
+// as a run would (--config or ~/.awss/config.yaml), or the default list.
+func regionValues(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if cfg, err := cmd.Flags().GetString(labelConfig); err == nil {
+		// Completion has no way to report an error: a bad config file keeps the default list.
+		_ = initConfig(cfg)
+	}
+	regions := func() []string { return viper.GetStringSlice(labelAllRegions) }
+	return allOrList(regions)(cmd, args, toComplete)
+}
+
+// allOrList completes a comma list of names, as listValues, and offers "all" as the first item
+// only: awss accepts "all" alone.
+func allOrList(names func() []string) cobra.CompletionFunc {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		withAll := names
+		if !strings.Contains(toComplete, ",") {
+			withAll = func() []string { return append([]string{"all"}, names()...) }
+		}
+		return listValues(withAll)(cmd, args, toComplete)
+	}
 }
 
 // noArgs completes the positional arguments of a command that takes none: no file names, and an

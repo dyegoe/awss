@@ -279,6 +279,11 @@ func CheckRegions(regions, allRegions []string) ([]string, error) {
 	return regions, nil
 }
 
+// AvailabilityZoneLetters returns the zone letters awss accepts, appended to the region name.
+func AvailabilityZoneLetters() []string {
+	return []string{"a", "b", "c", "d", "e", "f"}
+}
+
 // CheckAvailabilityZones checks if the availability zones are valid.
 //
 // Availability zones must be only one letter that will be appended to the region name.
@@ -288,8 +293,8 @@ func CheckAvailabilityZones(az []string) error {
 		return ErrNoAZSelected
 	}
 
+	validAvailabilityZones := AvailabilityZoneLetters()
 	for _, zone := range az {
-		validAvailabilityZones := []string{"a", "b", "c", "d", "e", "f"}
 		if len(zone) != 1 {
 			return fmt.Errorf("availability zones must be just a letter. It will be append to the region: %s", zone)
 		}
