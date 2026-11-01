@@ -126,19 +126,15 @@ func commandCompletions(cmd *cobra.Command) flagCompletions {
 	return comps
 }
 
-// fixedLists returns, by command and flag, the values of the flags that take a fixed list.
+// fixedLists returns, by command and flag, the values of the flags that take a fixed list. Their
+// help text lists the same values, with listHelp.
 func fixedLists() map[string]map[string]func() []string {
-	trueFalse := func() []string { return []string{"true", "false"} }
 	return map[string]map[string]func() []string{
-		"ec2": {"instance-states": enumNames(ec2types.InstanceStateName("").Values)},
-		"ebs": {
-			flagStatuses:   enumNames(ec2types.VolumeState("").Values),
-			"volume-types": enumNames(ec2types.VolumeType("").Values),
-			"encrypted":    trueFalse,
-		},
-		"vpc": {flagStates: enumNames(ec2types.VpcState("").Values), "default": trueFalse},
+		"ec2": {"instance-states": instanceStateNames},
+		"ebs": {flagStatuses: volumeStateNames, "volume-types": volumeTypeNames, "encrypted": trueFalse},
+		"vpc": {flagStates: vpcStateNames, "default": trueFalse},
 		"subnet": {
-			flagStates:            enumNames(ec2types.SubnetState("").Values),
+			flagStates:            subnetStateNames,
 			"default-for-az":      trueFalse,
 			"public-ip-on-launch": trueFalse,
 		},
@@ -146,15 +142,37 @@ func fixedLists() map[string]map[string]func() []string {
 	}
 }
 
+// instanceStateNames returns the EC2 instance states of the AWS SDK.
+func instanceStateNames() []string { return enumNames(ec2types.InstanceStateName("").Values()) }
+
+// volumeStateNames returns the EBS volume states of the AWS SDK.
+func volumeStateNames() []string { return enumNames(ec2types.VolumeState("").Values()) }
+
+// volumeTypeNames returns the EBS volume types of the AWS SDK.
+func volumeTypeNames() []string { return enumNames(ec2types.VolumeType("").Values()) }
+
+// vpcStateNames returns the VPC states of the AWS SDK.
+func vpcStateNames() []string { return enumNames(ec2types.VpcState("").Values()) }
+
+// subnetStateNames returns the subnet states of the AWS SDK.
+func subnetStateNames() []string { return enumNames(ec2types.SubnetState("").Values()) }
+
+// trueFalse returns the values of a filter that is true or false.
+func trueFalse() []string { return []string{"true", "false"} }
+
 // enumNames returns the values of an AWS SDK enum as strings.
-func enumNames[T ~string](values func() []T) func() []string {
-	return func() []string {
-		var names []string
-		for _, v := range values() {
-			names = append(names, string(v))
-		}
-		return names
+func enumNames[T ~string](values []T) []string {
+	names := make([]string, 0, len(values))
+	for _, v := range values {
+		names = append(names, string(v))
 	}
+	return names
+}
+
+// listHelp builds the help text of a flag that takes a fixed list from the values it completes,
+// so the help never drifts from them. example is the value placeholder shown in --help.
+func listHelp(text string, values []string, example string) string {
+	return fmt.Sprintf("%s: %s. %#q", text, strings.Join(values, ", "), example)
 }
 
 // awsProfiles returns the profiles of the AWS config file. Completion has no way to report an

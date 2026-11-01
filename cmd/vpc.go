@@ -111,9 +111,9 @@ func vpcInitFlags() {
 	vpcCmd.Flags().StringSliceVarP(&vpcF.CIDRs, flagCIDRs, "c", []string{},
 		"Filter VPCs by associated IPv4 CIDR blocks. Exact match. `10.0.0.0/16,10.1.0.0/16`")
 	vpcCmd.Flags().StringSliceVarP(&vpcF.States, flagStates, "s", []string{},
-		"Filter VPCs by state. `pending,available`")
+		listHelp("Filter VPCs by state", vpcStateNames(), "available"))
 	vpcCmd.Flags().StringSliceVarP(&vpcF.IsDefault, "default", "d", []string{},
-		"Filter VPCs by whether they are the default VPC. `true,false`")
+		listHelp("Filter VPCs by whether they are the default VPC", trueFalse(), "true"))
 	vpcCmd.Flags().StringSliceVarP(&vpcF.OwnerIDs, "owner-ids", "o", []string{},
 		"Filter VPCs by owner account IDs. `123456789012`")
 	vpcCmd.Flags().String("sort", "name", sortHelp("vpc", "VPCs", "name"))

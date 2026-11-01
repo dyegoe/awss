@@ -22,6 +22,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/dyegoe/awss/common"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -100,15 +102,16 @@ func ebsInitFlags() {
 	ebsCmd.Flags().StringSliceVarP(&ebsF.TagsKey, flagTagsKey, "k", []string{},
 		"Filter EBS volumes by tags key. `Key,Environment`")
 	ebsCmd.Flags().StringSliceVarP(&ebsF.AvailabilityZones, flagAvailabilityZones, "z", []string{},
-		"Filter EBS volumes by availability zones. It will append to current region. `a,b`")
+		listHelp("Filter EBS volumes by availability zones, appended to the current region",
+			common.AvailabilityZoneLetters(), "a,b"))
 	ebsCmd.Flags().StringSliceVarP(&ebsF.Statuses, "statuses", "s", []string{},
-		"Filter EBS volumes by status. `available,in-use,creating,deleting,deleted,error`")
+		listHelp("Filter EBS volumes by status", volumeStateNames(), "available,in-use"))
 	ebsCmd.Flags().StringSliceVarP(&ebsF.VolumeTypes, "volume-types", "T", []string{},
-		"Filter EBS volumes by volume type. `gp2,gp3,io1,io2,st1,sc1,standard`")
+		listHelp("Filter EBS volumes by volume type", volumeTypeNames(), "gp3,io2"))
 	ebsCmd.Flags().StringSliceVarP(&ebsF.InstanceIDs, "instance-ids", "I", []string{},
 		"Filter EBS volumes by attached instance IDs. `i-1230456078901,i-1230456078902`")
 	ebsCmd.Flags().StringSliceVarP(&ebsF.Encrypted, "encrypted", "e", []string{},
-		"Filter EBS volumes by encryption. `true,false`")
+		listHelp("Filter EBS volumes by encryption", trueFalse(), "true"))
 	ebsCmd.Flags().String("sort", "id", sortHelp("ebs", "EBS volumes", "id"))
 	ebsCmd.Flags().Bool("no-instance-name", false,
 		"Skip the instance name lookup to speed up the EBS volume search.")

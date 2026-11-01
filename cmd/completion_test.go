@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -25,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dyegoe/awss/common"
 	"github.com/dyegoe/awss/search"
 
 	"github.com/spf13/cobra"
@@ -172,6 +174,25 @@ func TestFixedLists(t *testing.T) {
 				t.Errorf("complete(%v) directive = %d, want %d", tt.args, directive, want)
 			}
 		})
+	}
+}
+
+// TestFixedLists_inHelp checks that the help of every flag of a fixed list, and of the
+// availability zones, lists the values it completes.
+func TestFixedLists_inHelp(t *testing.T) {
+	resetCLI(t, nil)
+	for _, sub := range subcommands {
+		lists := map[string]func() []string{}
+		maps.Copy(lists, fixedLists()[sub.cmd.Name()])
+		if sub.cmd.Flags().Lookup(flagAvailabilityZones) != nil {
+			lists[flagAvailabilityZones] = common.AvailabilityZoneLetters
+		}
+		for flag, values := range lists {
+			usage := sub.cmd.Flags().Lookup(flag).Usage
+			if want := strings.Join(values(), ", "); !strings.Contains(usage, want) {
+				t.Errorf("%s --%s usage = %q, want it to list %q", sub.cmd.Name(), flag, usage, want)
+			}
+		}
 	}
 }
 
