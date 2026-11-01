@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.20.0](https://github.com/dyegoe/awss/compare/v0.19.0...v0.20.0) (2026-11-01)
+
+
+### Features
+
+* **cmd:** complete the values of every flag, and no file names for free-text flags ([#227](https://github.com/dyegoe/awss/issues/227)) ([#228](https://github.com/dyegoe/awss/issues/228)) ([6ebd4a1](https://github.com/dyegoe/awss/commit/6ebd4a101ea64dd213965f9b70d0b513e32044a8))
+* **cmd:** no file completion and an Active Help hint after a search command ([#225](https://github.com/dyegoe/awss/issues/225)) ([#226](https://github.com/dyegoe/awss/issues/226)) ([4313539](https://github.com/dyegoe/awss/commit/4313539c6269a1f762e275246e725733db4dd552))
+
 ## [0.19.0](https://github.com/dyegoe/awss/compare/v0.18.0...v0.19.0) (2026-10-29)
 
 
