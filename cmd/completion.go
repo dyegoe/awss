@@ -110,12 +110,13 @@ func globalCompletions() flagCompletions {
 	}
 }
 
-// commandCompletions returns the completions of the flags of a search command: --sort, the
+// commandCompletions returns the completions of the flags of a command: --sort when it has one, the
 // availability zones when the command has them, and the flags of a fixed list.
 func commandCompletions(cmd *cobra.Command) flagCompletions {
 	name := cmd.Name()
-	comps := flagCompletions{
-		flagSort: fixedValues(func() []string { return search.SortFieldNames(name) }),
+	comps := flagCompletions{}
+	if cmd.Flags().Lookup(flagSort) != nil {
+		comps[flagSort] = fixedValues(func() []string { return search.SortFieldNames(name) })
 	}
 	if cmd.Flags().Lookup(flagAvailabilityZones) != nil {
 		comps[flagAvailabilityZones] = listValues(common.AvailabilityZoneLetters)
@@ -202,7 +203,7 @@ func allOrList(names func() []string) cobra.CompletionFunc {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		withAll := names
 		if !strings.Contains(toComplete, ",") {
-			withAll = func() []string { return append([]string{"all"}, names()...) }
+			withAll = func() []string { return append([]string{valueAll}, names()...) }
 		}
 		return listValues(withAll)(cmd, args, toComplete)
 	}

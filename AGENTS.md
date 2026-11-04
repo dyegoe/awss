@@ -13,11 +13,16 @@ and do not add a tool-specific copy such as `.github/copilot-instructions.md`.
 **awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs, subnets, S3 buckets and objects, RDS DB instances and clusters, Organization accounts, CloudFront distributions) in parallel
 across multiple profiles and regions. It wraps AWS SDK Go v2 and uses Cobra + Viper for CLI wiring.
 
+The search commands are read-only. The `cleanup` commands (`awss cleanup default-vpc`) are the only
+ones that change AWS resources: they report a plan unless `--apply` is given, and `--apply` over
+`--profiles all` or `--regions all` also needs `--confirm-all`. A flag that turns on deleting is never bound to
+Viper, so the config file cannot turn it on.
+
 **Module:** `github.com/dyegoe/awss`
 **Go version:** the project follows the latest Go release. The `go` directive in `go.mod` is the
 single source: CI and the release builds read it. When Go is upgraded locally, bump the directive
 in the same PR (`go mod edit -go=<version>`). Do not hardcode the version in docs.
-**Key dependencies:** cobra, viper, aws-sdk-go-v2 (config, ec2, s3, rds, organizations, cloudfront), go-pretty, ini.v1
+**Key dependencies:** cobra, viper, aws-sdk-go-v2 (config, ec2, s3, rds, organizations, cloudfront, sts), go-pretty, ini.v1
 
 ### Package layout
 
@@ -36,6 +41,8 @@ search/rds/          — RDS DB instance search: AWS filters plus client-side na
 search/rdscluster/   — RDS DB cluster search, reusing the rds local filters; VPC joined from the subnet groups
 search/org/          — AWS Organization accounts (one profile, global), and their names for --org-profile
 search/cloudfront/   — CloudFront distributions (global, once per profile), client-side filters, opt-in tags
+cleanup/defaultvpc/  — deletes the default VPC and its plumbing, all-or-nothing on its ENIs; a plan
+                       unless Apply. Registered in the search engines map as "default-vpc"
 internal/testconv/   — checks the test conventions of every package (run by its own test in CI)
 internal/nesting/    — checks the nesting depth of every function (run by its own test in CI)
 scripts/             — coverage.awk: the per-package coverage and test-file check of make test
@@ -167,7 +174,8 @@ maintainer verifies these on the work setup before merging:
 - authentication and profile handling: AWS SSO with Granted, ~150 profiles in
   `~/.awss/config.yaml`, `--profiles all` / `all-profiles`;
 - shared VPCs in an AWS Organization: subnets owned by a network account and shared with other
-  accounts, VPCs with a secondary CIDR block, instances with several ENIs (`eni`, `ec2 --cidrs`).
+  accounts, VPCs with a secondary CIDR block, instances with several ENIs (`eni`, `ec2 --cidrs`);
+- the `cleanup` commands: what they delete and in which order, in a sandbox account only.
 
 For such a change, cover it with unit tests and fake clients, then put the exact `awss` commands
 to run and the expected result in the pull request description.
@@ -252,7 +260,8 @@ A justified suppression names the linter and the reason:
 <type>(<scope>): <short description>
 
 Types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test
-Scope: cmd, common, search, search/<resource> (ec2, eni, ebs, vpc, subnet, s3, s3obj, rds, rdscluster, org, cloudfront), release
+Scope: cmd, common, search, search/<resource> (ec2, eni, ebs, vpc, subnet, s3, s3obj, rds, rdscluster, org, cloudfront),
+       cleanup, cleanup/<resource> (defaultvpc), release
 
 Reference the issue in the body or title, e.g. "(#82)". `feat` bumps the minor version and `fix`
 the patch version on release (release-please), so pick the type by what the user sees.
