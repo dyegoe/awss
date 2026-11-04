@@ -56,6 +56,10 @@ const (
 	labelStats          = "stats"
 	labelOrgProfile     = "org-profile"
 
+	// labelProfilesAllAsked is set by persistentPreRun when --profiles is "all", before it is
+	// replaced by the list of profiles: a cleanup needs to know it.
+	labelProfilesAllAsked = "profiles-all-asked"
+
 	// defaultTimeout is generous so --profiles all over many regions is not cut short.
 	defaultTimeout = 5 * time.Minute
 
@@ -124,6 +128,7 @@ var subcommands = []subcommand{
 	{rdsCmd, rdsInitFlags, rdsInitViper},
 	{rdsClusterCmd, rdsClusterInitFlags, rdsClusterInitViper},
 	{cloudfrontCmd, cloudfrontInitFlags, cloudfrontInitViper},
+	{defaultVpcCmd, defaultVpcInitFlags, defaultVpcInitViper},
 }
 
 // setup registers the global flags and every subcommand with its flags, then binds them to viper.
@@ -175,10 +180,12 @@ func persistentPreRun(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	profiles, err := common.CheckProfiles(viper.GetStringSlice(labelProfiles), viper.GetStringSlice(labelAllProfiles))
+	asked := viper.GetStringSlice(labelProfiles)
+	profiles, err := common.CheckProfiles(asked, viper.GetStringSlice(labelAllProfiles))
 	if err != nil {
 		return err
 	}
+	viper.Set(labelProfilesAllAsked, len(asked) == 1 && asked[0] == "all")
 	viper.Set(labelProfiles, profiles)
 
 	regions, err := common.CheckRegions(viper.GetStringSlice(labelRegions), viper.GetStringSlice(labelAllRegions))
@@ -509,13 +516,18 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 	if err != nil {
 		return err
 	}
+	finishRun(cmd, start, &summary)
+	return nil
+}
 
-	writeFailures(cmd.ErrOrStderr(), &summary)
+// finishRun writes on stderr, after the results, a line when a search failed, and the stats of
+// the run with --stats: stdout stays only the results, so JSON output still parses.
+func finishRun(cmd *cobra.Command, start time.Time, summary *search.Summary) {
+	writeFailures(cmd.ErrOrStderr(), summary)
 	if viper.GetBool(labelStats) {
-		st := collectStats(start, &summary)
+		st := collectStats(start, summary)
 		writeStats(cmd.ErrOrStderr(), &st)
 	}
-	return nil
 }
 
 // accountNames returns the account names for the Owner column, keyed by account ID: from the

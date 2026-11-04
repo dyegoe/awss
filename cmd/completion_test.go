@@ -56,10 +56,20 @@ func complete(t *testing.T, args ...string) ([]string, cobra.ShellCompDirective)
 	return nil, 0
 }
 
+// commandArgs returns the words that run cmd, without the root: ["vpc"], or ["cleanup",
+// "default-vpc"] for a command of a group.
+func commandArgs(cmd *cobra.Command) []string {
+	return strings.Fields(cmd.CommandPath())[1:]
+}
+
 // TestRegisterCompletions_sort checks that --sort of every search command completes its sort
-// fields, the list awss validates against, without file names.
+// fields, the list awss validates against, without file names. A command without --sort, such as
+// cleanup default-vpc, is skipped.
 func TestRegisterCompletions_sort(t *testing.T) {
 	for _, sub := range subcommands {
+		if sub.cmd.Flags().Lookup(flagSort) == nil {
+			continue
+		}
 		name := sub.cmd.Name()
 		t.Run(name, func(t *testing.T) {
 			resetCLI(t, nil)
@@ -244,6 +254,8 @@ func TestRegisterCompletions_everyFlag(t *testing.T) {
 	for _, sub := range subcommands {
 		sub.cmd.NonInheritedFlags().VisitAll(func(f *pflag.Flag) { flags = append(flags, flagOf{sub.cmd.Name(), f.Name}) })
 	}
+	// The global flags complete on a command of a group too.
+	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { flags = append(flags, flagOf{"default-vpc", f.Name}) })
 	for _, f := range flags {
 		t.Run(f.cmd+" --"+f.flag, func(t *testing.T) {
 			resetCLI(t, nil)
@@ -258,7 +270,8 @@ func TestRegisterCompletions_everyFlag(t *testing.T) {
 			if f.flag == labelConfig {
 				want = cobra.ShellCompDirectiveFilterFileExt
 			}
-			if _, directive := complete(t, f.cmd, "--"+f.flag, ""); directive&want == 0 {
+			args := append(commandArgs(mustCommand(t, f.cmd)), "--"+f.flag, "")
+			if _, directive := complete(t, args...); directive&want == 0 {
 				t.Errorf("complete(%s --%s) directive = %d, want %d set", f.cmd, f.flag, directive, want)
 			}
 		})
@@ -345,7 +358,7 @@ func TestNoArgs(t *testing.T) {
 				t.Setenv("COBRA_ACTIVE_HELP", "")
 				t.Setenv(tt.envVar, tt.envValue)
 				resetCLI(t, nil)
-				got, directive := complete(t, name, "")
+				got, directive := complete(t, append(commandArgs(sub.cmd), "")...)
 				want := []string{}
 				if tt.wantHint {
 					want = []string{"_activeHelp_ " + fmt.Sprintf(noArgsHint, name)}

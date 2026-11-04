@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dyegoe/awss/cleanup/defaultvpc"
 	"github.com/dyegoe/awss/common"
 	searchCloudFront "github.com/dyegoe/awss/search/cloudfront"
 	searchEBS "github.com/dyegoe/awss/search/ebs"
@@ -81,6 +82,10 @@ type Options struct {
 	// Concurrency is how many profile and region searches may run at once. Zero means
 	// DefaultConcurrency.
 	Concurrency int
+
+	// Apply makes a cleanup command delete what it finds; without it a cleanup only reports its plan.
+	// The search commands ignore it.
+	Apply bool
 
 	// Timeout is how long the run may take. A profile and region still searching at the deadline
 	// is reported as timed out. Zero disables it.
@@ -197,6 +202,15 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchCloudFront.GetSortFields,
 		sortFieldNames: searchCloudFront.SortFieldNames,
+	},
+	// default-vpc is the cleanup of the default VPCs (awss cleanup default-vpc). It deletes only
+	// with opts.Apply; otherwise it reports the plan.
+	"default-vpc": {
+		new: func(profile, region string, _ map[string][]string, opts *Options) common.Results {
+			return defaultvpc.New(profile, region, opts.Apply)
+		},
+		sortFields:     defaultvpc.GetSortFields,
+		sortFieldNames: defaultvpc.SortFieldNames,
 	},
 }
 
