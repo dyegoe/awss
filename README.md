@@ -1,6 +1,7 @@
 # AWSS
 
 AWSS (AWS Search) is a CLI tool that searches AWS resources in parallel across multiple profiles and regions.
+It also cleans up: `awss cleanup default-vpc` deletes the default VPCs that hold no workload (preview by default).
 
 Built in Go with AWS SDK Go v2, Cobra, and Viper.
 
@@ -19,6 +20,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Run stats: `--stats` prints elapsed time, peak memory, search counts and AWS API calls on stderr; see [Run report and stats](#run-report-and-stats)
 - Account names next to owner account IDs, from the `accounts` map of the config file or, with `--org-profile`, from AWS Organizations; see [Account names](#account-names)
 - Shell completion of commands, flags and the values of the flags that take a known list (sort fields, profiles, regions, states); see [Shell completion](#shell-completion)
+- Cleanup of the default VPCs with no workload: `awss cleanup default-vpc`, a preview unless `--apply`; see [Cleanup](#cleanup)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
 
@@ -370,6 +372,85 @@ with AND.
 
 Sort by: `--sort id|domain|status|modified` (default: `id`)
 
+### Cleanup
+
+The cleanup commands are the only ones that change your AWS accounts. Each one shows its plan
+and changes nothing unless `--apply` is given.
+
+#### Default VPCs (`awss cleanup default-vpc`)
+
+Deletes the default VPC of each profile and region, with the network plumbing inside it. The
+rule: what exists only because of the VPC is deleted; anything that runs or holds data blocks
+the deletion; for what lives outside the VPC, only its link to the VPC is removed.
+
+| Flag | Description |
+| --- | --- |
+| `--apply` | Delete what the plan lists. Without it, nothing changes |
+| `--confirm-all-profiles` | Required with `--apply` when the profiles are `all` (`--profiles all`, or `profiles: all` in the config file); refused otherwise |
+
+The two flags are command-line only: the config file cannot turn on deleting.
+
+```bash
+# The plan for one account, every region: what would be deleted, and what blocks
+awss cleanup default-vpc --profiles sandbox --regions all
+
+# Delete in one region
+awss cleanup default-vpc --profiles sandbox --regions eu-west-1 --apply
+
+# Every profile and region; deleting waits for NAT gateways and endpoints, so raise --timeout
+awss cleanup default-vpc --profiles all --regions all --apply --confirm-all-profiles --timeout 30m
+
+# The blocked VPCs only, as JSON
+awss cleanup default-vpc --profiles all --regions all --output json | jq 'select(.data[0].status == "blocked")'
+```
+
+**All or nothing.** Every service that runs in a VPC places a network interface (ENI) in it:
+EC2, RDS, Lambda, load balancers, EFS, ECS, ElastiCache, MSK, OpenSearch, API Gateway VPC
+links... One listing of the VPC's ENIs finds them all. If any ENI is not plumbing, the VPC is
+`blocked` and nothing in it is touched, not even its endpoints or security groups: a partial
+cleanup could break the workload.
+
+| What | With `--apply` |
+| --- | --- |
+| VPC endpoints | deleted |
+| NAT gateways | deleted, then their Elastic IPs are **released (permanent)**; only the IPs of those gateways |
+| Peering connections | deleted; a request the VPC was asked to accept is rejected. Routes to it on the other side stop working |
+| Transit Gateway attachment | deleted; **the Transit Gateway stays** |
+| VPN gateway | **detached only**; the gateway, its VPN connections and the customer gateway stay |
+| Detached ENIs of the account | deleted |
+| Security groups but the default one | rules that reference them are revoked first (groups that reference each other), then deleted |
+| Subnets, route tables but the main one, network ACLs but the default one | deleted |
+| Internet gateway, egress-only internet gateways | detached and deleted |
+| Flow logs | deleted; the logs they stored stay |
+| The VPC | deleted last |
+| An ENI in use, other than the plumbing above | **blocks** |
+| A detached ENI managed by AWS (Lambda leftovers) | **blocks**: AWS removes it by itself, retry later |
+| A VPC owned by another account | **blocks**: never touched |
+
+Each profile and region with a default VPC prints one row: VPC ID, CIDR, status and details. A
+region without a default VPC prints nothing (`--show-empty` shows it).
+
+| Status | Meaning |
+| --- | --- |
+| `deletable` | Preview, no blocker: the details list what `--apply` deletes |
+| `blocked` | The details name every blocker, such as `EC2 instance i-0abc (eni-1)` or `RDSNetworkInterface (eni-2)` |
+| `denied` | Preview: a DryRun of `ec2:DeleteVpc` says this role may not delete VPCs |
+| `deleted` | `--apply` deleted the VPC; the details list what was deleted |
+| `failed` | `--apply` stopped at a step; the details give the step and the AWS error |
+
+A run that stops partway (an error, the timeout, an instance launched during the run) leaves
+what it deleted deleted. Run it again: it starts from what is left, and a resource already gone
+counts as done. A deleted default VPC can be recreated with `aws ec2 create-default-vpc`.
+
+The preview needs only `ec2:Describe*` and `sts:GetCallerIdentity`. `--apply` also needs:
+`ec2:DeleteVpcEndpoints`, `ec2:DeleteNatGateway`, `ec2:ReleaseAddress`,
+`ec2:DeleteVpcPeeringConnection`, `ec2:RejectVpcPeeringConnection`,
+`ec2:DeleteTransitGatewayVpcAttachment`, `ec2:DetachVpnGateway`, `ec2:DeleteNetworkInterface`,
+`ec2:RevokeSecurityGroupIngress`, `ec2:RevokeSecurityGroupEgress`, `ec2:DeleteSecurityGroup`,
+`ec2:DeleteSubnet`, `ec2:DisassociateRouteTable`, `ec2:DeleteRouteTable`,
+`ec2:DeleteNetworkAcl`, `ec2:DetachInternetGateway`, `ec2:DeleteInternetGateway`,
+`ec2:DeleteEgressOnlyInternetGateway`, `ec2:DeleteFlowLogs` and `ec2:DeleteVpc`.
+
 ### Common behavior
 
 - Filters can be combined: `awss ec2 -n '*' -s running -z a,b`
@@ -506,7 +587,9 @@ cp awss /usr/local/bin
 - A valid session for every profile you search. awss never logs in: run `aws sso login`, or your
   credential helper (for example Granted), before searching. A profile without a valid session
   reports its own error in its result set; the other profiles are searched as usual.
-- Read-only IAM permissions. awss never modifies anything. The minimum policy is:
+- Read-only IAM permissions. The search commands never modify anything; only
+  `awss cleanup ... --apply` deletes, and needs the permissions listed in [Cleanup](#cleanup). The
+  minimum policy of the search commands is:
 
 ```json
 {
@@ -643,6 +726,9 @@ awss --regions all s3obj -b my-logs -K 'logs/2024-01/*.gz' --sort size
 
 # Every PostgreSQL 13 instance, everywhere
 awss rds -e postgres -V '13*' --profiles all --regions all
+
+# The plan to delete the default VPCs of one account, in every region (nothing changes)
+awss cleanup default-vpc --profiles sandbox --regions all
 
 # JSON output for scripting
 awss ec2 --all --output json
