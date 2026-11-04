@@ -64,6 +64,7 @@ func resetCLIWithSummary(t *testing.T, searchErr error, summary search.Summary) 
 	t.Setenv("AWS_DEFAULT_REGION", "")
 	t.Setenv("AWS_PROFILE", "")
 	t.Setenv("AWS_CONFIG_FILE", "")
+	t.Setenv(envConfig, "")
 
 	rootCmd.ResetCommands()
 	rootCmd.ResetFlags()

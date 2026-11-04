@@ -45,13 +45,13 @@ type flagCompletions map[string]cobra.CompletionFunc
 // of every search command:
 //   - the flags of a known list complete its values. The values come from the lists awss
 //     validates against, or from the AWS SDK enums, so completion cannot drift;
-//   - --config completes YAML file names;
+//   - --config completes the config names of ~/.awss, or YAML file names for a path;
 //   - every other flag that takes a value completes nothing, so the shell offers no file names.
 //
 // Cobra keeps the completions by flag, and setup creates new flags every time, so every setup
 // registers them again.
 func registerCompletions() error {
-	if err := rootCmd.MarkPersistentFlagFilename(labelConfig, "yaml", "yml"); err != nil {
+	if err := rootCmd.RegisterFlagCompletionFunc(labelConfig, configValues); err != nil {
 		return fmt.Errorf("registering the --%s completion: %w", labelConfig, err)
 	}
 	if err := register(rootCmd, globalCompletions()); err != nil {
