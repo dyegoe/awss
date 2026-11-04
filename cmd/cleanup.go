@@ -77,11 +77,12 @@ Deleting waits for NAT gateways and endpoints: raise --timeout for large runs, e
   awss cleanup default-vpc --profiles sandbox --regions eu-west-1 --apply
   awss cleanup default-vpc --profiles all --regions all --apply --confirm-all --timeout 30m`,
 	Args: cobra.NoArgs,
-	RunE: defaultVpcRunE,
+	RunE: cleanupRunE,
 }
 
-// defaultVpcRunE checks the safety flags and runs the cleanup over every profile and region.
-func defaultVpcRunE(cmd *cobra.Command, _ []string) error {
+// cleanupRunE is the RunE of every cleanup command: it checks the safety flags and runs the
+// cleanup named after the command over every profile and region.
+func cleanupRunE(cmd *cobra.Command, _ []string) error {
 	apply, err := cmd.Flags().GetBool(flagApply)
 	if err != nil {
 		return fmt.Errorf("reading the --%s flag: %w", flagApply, err)
@@ -131,21 +132,26 @@ func checkApply(apply, confirm, everywhere bool) error {
 	return nil
 }
 
-// defaultVpcInitFlags registers the cleanup command group and its default-vpc command.
+// addCleanupCommand adds cmd to the cleanup group, and the group to the root, with the safety
+// flags of every cleanup command.
 //
-// The two flags are not bound to viper on purpose: a config file must never turn on deleting.
-func defaultVpcInitFlags() {
-	// setup runs again in tests: drop the child added by the previous run. ResetCommands also
-	// clears the parent, so it comes before rootCmd.AddCommand.
-	cleanupCmd.ResetCommands()
-	cleanupCmd.AddCommand(defaultVpcCmd)
+// setup runs again in tests, so a command added by the previous run is removed first; removing
+// one that is not there does nothing. The flags are not bound to viper on purpose: a config file
+// must never turn on deleting.
+func addCleanupCommand(cmd *cobra.Command) {
+	rootCmd.RemoveCommand(cleanupCmd)
 	rootCmd.AddCommand(cleanupCmd)
+	cleanupCmd.RemoveCommand(cmd)
+	cleanupCmd.AddCommand(cmd)
 
-	defaultVpcCmd.Flags().Bool(flagApply, false,
+	cmd.Flags().Bool(flagApply, false,
 		"Delete what the plan lists. Without it, nothing changes.")
-	defaultVpcCmd.Flags().Bool(flagConfirmAll, false,
+	cmd.Flags().Bool(flagConfirmAll, false,
 		"Confirm --apply with --profiles all or --regions all, which deletes in every profile or region.")
 }
 
-// defaultVpcInitViper binds nothing: the flags of default-vpc are read from the command only.
-func defaultVpcInitViper() error { return nil }
+// cleanupInitViper binds nothing: the flags of a cleanup command are read from the command only.
+func cleanupInitViper() error { return nil }
+
+// defaultVpcInitFlags registers the default-vpc command.
+func defaultVpcInitFlags() { addCleanupCommand(defaultVpcCmd) }

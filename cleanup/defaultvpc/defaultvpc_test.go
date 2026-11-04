@@ -19,16 +19,16 @@ package defaultvpc
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/dyegoe/awss/cleanup"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/aws/smithy-go"
 )
 
 // newTest returns the cleanup of profile p in eu-west-1, polling every millisecond.
@@ -123,7 +123,7 @@ func TestResults_Search(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := newTest(false)
-			r.newClients = func(string, string) (ec2API, stsAPI, error) {
+			r.newClients = func(string, string) (ec2API, cleanup.STSAPI, error) {
 				return tt.fake, &fakeSTS{account: testAccount}, tt.clientErr
 			}
 			r.Search(context.Background())
@@ -427,29 +427,6 @@ func TestUnsuccessful(t *testing.T) {
 	}
 }
 
-// TestIsNotFound checks the error codes that mean a resource is already gone.
-func TestIsNotFound(t *testing.T) {
-	tests := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{name: "nil", err: nil},
-		{name: "plain", err: errors.New("boom")},
-		{name: "not found", err: apiErr("InvalidSubnetID.NotFound"), want: true},
-		{name: "nat not found", err: apiErr("NatGatewayNotFound"), want: true},
-		{name: "not attached", err: apiErr("Gateway.NotAttached"), want: true},
-		{name: "dependency", err: apiErr("DependencyViolation")},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isNotFound(tt.err); got != tt.want {
-				t.Errorf("isNotFound(%v) = %v, want %v", tt.err, got, tt.want)
-			}
-		})
-	}
-}
-
 // TestResults_waitUntil checks that a wait ends with the context, with an error of done, and at
 // the first success.
 func TestResults_waitUntil(t *testing.T) {
@@ -612,30 +589,6 @@ func TestResults_releaseAddress_ctx(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "the last release error") ||
 		!errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("releaseAddress() = %v, want the deadline and the last release error", err)
-	}
-}
-
-// TestConciseError checks that the SDK operation error is cut down to the AWS code and message,
-// and that other errors are kept as they are.
-func TestConciseError(t *testing.T) {
-	sdkErr := &smithy.OperationError{
-		ServiceID: "EC2", OperationName: "ReleaseAddress", Err: apiErr("InvalidIPAddress.InUse"),
-	}
-	tests := []struct {
-		name string
-		err  error
-		want string
-	}{
-		{name: "sdk error", err: fmt.Errorf("eipalloc-1: %w", sdkErr),
-			want: "eipalloc-1: InvalidIPAddress.InUse: InvalidIPAddress.InUse message"},
-		{name: "plain error", err: errors.New("boom"), want: "boom"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := conciseError(tt.err); got != tt.want {
-				t.Errorf("conciseError(%v) = %q, want %q", tt.err, got, tt.want)
-			}
-		})
 	}
 }
 

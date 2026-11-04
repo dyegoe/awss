@@ -24,10 +24,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dyegoe/awss/cleanup"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/aws/smithy-go"
 )
 
 // maxEndpointsPerCall is how many VPC endpoints one DeleteVpcEndpoints call takes.
@@ -72,38 +73,10 @@ func (r *Results) steps() []step {
 func (r *Results) apply(ctx context.Context, c ec2API, inv *inventory) []string {
 	for _, s := range r.steps() {
 		if err := s.fn(ctx, c, inv); err != nil {
-			return []string{"failed step: " + s.name, "error: " + conciseError(err)}
+			return []string{"failed step: " + s.name, "error: " + cleanup.ConciseError(err)}
 		}
 	}
 	return nil
-}
-
-// conciseError returns the message of err with the SDK's operation error, which names the
-// operation, the HTTP status and the request ID before the AWS error, cut down to "Code: message":
-// the table has room for one line per detail.
-func conciseError(err error) string {
-	msg := err.Error()
-	var opErr *smithy.OperationError
-	var apiErr smithy.APIError
-	if errors.As(err, &opErr) && errors.As(err, &apiErr) {
-		msg = strings.Replace(msg, opErr.Error(), apiErr.ErrorCode()+": "+apiErr.ErrorMessage(), 1)
-	}
-	return msg
-}
-
-// isNotFound reports whether err says the resource is already gone, or already detached: the
-// deletion of that resource is done.
-func isNotFound(err error) bool {
-	code := errorCode(err)
-	return strings.HasSuffix(code, "NotFound") || code == "Gateway.NotAttached"
-}
-
-// ignoreNotFound returns err, or nil when it says the resource is already gone.
-func ignoreNotFound(err error) error {
-	if err == nil || isNotFound(err) {
-		return nil
-	}
-	return err
 }
 
 // unsuccessful returns an error for the items AWS could not delete, ignoring the ones already gone.
@@ -124,7 +97,7 @@ func unsuccessful(items []types.UnsuccessfulItem) error {
 // each calls fn for every id and returns the first error that does not say the resource is gone.
 func each(ids []string, fn func(id string) error) error {
 	for _, id := range ids {
-		if err := ignoreNotFound(fn(id)); err != nil {
+		if err := cleanup.IgnoreNotFound(fn(id)); err != nil {
 			return fmt.Errorf("%s: %w", id, err)
 		}
 	}
@@ -135,7 +108,7 @@ func each(ids []string, fn func(id string) error) error {
 func deleteEndpoints(ctx context.Context, c ec2API, inv *inventory) error {
 	for chunk := range slices.Chunk(inv.endpoints, maxEndpointsPerCall) {
 		out, err := c.DeleteVpcEndpoints(ctx, &ec2.DeleteVpcEndpointsInput{VpcEndpointIds: chunk})
-		if err := ignoreNotFound(err); err != nil {
+		if err := cleanup.IgnoreNotFound(err); err != nil {
 			return fmt.Errorf("deleting %s: %w", strings.Join(chunk, ", "), err)
 		}
 		if out != nil {
@@ -154,7 +127,7 @@ func deleteNATs(ctx context.Context, c ec2API, inv *inventory) error {
 			continue
 		}
 		_, err := c.DeleteNatGateway(ctx, &ec2.DeleteNatGatewayInput{NatGatewayId: aws.String(n.id)})
-		if err := ignoreNotFound(err); err != nil {
+		if err := cleanup.IgnoreNotFound(err); err != nil {
 			return fmt.Errorf("%s: %w", n.id, err)
 		}
 	}
@@ -185,10 +158,10 @@ func (r *Results) releaseAddress(ctx context.Context, c ec2API, id string) error
 	var last error
 	err := r.waitUntil(ctx, "Elastic IP "+id, func() (bool, error) {
 		_, err := c.ReleaseAddress(ctx, &ec2.ReleaseAddressInput{AllocationId: aws.String(id)})
-		if err == nil || isNotFound(err) {
+		if err == nil || cleanup.IsNotFound(err) {
 			return true, nil
 		}
-		if errorCode(err) == "UnauthorizedOperation" {
+		if cleanup.ErrorCode(err) == "UnauthorizedOperation" {
 			return false, fmt.Errorf("releasing: %w", err)
 		}
 		last = err
@@ -217,7 +190,7 @@ func deletePeerings(ctx context.Context, c ec2API, inv *inventory) error {
 			_, err = c.DeleteVpcPeeringConnection(ctx,
 				&ec2.DeleteVpcPeeringConnectionInput{VpcPeeringConnectionId: aws.String(p.id)})
 		}
-		if err := ignoreNotFound(err); err != nil {
+		if err := cleanup.IgnoreNotFound(err); err != nil {
 			return fmt.Errorf("%s: %w", p.id, err)
 		}
 	}
@@ -230,7 +203,7 @@ func deleteTGWAttachments(ctx context.Context, c ec2API, inv *inventory) error {
 	for _, a := range inv.tgwAttachments {
 		_, err := c.DeleteTransitGatewayVpcAttachment(ctx,
 			&ec2.DeleteTransitGatewayVpcAttachmentInput{TransitGatewayAttachmentId: aws.String(a.id)})
-		if err := ignoreNotFound(err); err != nil {
+		if err := cleanup.IgnoreNotFound(err); err != nil {
 			return fmt.Errorf("%s: %w", a.id, err)
 		}
 	}
@@ -277,14 +250,14 @@ func revokeReferences(ctx context.Context, c ec2API, sg *types.SecurityGroup, ta
 	if in := referencing(sg.IpPermissions, targets); len(in) > 0 {
 		_, err := c.RevokeSecurityGroupIngress(ctx,
 			&ec2.RevokeSecurityGroupIngressInput{GroupId: aws.String(id), IpPermissions: in})
-		if err := ignoreNotFound(err); err != nil {
+		if err := cleanup.IgnoreNotFound(err); err != nil {
 			return fmt.Errorf("revoking the inbound rules of %s: %w", id, err)
 		}
 	}
 	if out := referencing(sg.IpPermissionsEgress, targets); len(out) > 0 {
 		_, err := c.RevokeSecurityGroupEgress(ctx,
 			&ec2.RevokeSecurityGroupEgressInput{GroupId: aws.String(id), IpPermissions: out})
-		if err := ignoreNotFound(err); err != nil {
+		if err := cleanup.IgnoreNotFound(err); err != nil {
 			return fmt.Errorf("revoking the outbound rules of %s: %w", id, err)
 		}
 	}
@@ -348,7 +321,7 @@ func deleteInternetGateways(ctx context.Context, c ec2API, inv *inventory) error
 	return each(inv.internetGateways, func(id string) error {
 		_, err := c.DetachInternetGateway(ctx,
 			&ec2.DetachInternetGatewayInput{InternetGatewayId: aws.String(id), VpcId: aws.String(inv.vpcID)})
-		if err := ignoreNotFound(err); err != nil {
+		if err := cleanup.IgnoreNotFound(err); err != nil {
 			return fmt.Errorf("detaching: %w", err)
 		}
 		_, err = c.DeleteInternetGateway(ctx, &ec2.DeleteInternetGatewayInput{InternetGatewayId: aws.String(id)})
@@ -371,7 +344,7 @@ func deleteFlowLogs(ctx context.Context, c ec2API, inv *inventory) error {
 		return nil
 	}
 	out, err := c.DeleteFlowLogs(ctx, &ec2.DeleteFlowLogsInput{FlowLogIds: inv.flowLogs})
-	if err := ignoreNotFound(err); err != nil {
+	if err := cleanup.IgnoreNotFound(err); err != nil {
 		return fmt.Errorf("deleting %s: %w", strings.Join(inv.flowLogs, ", "), err)
 	}
 	if out == nil {
@@ -383,7 +356,7 @@ func deleteFlowLogs(ctx context.Context, c ec2API, inv *inventory) error {
 // deleteVPC deletes the VPC, the last step.
 func deleteVPC(ctx context.Context, c ec2API, inv *inventory) error {
 	_, err := c.DeleteVpc(ctx, &ec2.DeleteVpcInput{VpcId: aws.String(inv.vpcID)})
-	if err := ignoreNotFound(err); err != nil {
+	if err := cleanup.IgnoreNotFound(err); err != nil {
 		return fmt.Errorf("%s: %w", inv.vpcID, err)
 	}
 	return nil
