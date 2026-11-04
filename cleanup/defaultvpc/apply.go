@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 )
 
 // maxEndpointsPerCall is how many VPC endpoints one DeleteVpcEndpoints call takes.
@@ -46,7 +47,7 @@ func (r *Results) steps() []step {
 		{"delete the NAT gateways", deleteNATs},
 		{"wait for the VPC endpoints to be deleted", r.waitEndpoints},
 		{"wait for the NAT gateways to be deleted", r.waitNATs},
-		{"release the Elastic IPs of the NAT gateways", releaseNATAddresses},
+		{"release the Elastic IPs of the NAT gateways", r.releaseNATAddresses},
 		{"delete the peering connections", deletePeerings},
 		{"delete the Transit Gateway attachments", deleteTGWAttachments},
 		{"wait for the Transit Gateway attachments to be deleted", r.waitTGWAttachments},
@@ -65,15 +66,29 @@ func (r *Results) steps() []step {
 	}
 }
 
-// apply deletes everything in inv, then the VPC. It stops at the first step that fails; what was
-// deleted stays deleted, and a new run resumes from what is left.
-func (r *Results) apply(ctx context.Context, c ec2API, inv *inventory) error {
+// apply deletes everything in inv, then the VPC. It stops at the first step that fails and
+// returns the details of the failure; what was deleted stays deleted, and a new run resumes from
+// what is left.
+func (r *Results) apply(ctx context.Context, c ec2API, inv *inventory) []string {
 	for _, s := range r.steps() {
 		if err := s.fn(ctx, c, inv); err != nil {
-			return fmt.Errorf("%s: %w", s.name, err)
+			return []string{"failed step: " + s.name, "error: " + conciseError(err)}
 		}
 	}
 	return nil
+}
+
+// conciseError returns the message of err with the SDK's operation error, which names the
+// operation, the HTTP status and the request ID before the AWS error, cut down to "Code: message":
+// the table has room for one line per detail.
+func conciseError(err error) string {
+	msg := err.Error()
+	var opErr *smithy.OperationError
+	var apiErr smithy.APIError
+	if errors.As(err, &opErr) && errors.As(err, &apiErr) {
+		msg = strings.Replace(msg, opErr.Error(), apiErr.ErrorCode()+": "+apiErr.ErrorMessage(), 1)
+	}
+	return msg
 }
 
 // isNotFound reports whether err says the resource is already gone, or already detached: the
@@ -135,6 +150,9 @@ func deleteEndpoints(ctx context.Context, c ec2API, inv *inventory) error {
 // deleteNATs starts the deletion of the NAT gateways.
 func deleteNATs(ctx context.Context, c ec2API, inv *inventory) error {
 	for _, n := range inv.nats {
+		if n.deleted {
+			continue
+		}
 		_, err := c.DeleteNatGateway(ctx, &ec2.DeleteNatGatewayInput{NatGatewayId: aws.String(n.id)})
 		if err := ignoreNotFound(err); err != nil {
 			return fmt.Errorf("%s: %w", n.id, err)
@@ -145,17 +163,43 @@ func deleteNATs(ctx context.Context, c ec2API, inv *inventory) error {
 
 // releaseNATAddresses releases the Elastic IPs of the NAT gateways, once the gateways are gone.
 // Only the IPs that belonged to those gateways are released.
-func releaseNATAddresses(ctx context.Context, c ec2API, inv *inventory) error {
+func (r *Results) releaseNATAddresses(ctx context.Context, c ec2API, inv *inventory) error {
 	for _, n := range inv.nats {
-		err := each(n.allocationIDs, func(id string) error {
-			_, err := c.ReleaseAddress(ctx, &ec2.ReleaseAddressInput{AllocationId: aws.String(id)})
-			return err
-		})
-		if err != nil {
-			return err
+		for _, a := range n.addresses {
+			if err := r.releaseAddress(ctx, c, a.allocationID); err != nil {
+				return fmt.Errorf("%s: %w", a.allocationID, err)
+			}
 		}
 	}
 	return nil
+}
+
+// releaseAddress releases one Elastic IP of a deleted NAT gateway. AWS may keep the IP associated
+// a little after the gateway is gone, so a release that fails is tried again while the IP still
+// exists; an IP already gone, released by AWS or by hand, counts as released. A permission error
+// fails at once.
+func (r *Results) releaseAddress(ctx context.Context, c ec2API, id string) error {
+	var last error
+	err := r.waitUntil(ctx, "Elastic IP "+id, func() (bool, error) {
+		_, err := c.ReleaseAddress(ctx, &ec2.ReleaseAddressInput{AllocationId: aws.String(id)})
+		if err == nil || isNotFound(err) {
+			return true, nil
+		}
+		if errorCode(err) == "UnauthorizedOperation" {
+			return false, fmt.Errorf("releasing: %w", err)
+		}
+		last = err
+		associations, err := addressAssociations(ctx, c, []string{id})
+		if err != nil {
+			return false, err
+		}
+		_, exists := associations[id]
+		return !exists, nil
+	})
+	if err != nil && last != nil {
+		return fmt.Errorf("%w; the last release error: %w", err, last)
+	}
+	return err
 }
 
 // deletePeerings deletes the peering connections, or rejects the requests this VPC was asked to
@@ -385,7 +429,7 @@ func (r *Results) waitNATs(ctx context.Context, c ec2API, inv *inventory) error 
 	probe := &inventory{vpcID: inv.vpcID}
 	return r.waitUntil(ctx, "NAT gateways", func() (bool, error) {
 		err := listNATs(ctx, c, probe)
-		return len(probe.nats) == 0, err
+		return !slices.ContainsFunc(probe.nats, func(n natGateway) bool { return !n.deleted }), err
 	})
 }
 

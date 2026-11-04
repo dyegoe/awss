@@ -187,9 +187,10 @@ func (r *Results) run(ctx context.Context, c ec2API, s stsAPI) (*dataRow, error)
 		return r.preview(ctx, c, row)
 	}
 	// A failed deletion is a row, not an error of the run: the details give the step and the error.
+	// apply returns those details rather than an error.
 	row.Status = StatusDeleted
-	if err := r.apply(ctx, c, inv); err != nil {
-		row.Status, row.Details = StatusFailed, []string{err.Error()}
+	if failure := r.apply(ctx, c, inv); failure != nil {
+		row.Status, row.Details = StatusFailed, failure
 	}
 	return row, nil
 }

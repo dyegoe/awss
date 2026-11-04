@@ -440,7 +440,14 @@ region without a default VPC prints nothing (`--show-empty` shows it).
 
 A run that stops partway (an error, the timeout, an instance launched during the run) leaves
 what it deleted deleted. Run it again: it starts from what is left, and a resource already gone
-counts as done. A deleted default VPC can be recreated with `aws ec2 create-default-vpc`.
+counts as done. That includes the Elastic IP of a NAT gateway a previous run deleted: AWS lists a
+deleted NAT gateway for about an hour, and the IP is released if it still exists and is
+associated with nothing else. A release that AWS refuses because the IP is still held by the
+deleted gateway is tried again. A deleted default VPC can be recreated with
+`aws ec2 create-default-vpc`.
+
+A `failed` row shows the step and the AWS error (`Code: message`) on two lines. For the full
+error, with the request ID, use `--output json`.
 
 The preview needs only `ec2:Describe*` and `sts:GetCallerIdentity`. `--apply` also needs:
 `ec2:DeleteVpcEndpoints`, `ec2:DeleteNatGateway`, `ec2:ReleaseAddress`,

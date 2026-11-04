@@ -59,8 +59,8 @@ func (f *fakeEC2) DeleteNatGateway(_ context.Context, in *ec2.DeleteNatGatewayIn
 	return nil, apiErr("NatGatewayNotFound")
 }
 
-// ReleaseAddress releases an Elastic IP. It fails while a NAT gateway still lists the IP, as AWS
-// does while the IP is associated.
+// ReleaseAddress releases an Elastic IP. It fails while a NAT gateway that is not deleted lists
+// the IP, and inUse more times after, as AWS does while the IP is associated.
 func (f *fakeEC2) ReleaseAddress(_ context.Context, in *ec2.ReleaseAddressInput, _ ...func(*ec2.Options)) (
 	*ec2.ReleaseAddressOutput, error,
 ) {
@@ -70,12 +70,17 @@ func (f *fakeEC2) ReleaseAddress(_ context.Context, in *ec2.ReleaseAddressInput,
 	}
 	for i := range f.nats {
 		for _, a := range f.nats[i].NatGatewayAddresses {
-			if aws.ToString(a.AllocationId) == id {
+			if aws.ToString(a.AllocationId) == id && f.nats[i].State != types.NatGatewayStateDeleted {
 				return nil, apiErr("InvalidIPAddress.InUse")
 			}
 		}
 	}
-	return &ec2.ReleaseAddressOutput{}, nil
+	if f.inUse[id] > 0 {
+		f.inUse[id]--
+		return nil, apiErr("InvalidIPAddress.InUse")
+	}
+	return &ec2.ReleaseAddressOutput{}, deleteOne(f, "", "AllocationID", &f.addresses,
+		func(a *types.Address) *string { return a.AllocationId }, in.AllocationId)
 }
 
 // DeleteVpcPeeringConnection deletes a peering connection.

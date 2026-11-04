@@ -32,9 +32,10 @@ import (
 // everything they hold, except the peering connections, matched by side. The delete calls remove
 // the resource and record the call; a missing resource answers a NotFound error, as AWS does.
 //
-// Like AWS, some deletions finish later: a deleted endpoint, NAT gateway or Transit Gateway
-// attachment, and a detaching VPN gateway, are still listed once by the next Describe; the ENIs of
-// the plumbing are listed once more after any deletion started.
+// Like AWS, some deletions finish later: a deleted endpoint or Transit Gateway attachment, and a
+// detaching VPN gateway, are still listed once by the next Describe; a deleting NAT gateway is
+// listed once more, then stays listed as deleted, with its addresses; the ENIs of the plumbing are
+// listed once more after any deletion started.
 type fakeEC2 struct {
 	vpcs      []types.Vpc
 	enis      []types.NetworkInterface
@@ -50,11 +51,15 @@ type fakeEC2 struct {
 	igws      []types.InternetGateway
 	eigws     []types.EgressOnlyInternetGateway
 	flowLogs  []types.FlowLog
+	addresses []types.Address
 
 	// errs fails the call of that name with that error.
 	errs map[string]error
 	// dryRunCode is the error code of a DryRun DeleteVpc; "" means DryRunOperation.
 	dryRunCode string
+	// inUse is how many more times ReleaseAddress answers that the IP is in use, by allocation ID,
+	// as AWS does a little after a NAT gateway is deleted.
+	inUse map[string]int
 	// unsuccessful is returned as the Unsuccessful items of DeleteVpcEndpoints and DeleteFlowLogs.
 	unsuccessful []types.UnsuccessfulItem
 
@@ -105,9 +110,13 @@ func (f *fakeEC2) change(name string, ids ...string) error {
 
 // deleteOne records the call name for the resource want, and removes from s the item whose id is
 // want. A missing item answers the NotFound error of kind, as AWS does.
+//
+// An empty name records no call: the caller recorded it.
 func deleteOne[T any](f *fakeEC2, name, kind string, s *[]T, id func(*T) *string, want *string) error {
-	if err := f.change(name, aws.ToString(want)); err != nil {
-		return err
+	if name != "" {
+		if err := f.change(name, aws.ToString(want)); err != nil {
+			return err
+		}
 	}
 	n := len(*s)
 	*s = slices.DeleteFunc(*s, func(v T) bool { return aws.ToString(id(&v)) == aws.ToString(want) })
@@ -152,8 +161,25 @@ func (f *fakeEC2) DescribeNatGateways(_ context.Context, in *ec2.DescribeNatGate
 	*ec2.DescribeNatGatewaysOutput, error,
 ) {
 	out := &ec2.DescribeNatGatewaysOutput{NatGateways: slices.Clone(f.nats)}
-	f.nats = slices.DeleteFunc(f.nats, func(n types.NatGateway) bool { return n.State == types.NatGatewayStateDeleting })
+	for i := range f.nats {
+		if f.nats[i].State == types.NatGatewayStateDeleting {
+			f.nats[i].State = types.NatGatewayStateDeleted
+		}
+	}
 	return out, f.describe("DescribeNatGateways", in.MaxResults)
+}
+
+// DescribeAddresses returns the Elastic IPs of the allocation-id filter.
+func (f *fakeEC2) DescribeAddresses(_ context.Context, in *ec2.DescribeAddressesInput, _ ...func(*ec2.Options)) (
+	*ec2.DescribeAddressesOutput, error,
+) {
+	out := &ec2.DescribeAddressesOutput{}
+	for i := range f.addresses {
+		if slices.Contains(in.Filters[0].Values, aws.ToString(f.addresses[i].AllocationId)) {
+			out.Addresses = append(out.Addresses, f.addresses[i])
+		}
+	}
+	return out, f.describe("DescribeAddresses", nil)
 }
 
 // DescribeVpcPeeringConnections returns the peering connections whose side, named by the filter,

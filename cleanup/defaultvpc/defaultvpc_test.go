@@ -19,6 +19,7 @@ package defaultvpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 )
 
 // newTest returns the cleanup of profile p in eu-west-1, polling every millisecond.
@@ -265,18 +267,18 @@ func TestResults_run_applyFailed(t *testing.T) {
 			f := emptyVPC()
 			f.errs = map[string]error{"DeleteVpc": apiErr("DependencyViolation")}
 			return f
-		}, wantPart: "delete the VPC: vpc-1: api error DependencyViolation"},
+		}, wantPart: "failed step: delete the VPC\nerror: vpc-1: api error DependencyViolation"},
 		{name: "unsuccessful endpoint", fake: func() *fakeEC2 {
 			f := fullVPC()
 			f.unsuccessful = []types.UnsuccessfulItem{{ResourceId: aws.String("vpce-1"),
 				Error: &types.UnsuccessfulItemError{Code: aws.String("Boom"), Message: aws.String("cannot")}}}
 			return f
-		}, wantPart: "delete the VPC endpoints: vpce-1: cannot"},
+		}, wantPart: "failed step: delete the VPC endpoints\nerror: vpce-1: cannot"},
 		{name: "security group", fake: func() *fakeEC2 {
 			f := fullVPC()
 			f.errs = map[string]error{"DeleteSecurityGroup": apiErr("DependencyViolation")}
 			return f
-		}, wantPart: "delete the security groups: sg-a"},
+		}, wantPart: "failed step: delete the security groups\nerror: sg-a"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -284,7 +286,7 @@ func TestResults_run_applyFailed(t *testing.T) {
 			if err != nil {
 				t.Fatalf("run() error = %v", err)
 			}
-			if row.Status != StatusFailed || len(row.Details) != 1 || !strings.Contains(row.Details[0], tt.wantPart) {
+			if row.Status != StatusFailed || !strings.Contains(strings.Join(row.Details, "\n"), tt.wantPart) {
 				t.Errorf("run() = %s %v, want failed with %q", row.Status, row.Details, tt.wantPart)
 			}
 		})
@@ -492,5 +494,147 @@ func TestResults_apply_skipsEmptySteps(t *testing.T) {
 	}
 	if got := deletes(f); !slices.Equal(got, want) {
 		t.Errorf("run() calls = %v, want %v", got, want)
+	}
+}
+
+// count returns how many times call appears in calls.
+func count(calls []string, call string) int {
+	n := 0
+	for _, c := range calls {
+		if c == call {
+			n++
+		}
+	}
+	return n
+}
+
+// TestResults_run_applyReleaseRetry checks that a release refused while AWS still holds the IP
+// of the deleted NAT gateway is tried again until it succeeds.
+func TestResults_run_applyReleaseRetry(t *testing.T) {
+	f := fullVPC()
+	f.inUse = map[string]int{"eipalloc-1": 2}
+	row, err := runTest(t, f, true)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+	if row.Status != StatusDeleted || count(f.calls, "ReleaseAddress eipalloc-1") != 3 || len(f.addresses) != 0 {
+		t.Errorf("run() = %s %v, releases %d, addresses left %d; want deleted after 3 releases, none left",
+			row.Status, row.Details, count(f.calls, "ReleaseAddress eipalloc-1"), len(f.addresses))
+	}
+}
+
+// deletedNAT returns emptyVPC with a NAT gateway a previous run deleted, whose Elastic IP has
+// the association association; "" means the IP no longer exists.
+func deletedNAT(association string) *fakeEC2 {
+	f := emptyVPC()
+	f.nats = []types.NatGateway{{NatGatewayId: aws.String("nat-1"), State: types.NatGatewayStateDeleted,
+		NatGatewayAddresses: []types.NatGatewayAddress{{AllocationId: aws.String("eipalloc-1"),
+			PublicIp: aws.String("3.3.3.3"), AssociationId: aws.String("eipassoc-1")}}}}
+	switch association {
+	case "":
+	case "none":
+		f.addresses = []types.Address{{AllocationId: aws.String("eipalloc-1")}}
+	default:
+		f.addresses = []types.Address{{AllocationId: aws.String("eipalloc-1"), AssociationId: aws.String(association)}}
+	}
+	return f
+}
+
+// TestResults_run_resumeDeletedNAT checks that a run after one that deleted a NAT gateway
+// releases its Elastic IP, unless the IP is gone or associated with something else.
+func TestResults_run_resumeDeletedNAT(t *testing.T) {
+	line := "Elastic IP 3.3.3.3 released (permanent), of the deleted NAT gateway nat-1"
+	tests := []struct {
+		name        string
+		association string
+		wantRelease bool
+	}{
+		{name: "still associated with the gateway", association: "eipassoc-1", wantRelease: true},
+		{name: "associated with nothing", association: "none", wantRelease: true},
+		{name: "already released", association: ""},
+		{name: "associated with something else", association: "eipassoc-other"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := deletedNAT(tt.association)
+			row, err := runTest(t, f, true)
+			if err != nil {
+				t.Fatalf("run() error = %v", err)
+			}
+			if got := slices.Contains(row.Details, line); got != tt.wantRelease {
+				t.Errorf("run() details = %v, want the release line %v", row.Details, tt.wantRelease)
+			}
+			if got := count(f.calls, "ReleaseAddress eipalloc-1"); got != map[bool]int{true: 1}[tt.wantRelease] {
+				t.Errorf("run() releases = %d, want release %v", got, tt.wantRelease)
+			}
+			if row.Status != StatusDeleted || count(f.calls, "DeleteNatGateway nat-1") != 0 {
+				t.Errorf("run() = %s, calls %v; want deleted, no DeleteNatGateway", row.Status, f.calls)
+			}
+		})
+	}
+}
+
+// TestResults_releaseAddress checks that a permission error fails at once, that an IP AWS
+// released by itself counts as released, and that a failed lookup fails.
+func TestResults_releaseAddress(t *testing.T) {
+	tests := []struct {
+		name      string
+		errs      map[string]error
+		addresses []types.Address
+		wantErr   string
+	}{
+		{name: "unauthorized", errs: map[string]error{"ReleaseAddress": apiErr("UnauthorizedOperation")},
+			addresses: []types.Address{{AllocationId: aws.String("eipalloc-1")}}, wantErr: "UnauthorizedOperation"},
+		{name: "released by aws", errs: map[string]error{"ReleaseAddress": apiErr("AuthFailure")}},
+		{name: "lookup fails", errs: map[string]error{
+			"ReleaseAddress": apiErr("AuthFailure"), "DescribeAddresses": errors.New("boom"),
+		}, wantErr: "boom"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &fakeEC2{errs: tt.errs, addresses: tt.addresses}
+			err := newTest(true).releaseAddress(context.Background(), f, "eipalloc-1")
+			if tt.wantErr == "" && err != nil || tt.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErr)) {
+				t.Errorf("releaseAddress() = %v, want error %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestResults_releaseAddress_ctx checks that a release still refused when the run ends reports
+// the last AWS error.
+func TestResults_releaseAddress_ctx(t *testing.T) {
+	f := &fakeEC2{errs: map[string]error{"ReleaseAddress": apiErr("InvalidIPAddress.InUse")},
+		addresses: []types.Address{{AllocationId: aws.String("eipalloc-1")}}}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	err := newTest(true).releaseAddress(ctx, f, "eipalloc-1")
+	if err == nil || !strings.Contains(err.Error(), "the last release error") ||
+		!errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("releaseAddress() = %v, want the deadline and the last release error", err)
+	}
+}
+
+// TestConciseError checks that the SDK operation error is cut down to the AWS code and message,
+// and that other errors are kept as they are.
+func TestConciseError(t *testing.T) {
+	sdkErr := &smithy.OperationError{
+		ServiceID: "EC2", OperationName: "ReleaseAddress", Err: apiErr("InvalidIPAddress.InUse"),
+	}
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "sdk error", err: fmt.Errorf("eipalloc-1: %w", sdkErr),
+			want: "eipalloc-1: InvalidIPAddress.InUse: InvalidIPAddress.InUse message"},
+		{name: "plain error", err: errors.New("boom"), want: "boom"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := conciseError(tt.err); got != tt.want {
+				t.Errorf("conciseError(%v) = %q, want %q", tt.err, got, tt.want)
+			}
+		})
 	}
 }

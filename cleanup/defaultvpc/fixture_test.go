@@ -82,7 +82,8 @@ func fullVPC() *fakeEC2 {
 	f.nats = []types.NatGateway{
 		{NatGatewayId: aws.String("nat-1"), State: types.NatGatewayStateAvailable,
 			NatGatewayAddresses: []types.NatGatewayAddress{
-				{AllocationId: aws.String("eipalloc-1"), PublicIp: aws.String("3.3.3.3")},
+				{AllocationId: aws.String("eipalloc-1"), PublicIp: aws.String("3.3.3.3"),
+					AssociationId: aws.String("eipassoc-1")},
 			}},
 		{NatGatewayId: aws.String("nat-2"), State: types.NatGatewayStateAvailable,
 			NatGatewayAddresses: []types.NatGatewayAddress{{PrivateIp: aws.String("172.31.0.9")}}},
@@ -118,6 +119,7 @@ func fullVPC() *fakeEC2 {
 		}},
 	}
 	f.flowLogs = []types.FlowLog{{FlowLogId: aws.String("fl-1")}}
+	f.addresses = []types.Address{{AllocationId: aws.String("eipalloc-1"), AssociationId: aws.String("eipassoc-1")}}
 	return f
 }
 

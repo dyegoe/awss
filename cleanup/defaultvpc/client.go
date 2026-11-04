@@ -41,6 +41,8 @@ type ec2API interface {
 	ec2.DescribeFlowLogsAPIClient
 	DescribeVpnGateways(context.Context, *ec2.DescribeVpnGatewaysInput, ...func(*ec2.Options)) (
 		*ec2.DescribeVpnGatewaysOutput, error)
+	DescribeAddresses(context.Context, *ec2.DescribeAddressesInput, ...func(*ec2.Options)) (
+		*ec2.DescribeAddressesOutput, error)
 
 	deleteAPI
 }
