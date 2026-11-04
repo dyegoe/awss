@@ -133,6 +133,7 @@ var subcommands = []subcommand{
 	{rdsClusterCmd, rdsClusterInitFlags, rdsClusterInitViper},
 	{cloudfrontCmd, cloudfrontInitFlags, cloudfrontInitViper},
 	{defaultVpcCmd, defaultVpcInitFlags, cleanupInitViper},
+	{dhcpOptionsCmd, dhcpOptionsInitFlags, cleanupInitViper},
 }
 
 // setup registers the global flags and every subcommand with its flags, then binds them to viper.

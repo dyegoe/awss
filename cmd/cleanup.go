@@ -80,6 +80,35 @@ Deleting waits for NAT gateways and endpoints: raise --timeout for large runs, e
 	RunE: cleanupRunE,
 }
 
+// dhcpOptionsCmd deletes the DHCP options sets no VPC uses.
+var dhcpOptionsCmd = &cobra.Command{
+	Use:   "dhcp-options",
+	Short: "Delete the DHCP options sets that no VPC uses.",
+	Long: `
+Delete the DHCP options sets of each profile and region that no VPC uses.
+
+Without --apply it only lists them: nothing changes.
+
+A DHCP options set is only used by being associated with a VPC, so a set no VPC of the account
+names is unused, and deleting it changes nothing for anything running. Deleting a VPC, for
+example with awss cleanup default-vpc, leaves its set behind: run this after it.
+
+Only the sets of the account are listed: a shared VPC uses its owner's set. The Options column
+shows each set's configuration, so a set someone created on purpose stands out from the AWS
+default (domain-name <region>.compute.internal, domain-name-servers AmazonProvidedDNS). A region
+with no unused set shows nothing (--show-empty shows it).
+
+Statuses: deletable, denied (the role may not delete), deleted, failed.
+
+--apply with --profiles all or --regions all needs --confirm-all too.
+`,
+	Example: `  awss cleanup dhcp-options --profiles sandbox --regions all
+  awss cleanup dhcp-options --profiles sandbox --regions eu-west-1 --apply
+  awss cleanup dhcp-options --profiles sandbox --regions all --apply --confirm-all`,
+	Args: cobra.NoArgs,
+	RunE: cleanupRunE,
+}
+
 // cleanupRunE is the RunE of every cleanup command: it checks the safety flags and runs the
 // cleanup named after the command over every profile and region.
 func cleanupRunE(cmd *cobra.Command, _ []string) error {
@@ -105,6 +134,8 @@ func cleanupRunE(cmd *cobra.Command, _ []string) error {
 		&search.Options{
 			Output:      viper.GetString(labelOutput),
 			ShowEmpty:   viper.GetBool(labelShowEmpty),
+			ShowTags:    viper.GetBool(labelShowTags) || len(viper.GetStringSlice(labelTagsKeys)) > 0,
+			TagsKeys:    viper.GetStringSlice(labelTagsKeys),
 			Concurrency: viper.GetInt(labelConcurrency),
 			Timeout:     viper.GetDuration(labelTimeout),
 			Apply:       apply,
@@ -155,3 +186,6 @@ func cleanupInitViper() error { return nil }
 
 // defaultVpcInitFlags registers the default-vpc command.
 func defaultVpcInitFlags() { addCleanupCommand(defaultVpcCmd) }
+
+// dhcpOptionsInitFlags registers the dhcp-options command.
+func dhcpOptionsInitFlags() { addCleanupCommand(dhcpOptionsCmd) }

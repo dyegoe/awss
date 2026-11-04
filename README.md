@@ -1,7 +1,8 @@
 # AWSS
 
 AWSS (AWS Search) is a CLI tool that searches AWS resources in parallel across multiple profiles and regions.
-It also cleans up: `awss cleanup default-vpc` deletes the default VPCs that hold no workload (preview by default).
+It also cleans up: `awss cleanup default-vpc` deletes the default VPCs that hold no workload, and
+`awss cleanup dhcp-options` the DHCP options sets no VPC uses (both a preview by default).
 
 Built in Go with AWS SDK Go v2, Cobra, and Viper.
 
@@ -20,7 +21,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Run stats: `--stats` prints elapsed time, peak memory, search counts and AWS API calls on stderr; see [Run report and stats](#run-report-and-stats)
 - Account names next to owner account IDs, from the `accounts` map of the config file or, with `--org-profile`, from AWS Organizations; see [Account names](#account-names)
 - Shell completion of commands, flags and the values of the flags that take a known list (sort fields, profiles, regions, states); see [Shell completion](#shell-completion)
-- Cleanup of the default VPCs with no workload: `awss cleanup default-vpc`, a preview unless `--apply`; see [Cleanup](#cleanup)
+- Cleanup of the default VPCs with no workload (`awss cleanup default-vpc`) and of the unused DHCP options sets (`awss cleanup dhcp-options`), a preview unless `--apply`; see [Cleanup](#cleanup)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
 
@@ -451,6 +452,36 @@ deleted gateway is tried again. A deleted default VPC can be recreated with
 
 A `failed` row shows the step and the AWS error (`Code: message`) on two lines. For the full
 error, with the request ID, use `--output json`.
+
+#### Unused DHCP options sets (`awss cleanup dhcp-options`)
+
+Deletes the DHCP options sets of each profile and region that no VPC uses. A set is only used by
+being associated with a VPC, so deleting an unused one changes nothing for anything running.
+Deleting a VPC leaves its set behind, so run this after `cleanup default-vpc`.
+
+It takes the same `--apply` and `--confirm-all` flags as `default-vpc`.
+
+```bash
+# The unused sets of one account, every region
+awss cleanup dhcp-options --profiles sandbox --regions all
+
+# After cleanup default-vpc: delete them in every region
+awss cleanup dhcp-options --profiles sandbox --regions all --apply --confirm-all
+```
+
+- **Only the account's sets:** a participant of a shared VPC sees that VPC, but the VPC uses its
+  owner's set, so only the sets the account owns are listed.
+- **One row per unused set:** ID, Name tag, options, status and details. The options column shows
+  the set's configuration, so a set someone created on purpose stands out from the AWS default
+  (`domain-name: <region>.compute.internal`, `domain-name-servers: AmazonProvidedDNS`). `--show-tags`
+  adds its tags. JSON has `options` as key → values. A region with no unused set prints nothing
+  (`--show-empty` shows it).
+- **Statuses:** `deletable`, `denied` (a DryRun of `ec2:DeleteDhcpOptions` says the role may
+  not delete it), `deleted`, `failed` (the AWS error as `Code: message`, for example
+  `DependencyViolation` if a VPC started using the set during the run). A set already gone counts
+  as deleted.
+- **Permissions:** the preview needs `ec2:DescribeDhcpOptions`, `ec2:DescribeVpcs` and
+  `sts:GetCallerIdentity`; `--apply` also needs `ec2:DeleteDhcpOptions`.
 
 The preview needs only `ec2:Describe*` and `sts:GetCallerIdentity`. `--apply` also needs:
 `ec2:DeleteVpcEndpoints`, `ec2:DeleteNatGateway`, `ec2:ReleaseAddress`,
