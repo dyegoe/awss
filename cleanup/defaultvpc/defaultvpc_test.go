@@ -326,12 +326,12 @@ func TestListInventory_pageSize(t *testing.T) {
 		t.Fatalf("run() error = %v", err)
 	}
 	for name, size := range f.pageSizes {
-		if name != "DescribeVpnGateways" && size == 0 {
+		if name != "DescribeVpnGateways" && name != "DescribeAddresses" && size == 0 {
 			t.Errorf("%s MaxResults = 0, want a page size", name)
 		}
 	}
-	if got := len(f.pageSizes); got != 14 {
-		t.Errorf("Describe calls = %d, want 14", got)
+	if got := len(f.pageSizes); got != 15 {
+		t.Errorf("Describe calls = %d, want 15", got)
 	}
 }
 
@@ -543,7 +543,7 @@ func deletedNAT(association string) *fakeEC2 {
 // TestResults_run_resumeDeletedNAT checks that a run after one that deleted a NAT gateway
 // releases its Elastic IP, unless the IP is gone or associated with something else.
 func TestResults_run_resumeDeletedNAT(t *testing.T) {
-	line := "Elastic IP 3.3.3.3 released (permanent), of the deleted NAT gateway nat-1"
+	line := "deleted NAT gateway nat-1, Elastic IP 3.3.3.3 released (permanent)"
 	tests := []struct {
 		name        string
 		association string
@@ -636,5 +636,34 @@ func TestConciseError(t *testing.T) {
 				t.Errorf("conciseError(%v) = %q, want %q", tt.err, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestResults_run_awsManagedNATAddress checks that the Elastic IP AWS manages for a NAT gateway
+// created without one is named in the plan, never released, and not left to release once the
+// gateway is deleted.
+func TestResults_run_awsManagedNATAddress(t *testing.T) {
+	f := fullVPC()
+	f.addresses[0].ServiceManaged = types.ServiceManagedRnat
+	row, err := runTest(t, f, true)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+	want := "NAT gateway nat-1, Elastic IP 3.3.3.3 managed by AWS (freed with the gateway)"
+	if row.Status != StatusDeleted || row.Details[1] != want {
+		t.Errorf("run() = %s, plan line %q, want deleted with %q", row.Status, row.Details[1], want)
+	}
+	if got := count(f.calls, "ReleaseAddress eipalloc-1"); got != 0 {
+		t.Errorf("run() releases = %d, want 0", got)
+	}
+
+	resumed := deletedNAT("none")
+	resumed.addresses[0].ServiceManaged = types.ServiceManagedRnat
+	row, err = runTest(t, resumed, true)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+	if slices.ContainsFunc(row.Details, func(l string) bool { return strings.Contains(l, "nat-1") }) {
+		t.Errorf("run() after the gateway was deleted = %v, want no line for nat-1", row.Details)
 	}
 }

@@ -47,9 +47,20 @@ type natGateway struct {
 	addresses []natAddress
 }
 
-// natAddress is an Elastic IP of a NAT gateway.
+// natAddress is an Elastic IP of a NAT gateway. An IP managed by AWS, such as the one AWS
+// allocates to a NAT gateway created without an Elastic IP, cannot be released: AWS frees it with
+// the gateway.
 type natAddress struct {
 	allocationID, publicIP, associationID string
+	awsManaged                            bool
+}
+
+// eip is what DescribeAddresses says of an Elastic IP.
+type eip struct {
+	// associationID is "" when the IP is associated with nothing.
+	associationID string
+	// managedBy is the AWS service that manages the IP, "" when the account does.
+	managedBy types.ServiceManaged
 }
 
 // peering is a peering connection of the VPC. reject is set for a request this VPC was asked to
@@ -251,7 +262,7 @@ func listNATs(ctx context.Context, c ec2API, inv *inventory) error {
 			inv.nats = append(inv.nats, nat)
 		}
 	}
-	return keepUnreleased(ctx, c, inv)
+	return checkAddresses(ctx, c, inv)
 }
 
 // parseNAT returns the NAT gateway n with its Elastic IPs. AWS lists a deleted NAT gateway for
@@ -268,32 +279,35 @@ func parseNAT(n *types.NatGateway) natGateway {
 	return nat
 }
 
-// keepUnreleased keeps, for the NAT gateways already deleted, the Elastic IPs that still exist and
-// are associated with nothing but that gateway, and drops the gateways left with none. So a run
-// that stopped after deleting a NAT gateway releases its IPs on the next run, but never an IP
-// that was released since, or associated with something else.
-func keepUnreleased(ctx context.Context, c ec2API, inv *inventory) error {
+// checkAddresses looks up the Elastic IPs of the NAT gateways, in one call. It marks the IPs
+// managed by AWS, which are not released. For the NAT gateways already deleted, it keeps only the
+// IPs left to release: the ones that still exist, are managed by the account, and are associated
+// with nothing but that gateway; a deleted gateway left with none is dropped. So a run that
+// stopped after deleting a NAT gateway releases its IPs on the next run, but never an IP that was
+// released since, or associated with something else.
+func checkAddresses(ctx context.Context, c ec2API, inv *inventory) error {
 	var asked []string
 	for _, n := range inv.nats {
-		if n.deleted {
-			for _, a := range n.addresses {
-				asked = append(asked, a.allocationID)
-			}
+		for _, a := range n.addresses {
+			asked = append(asked, a.allocationID)
 		}
 	}
 	if len(asked) == 0 {
 		return nil
 	}
-	associations, err := addressAssociations(ctx, c, asked)
+	eips, err := lookupAddresses(ctx, c, asked)
 	if err != nil {
 		return err
 	}
 	kept := inv.nats[:0]
 	for _, n := range inv.nats {
+		for i := range n.addresses {
+			n.addresses[i].awsManaged = eips[n.addresses[i].allocationID].managedBy != ""
+		}
 		if n.deleted {
 			n.addresses = slices.DeleteFunc(n.addresses, func(a natAddress) bool {
-				assoc, exists := associations[a.allocationID]
-				return !exists || assoc != "" && assoc != a.associationID
+				e, exists := eips[a.allocationID]
+				return !exists || a.awsManaged || e.associationID != "" && e.associationID != a.associationID
 			})
 		}
 		if !n.deleted || len(n.addresses) > 0 {
@@ -304,21 +318,21 @@ func keepUnreleased(ctx context.Context, c ec2API, inv *inventory) error {
 	return nil
 }
 
-// addressAssociations returns, for the Elastic IPs of ids that exist, their association ID, ""
-// when they are associated with nothing. A filter, unlike AllocationIds, does not fail on an ID
-// that no longer exists. DescribeAddresses is not paginated.
-func addressAssociations(ctx context.Context, c ec2API, ids []string) (map[string]string, error) {
+// lookupAddresses returns the Elastic IPs of ids that exist. A filter, unlike AllocationIds, does
+// not fail on an ID that no longer exists. DescribeAddresses is not paginated.
+func lookupAddresses(ctx context.Context, c ec2API, ids []string) (map[string]eip, error) {
 	out, err := c.DescribeAddresses(ctx, &ec2.DescribeAddressesInput{
 		Filters: []types.Filter{{Name: aws.String("allocation-id"), Values: ids}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing the elastic ips: %w", err)
 	}
-	associations := map[string]string{}
+	eips := map[string]eip{}
 	for i := range out.Addresses {
-		associations[aws.ToString(out.Addresses[i].AllocationId)] = aws.ToString(out.Addresses[i].AssociationId)
+		a := &out.Addresses[i]
+		eips[aws.ToString(a.AllocationId)] = eip{associationID: aws.ToString(a.AssociationId), managedBy: a.ServiceManaged}
 	}
-	return associations, nil
+	return eips, nil
 }
 
 // listPeerings lists the peering connections of the VPC, as requester and as accepter.
@@ -540,21 +554,28 @@ func (inv *inventory) plan() []string {
 	return append(lines, "VPC: "+inv.vpcID)
 }
 
-// planLine returns the plan of one NAT gateway.
+// planLine returns the plan of one NAT gateway: the Elastic IPs released, and the ones AWS
+// manages and frees with the gateway.
 func (n *natGateway) planLine() string {
-	var ips []string
+	var own, managed []string
 	for _, a := range n.addresses {
-		ips = append(ips, a.publicIP)
+		if a.awsManaged {
+			managed = append(managed, a.publicIP)
+		} else {
+			own = append(own, a.publicIP)
+		}
 	}
-	released := "Elastic IP " + strings.Join(ips, ", ") + " released (permanent)"
-	switch {
-	case n.deleted:
-		return released + ", of the deleted NAT gateway " + n.id
-	case len(ips) > 0:
-		return "NAT gateway " + n.id + ", " + released
-	default:
-		return "NAT gateway " + n.id
+	line := "NAT gateway " + n.id
+	if n.deleted {
+		line = "deleted NAT gateway " + n.id
 	}
+	if len(own) > 0 {
+		line += ", Elastic IP " + strings.Join(own, ", ") + " released (permanent)"
+	}
+	if len(managed) > 0 {
+		line += ", Elastic IP " + strings.Join(managed, ", ") + " managed by AWS (freed with the gateway)"
+	}
+	return line
 }
 
 // customSecurityGroups returns the IDs of the security groups but the default one, which goes

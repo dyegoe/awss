@@ -166,6 +166,9 @@ func deleteNATs(ctx context.Context, c ec2API, inv *inventory) error {
 func (r *Results) releaseNATAddresses(ctx context.Context, c ec2API, inv *inventory) error {
 	for _, n := range inv.nats {
 		for _, a := range n.addresses {
+			if a.awsManaged {
+				continue
+			}
 			if err := r.releaseAddress(ctx, c, a.allocationID); err != nil {
 				return fmt.Errorf("%s: %w", a.allocationID, err)
 			}
@@ -189,11 +192,11 @@ func (r *Results) releaseAddress(ctx context.Context, c ec2API, id string) error
 			return false, fmt.Errorf("releasing: %w", err)
 		}
 		last = err
-		associations, err := addressAssociations(ctx, c, []string{id})
+		eips, err := lookupAddresses(ctx, c, []string{id})
 		if err != nil {
 			return false, err
 		}
-		_, exists := associations[id]
+		_, exists := eips[id]
 		return !exists, nil
 	})
 	if err != nil && last != nil {

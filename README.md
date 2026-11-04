@@ -413,7 +413,7 @@ cleanup could break the workload.
 | What | With `--apply` |
 | --- | --- |
 | VPC endpoints | deleted |
-| NAT gateways | deleted, then their Elastic IPs are **released (permanent)**; only the IPs of those gateways |
+| NAT gateways | deleted, then their Elastic IPs are **released (permanent)**; only the IPs of those gateways. An IP AWS manages, as for a NAT gateway created without an Elastic IP, is not released: AWS frees it with the gateway, and the plan says `managed by AWS` |
 | Peering connections | deleted; a request the VPC was asked to accept is rejected. Routes to it on the other side stop working |
 | Transit Gateway attachment | deleted; **the Transit Gateway stays** |
 | VPN gateway | **detached only**; the gateway, its VPN connections and the customer gateway stay |
@@ -441,8 +441,8 @@ region without a default VPC prints nothing (`--show-empty` shows it).
 A run that stops partway (an error, the timeout, an instance launched during the run) leaves
 what it deleted deleted. Run it again: it starts from what is left, and a resource already gone
 counts as done. That includes the Elastic IP of a NAT gateway a previous run deleted: AWS lists a
-deleted NAT gateway for about an hour, and the IP is released if it still exists and is
-associated with nothing else. A release that AWS refuses because the IP is still held by the
+deleted NAT gateway for about an hour, and the IP is released if it still exists, is managed by
+the account and is associated with nothing else. A release that AWS refuses because the IP is still held by the
 deleted gateway is tried again. A deleted default VPC can be recreated with
 `aws ec2 create-default-vpc`.
 
