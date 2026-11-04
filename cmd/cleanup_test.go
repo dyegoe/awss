@@ -27,7 +27,7 @@ import (
 )
 
 // TestExecute_defaultVpc checks the cleanup default-vpc command: a preview by default, --apply
-// to delete, and --confirm-all-profiles required with --apply over every profile only.
+// to delete, and --confirm-all required with --apply over every profile or every region only.
 func TestExecute_defaultVpc(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -43,15 +43,19 @@ func TestExecute_defaultVpc(t *testing.T) {
 		{name: "apply to named profiles", args: []string{"cleanup", "default-vpc", "--profiles", "dev,prod", "--apply"},
 			wantProfiles: []string{"dev", "prod"}, wantApply: true},
 		{name: "apply to every profile, confirmed", wantProfiles: []string{"default", "dev", "prod"}, wantApply: true,
-			args: []string{"cleanup", "default-vpc", "--profiles", "all", "--apply", "--confirm-all-profiles"}},
+			args: []string{"cleanup", "default-vpc", "--profiles", "all", "--apply", "--confirm-all"}},
 		{name: "apply to every profile, not confirmed", args: []string{"cleanup", "default-vpc", "--profiles", "all",
-			"--apply"}, wantErr: "add --confirm-all-profiles"},
+			"--apply"}, wantErr: "add --confirm-all"},
 		{name: "apply to every profile from the config file, not confirmed", config: "profiles: all\n",
-			args: []string{"cleanup", "default-vpc", "--apply"}, wantErr: "add --confirm-all-profiles"},
+			args: []string{"cleanup", "default-vpc", "--apply"}, wantErr: "add --confirm-all"},
+		{name: "apply to every region, not confirmed", args: []string{"cleanup", "default-vpc", "--profiles", "dev",
+			"--regions", "all", "--apply"}, wantErr: "add --confirm-all"},
+		{name: "apply to every region from the config file, not confirmed", config: "regions: all\n",
+			args: []string{"cleanup", "default-vpc", "--profiles", "dev", "--apply"}, wantErr: "add --confirm-all"},
 		{name: "confirm without apply", args: []string{"cleanup", "default-vpc", "--profiles", "all",
-			"--confirm-all-profiles"}, wantErr: "only goes with --apply"},
-		{name: "confirm with named profiles", args: []string{"cleanup", "default-vpc", "--profiles", "dev", "--apply",
-			"--confirm-all-profiles"}, wantErr: "only goes with --profiles all"},
+			"--confirm-all"}, wantErr: "only goes with --apply"},
+		{name: "confirm with named profiles and regions", args: []string{"cleanup", "default-vpc", "--profiles", "dev",
+			"--apply", "--confirm-all"}, wantErr: "only goes with --profiles all or --regions all"},
 		{name: "positional argument", args: []string{"cleanup", "default-vpc", "vpc-1"}, wantErr: "unknown command"},
 	}
 	for _, tt := range tests {
@@ -126,22 +130,22 @@ func TestExecute_defaultVpcSearchError(t *testing.T) {
 func TestCheckApply(t *testing.T) {
 	tests := []struct {
 		name                       string
-		apply, confirm, allProfile bool
+		apply, confirm, everywhere bool
 		wantErr                    bool
 	}{
 		{name: "preview"},
-		{name: "preview of every profile", allProfile: true},
+		{name: "preview everywhere", everywhere: true},
 		{name: "apply", apply: true},
-		{name: "apply to every profile", apply: true, allProfile: true, wantErr: true},
-		{name: "apply to every profile, confirmed", apply: true, confirm: true, allProfile: true},
+		{name: "apply everywhere", apply: true, everywhere: true, wantErr: true},
+		{name: "apply everywhere, confirmed", apply: true, confirm: true, everywhere: true},
 		{name: "confirm alone", confirm: true, wantErr: true},
-		{name: "confirm without apply", confirm: true, allProfile: true, wantErr: true},
-		{name: "confirm with named profiles", apply: true, confirm: true, wantErr: true},
+		{name: "confirm without apply", confirm: true, everywhere: true, wantErr: true},
+		{name: "confirm with named profiles and regions", apply: true, confirm: true, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := checkApply(tt.apply, tt.confirm, tt.allProfile); (err != nil) != tt.wantErr {
-				t.Errorf("checkApply(%v, %v, %v) = %v, want error %v", tt.apply, tt.confirm, tt.allProfile, err, tt.wantErr)
+			if err := checkApply(tt.apply, tt.confirm, tt.everywhere); (err != nil) != tt.wantErr {
+				t.Errorf("checkApply(%v, %v, %v) = %v, want error %v", tt.apply, tt.confirm, tt.everywhere, err, tt.wantErr)
 			}
 		})
 	}

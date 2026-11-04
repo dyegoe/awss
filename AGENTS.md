@@ -15,7 +15,7 @@ across multiple profiles and regions. It wraps AWS SDK Go v2 and uses Cobra + Vi
 
 The search commands are read-only. The `cleanup` commands (`awss cleanup default-vpc`) are the only
 ones that change AWS resources: they report a plan unless `--apply` is given, and `--apply` over
-`--profiles all` also needs `--confirm-all-profiles`. A flag that turns on deleting is never bound to
+`--profiles all` or `--regions all` also needs `--confirm-all`. A flag that turns on deleting is never bound to
 Viper, so the config file cannot turn it on.
 
 **Module:** `github.com/dyegoe/awss`

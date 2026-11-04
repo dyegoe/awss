@@ -203,7 +203,7 @@ func allOrList(names func() []string) cobra.CompletionFunc {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		withAll := names
 		if !strings.Contains(toComplete, ",") {
-			withAll = func() []string { return append([]string{"all"}, names()...) }
+			withAll = func() []string { return append([]string{valueAll}, names()...) }
 		}
 		return listValues(withAll)(cmd, args, toComplete)
 	}

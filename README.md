@@ -386,7 +386,7 @@ the deletion; for what lives outside the VPC, only its link to the VPC is remove
 | Flag | Description |
 | --- | --- |
 | `--apply` | Delete what the plan lists. Without it, nothing changes |
-| `--confirm-all-profiles` | Required with `--apply` when the profiles are `all` (`--profiles all`, or `profiles: all` in the config file); refused otherwise |
+| `--confirm-all` | Required with `--apply` when the profiles or the regions are `all` (`--profiles all`, `--regions all`, or `profiles: all` / `regions: all` in the config file); refused otherwise |
 
 The two flags are command-line only: the config file cannot turn on deleting.
 
@@ -397,8 +397,11 @@ awss cleanup default-vpc --profiles sandbox --regions all
 # Delete in one region
 awss cleanup default-vpc --profiles sandbox --regions eu-west-1 --apply
 
+# Delete in every region of one account: --regions all needs --confirm-all
+awss cleanup default-vpc --profiles sandbox --regions all --apply --confirm-all --timeout 30m
+
 # Every profile and region; deleting waits for NAT gateways and endpoints, so raise --timeout
-awss cleanup default-vpc --profiles all --regions all --apply --confirm-all-profiles --timeout 30m
+awss cleanup default-vpc --profiles all --regions all --apply --confirm-all --timeout 30m
 
 # The blocked VPCs only, as JSON
 awss cleanup default-vpc --profiles all --regions all --output json | jq 'select(.data[0].status == "blocked")'

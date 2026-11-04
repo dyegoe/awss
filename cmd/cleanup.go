@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	flagApply              = "apply"
-	flagConfirmAllProfiles = "confirm-all-profiles"
+	flagApply      = "apply"
+	flagConfirmAll = "confirm-all"
 )
 
 // cleanupCmd groups the commands that delete resources. They only report a plan unless --apply
@@ -70,12 +70,12 @@ blockers. A region without a default VPC shows nothing (--show-empty shows it).
 Statuses: deletable, blocked, denied (the role may not delete), deleted, failed (run again to
 resume).
 
---apply with --profiles all needs --confirm-all-profiles too.
+--apply with --profiles all or --regions all needs --confirm-all too.
 Deleting waits for NAT gateways and endpoints: raise --timeout for large runs, e.g. --timeout 30m.
 `,
 	Example: `  awss cleanup default-vpc --profiles sandbox --regions all
   awss cleanup default-vpc --profiles sandbox --regions eu-west-1 --apply
-  awss cleanup default-vpc --profiles all --regions all --apply --confirm-all-profiles --timeout 30m`,
+  awss cleanup default-vpc --profiles all --regions all --apply --confirm-all --timeout 30m`,
 	Args: cobra.NoArgs,
 	RunE: defaultVpcRunE,
 }
@@ -86,11 +86,12 @@ func defaultVpcRunE(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("reading the --%s flag: %w", flagApply, err)
 	}
-	confirm, err := cmd.Flags().GetBool(flagConfirmAllProfiles)
+	confirm, err := cmd.Flags().GetBool(flagConfirmAll)
 	if err != nil {
-		return fmt.Errorf("reading the --%s flag: %w", flagConfirmAllProfiles, err)
+		return fmt.Errorf("reading the --%s flag: %w", flagConfirmAll, err)
 	}
-	if err := checkApply(apply, confirm, viper.GetBool(labelProfilesAllAsked)); err != nil {
+	everywhere := viper.GetBool(labelProfilesAllAsked) || viper.GetBool(labelRegionsAllAsked)
+	if err := checkApply(apply, confirm, everywhere); err != nil {
 		return err
 	}
 
@@ -115,17 +116,17 @@ func defaultVpcRunE(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// checkApply refuses --apply over every profile without --confirm-all-profiles, and
-// --confirm-all-profiles where it means nothing.
-func checkApply(apply, confirm, allProfiles bool) error {
+// checkApply refuses --apply over every profile or every region (everywhere) without
+// --confirm-all, and --confirm-all where it means nothing.
+func checkApply(apply, confirm, everywhere bool) error {
 	switch {
 	case confirm && !apply:
-		return fmt.Errorf("--%s only goes with --%s", flagConfirmAllProfiles, flagApply)
-	case confirm && !allProfiles:
-		return fmt.Errorf("--%s only goes with --profiles all", flagConfirmAllProfiles)
-	case apply && allProfiles && !confirm:
-		return fmt.Errorf("--%s with --profiles all deletes in every profile: add --%s to confirm",
-			flagApply, flagConfirmAllProfiles)
+		return fmt.Errorf("--%s only goes with --%s", flagConfirmAll, flagApply)
+	case confirm && !everywhere:
+		return fmt.Errorf("--%s only goes with --profiles all or --regions all", flagConfirmAll)
+	case apply && everywhere && !confirm:
+		return fmt.Errorf("--%s with --profiles all or --regions all deletes in every profile or region: "+
+			"add --%s to confirm", flagApply, flagConfirmAll)
 	}
 	return nil
 }
@@ -142,8 +143,8 @@ func defaultVpcInitFlags() {
 
 	defaultVpcCmd.Flags().Bool(flagApply, false,
 		"Delete what the plan lists. Without it, nothing changes.")
-	defaultVpcCmd.Flags().Bool(flagConfirmAllProfiles, false,
-		"Confirm --apply with --profiles all, which deletes in every profile.")
+	defaultVpcCmd.Flags().Bool(flagConfirmAll, false,
+		"Confirm --apply with --profiles all or --regions all, which deletes in every profile or region.")
 }
 
 // defaultVpcInitViper binds nothing: the flags of default-vpc are read from the command only.

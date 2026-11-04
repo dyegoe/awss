@@ -56,9 +56,13 @@ const (
 	labelStats          = "stats"
 	labelOrgProfile     = "org-profile"
 
-	// labelProfilesAllAsked is set by persistentPreRun when --profiles is "all", before it is
-	// replaced by the list of profiles: a cleanup needs to know it.
+	// labelProfilesAllAsked and labelRegionsAllAsked are set by persistentPreRun when --profiles
+	// or --regions is "all", before it is replaced by the list: a cleanup needs to know it.
 	labelProfilesAllAsked = "profiles-all-asked"
+	labelRegionsAllAsked  = "regions-all-asked"
+
+	// valueAll is the --profiles and --regions value that means every profile or region.
+	valueAll = "all"
 
 	// defaultTimeout is generous so --profiles all over many regions is not cut short.
 	defaultTimeout = 5 * time.Minute
@@ -185,13 +189,15 @@ func persistentPreRun(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	viper.Set(labelProfilesAllAsked, len(asked) == 1 && asked[0] == "all")
+	viper.Set(labelProfilesAllAsked, isAll(asked))
 	viper.Set(labelProfiles, profiles)
 
-	regions, err := common.CheckRegions(viper.GetStringSlice(labelRegions), viper.GetStringSlice(labelAllRegions))
+	askedRegions := viper.GetStringSlice(labelRegions)
+	regions, err := common.CheckRegions(askedRegions, viper.GetStringSlice(labelAllRegions))
 	if err != nil {
 		return err
 	}
+	viper.Set(labelRegionsAllAsked, isAll(askedRegions))
 	viper.Set(labelRegions, regions)
 
 	if _, valid := common.ValidOutputs(viper.GetString(labelOutput)); !valid {
@@ -212,6 +218,11 @@ func persistentPreRun(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+// isAll reports whether a --profiles or --regions value is "all" alone, as awss accepts it.
+func isAll(values []string) bool {
+	return len(values) == 1 && values[0] == valueAll
 }
 
 // parseTimeout reads the --timeout flag or the timeout config key.
