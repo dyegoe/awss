@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.21.0](https://github.com/dyegoe/awss/compare/v0.20.0...v0.21.0) (2026-11-04)
+
+
+### Features
+
+* **cleanup/defaultvpc:** add awss cleanup default-vpc, all or nothing, a preview unless --apply ([#230](https://github.com/dyegoe/awss/issues/230)) ([#231](https://github.com/dyegoe/awss/issues/231)) ([cc0efe7](https://github.com/dyegoe/awss/commit/cc0efe7a3ddd0cc1325dfdc1035434e0c8b8eb2e))
+* **cleanup/dhcpoptions:** add awss cleanup dhcp-options, delete the DHCP options sets no VPC uses ([#232](https://github.com/dyegoe/awss/issues/232)) ([#234](https://github.com/dyegoe/awss/issues/234)) ([05a9603](https://github.com/dyegoe/awss/commit/05a9603b24d35895182f28b39235517fe12f114e))
+* **cmd:** named config files with --config &lt;name&gt; and AWSS_CONFIG ([#235](https://github.com/dyegoe/awss/issues/235)) ([#236](https://github.com/dyegoe/awss/issues/236)) ([b2b5215](https://github.com/dyegoe/awss/commit/b2b52156b61e82b4e05e7ed14742203e9c6f0a3f))
+
 ## [0.20.0](https://github.com/dyegoe/awss/compare/v0.19.0...v0.20.0) (2026-11-01)
 
 
