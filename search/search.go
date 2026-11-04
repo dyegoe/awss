@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/dyegoe/awss/cleanup/defaultvpc"
+	"github.com/dyegoe/awss/cleanup/dhcpoptions"
 	"github.com/dyegoe/awss/common"
 	searchCloudFront "github.com/dyegoe/awss/search/cloudfront"
 	searchEBS "github.com/dyegoe/awss/search/ebs"
@@ -211,6 +212,15 @@ var engines = map[string]engine{
 		},
 		sortFields:     defaultvpc.GetSortFields,
 		sortFieldNames: defaultvpc.SortFieldNames,
+	},
+	// dhcp-options is the cleanup of the DHCP options sets no VPC uses (awss cleanup dhcp-options).
+	// It deletes only with opts.Apply; otherwise it reports them.
+	"dhcp-options": {
+		new: func(profile, region string, _ map[string][]string, opts *Options) common.Results {
+			return dhcpoptions.New(profile, region, opts.Apply)
+		},
+		sortFields:     dhcpoptions.GetSortFields,
+		sortFieldNames: dhcpoptions.SortFieldNames,
 	},
 }
 

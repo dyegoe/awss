@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 // ec2API is the part of the EC2 client the cleanup uses. The real client is *ec2.Client; tests
@@ -88,10 +87,4 @@ type deleteAPI interface {
 	) (*ec2.DeleteEgressOnlyInternetGatewayOutput, error)
 	DeleteFlowLogs(context.Context, *ec2.DeleteFlowLogsInput, ...func(*ec2.Options)) (*ec2.DeleteFlowLogsOutput, error)
 	DeleteVpc(context.Context, *ec2.DeleteVpcInput, ...func(*ec2.Options)) (*ec2.DeleteVpcOutput, error)
-}
-
-// stsAPI is the part of the STS client the cleanup uses, to learn the account of the profile.
-type stsAPI interface {
-	GetCallerIdentity(context.Context, *sts.GetCallerIdentityInput, ...func(*sts.Options)) (
-		*sts.GetCallerIdentityOutput, error)
 }

@@ -78,13 +78,14 @@ func TestExecute_defaultVpc(t *testing.T) {
 				}
 				return
 			}
-			checkDefaultVpcRun(t, args, err, *calls, tt.wantProfiles, tt.wantApply)
+			checkCleanupRun(t, args, err, *calls, tt.wantProfiles, tt.wantApply)
 		})
 	}
 }
 
-// checkDefaultVpcRun checks that a run of args succeeded with one default-vpc run over profiles.
-func checkDefaultVpcRun(t *testing.T, args []string, err error, calls []searchCall, profiles []string, apply bool) {
+// checkCleanupRun checks that a run of args ("cleanup <command> ...") succeeded with one run of
+// that cleanup over profiles.
+func checkCleanupRun(t *testing.T, args []string, err error, calls []searchCall, profiles []string, apply bool) {
 	t.Helper()
 	if err != nil {
 		t.Fatalf("Execute(%v) error = %v", args, err)
@@ -93,7 +94,7 @@ func checkDefaultVpcRun(t *testing.T, args []string, err error, calls []searchCa
 		t.Fatalf("Execute(%v) runs = %d, want 1", args, len(calls))
 	}
 	want := searchCall{
-		cmd: "default-vpc", profiles: profiles, regions: []string{"us-east-1"}, filters: map[string][]string{},
+		cmd: args[1], profiles: profiles, regions: []string{"us-east-1"}, filters: map[string][]string{},
 		opts: search.Options{
 			Output: "table", Concurrency: search.DefaultConcurrency, Timeout: defaultTimeout, Apply: apply,
 		},
@@ -148,5 +149,52 @@ func TestCheckApply(t *testing.T) {
 				t.Errorf("checkApply(%v, %v, %v) = %v, want error %v", tt.apply, tt.confirm, tt.everywhere, err, tt.wantErr)
 			}
 		})
+	}
+}
+
+// TestExecute_dhcpOptions checks the cleanup dhcp-options command: the same safety flags as
+// default-vpc, and the tags flags.
+func TestExecute_dhcpOptions(t *testing.T) {
+	tests := []struct {
+		name         string
+		args         []string
+		wantProfiles []string
+		wantApply    bool
+		wantErr      string
+	}{
+		{name: "preview", args: []string{"cleanup", "dhcp-options"}, wantProfiles: []string{""}},
+		{name: "apply to a named profile", args: []string{"cleanup", "dhcp-options", "--profiles", "dev", "--apply"},
+			wantProfiles: []string{"dev"}, wantApply: true},
+		{name: "apply to every region, not confirmed", args: []string{"cleanup", "dhcp-options", "--profiles", "dev",
+			"--regions", "all", "--apply"}, wantErr: "add --confirm-all"},
+		{name: "confirm without apply", args: []string{"cleanup", "dhcp-options", "--confirm-all"},
+			wantErr: "only goes with --apply"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := resetCLI(t, nil)
+			useAwsConfig(t, testAwsConfig)
+			_, err := runCLI(t, tt.args...)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) || len(*calls) != 0 {
+					t.Errorf("Execute(%v) = %v, %d runs, want error %q and no run", tt.args, err, len(*calls), tt.wantErr)
+				}
+				return
+			}
+			checkCleanupRun(t, tt.args, err, *calls, tt.wantProfiles, tt.wantApply)
+		})
+	}
+}
+
+// TestExecute_dhcpOptionsTags checks that --show-tags-keys reaches the cleanup and implies the
+// tags column.
+func TestExecute_dhcpOptionsTags(t *testing.T) {
+	calls := resetCLI(t, nil)
+	if _, err := runCLI(t, "cleanup", "dhcp-options", "--show-tags-keys", "Name"); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	got := (*calls)[0].opts
+	if !got.ShowTags || !reflect.DeepEqual(got.TagsKeys, []string{"Name"}) {
+		t.Errorf("Execute() show tags %v keys %v, want true [Name]", got.ShowTags, got.TagsKeys)
 	}
 }

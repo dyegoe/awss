@@ -31,36 +31,35 @@ package defaultvpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
+	"github.com/dyegoe/awss/cleanup"
 	"github.com/dyegoe/awss/common"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/aws/smithy-go"
 )
 
-// The statuses of a default VPC.
+// The statuses of a default VPC: the shared ones of the cleanup package, and blocked.
 const (
 	// StatusDeletable is a preview with no blocker: --apply deletes what the details list.
-	StatusDeletable = "deletable"
+	StatusDeletable = cleanup.StatusDeletable
 
 	// StatusBlocked is a VPC with at least one blocker, named in the details. Nothing is deleted.
 	StatusBlocked = "blocked"
 
 	// StatusDenied is a preview where the role may not delete the VPC.
-	StatusDenied = "denied"
+	StatusDenied = cleanup.StatusDenied
 
 	// StatusDeleted is a VPC that --apply deleted.
-	StatusDeleted = "deleted"
+	StatusDeleted = cleanup.StatusDeleted
 
 	// StatusFailed is a VPC whose deletion stopped partway; the details give the step and the
 	// error. A new run resumes it.
-	StatusFailed = "failed"
+	StatusFailed = cleanup.StatusFailed
 )
 
 const (
@@ -86,7 +85,7 @@ type Results struct {
 	pollInterval time.Duration
 
 	// newClients builds the AWS clients of the profile and region. Tests replace it.
-	newClients func(profile, region string) (ec2API, stsAPI, error)
+	newClients func(profile, region string) (ec2API, cleanup.STSAPI, error)
 }
 
 // dataRow is the default VPC of one profile and region.
@@ -122,7 +121,7 @@ func New(profile, region string, apply bool) *Results {
 }
 
 // awsClients builds the EC2 and STS clients of profile and region.
-func awsClients(profile, region string) (ec2API, stsAPI, error) {
+func awsClients(profile, region string) (ec2API, cleanup.STSAPI, error) {
 	cfg, err := common.AwsConfig(profile, region)
 	if err != nil {
 		return nil, nil, err
@@ -150,14 +149,14 @@ func (r *Results) Search(ctx context.Context) {
 }
 
 // run returns the row of the default VPC, or nil when the region has none.
-func (r *Results) run(ctx context.Context, c ec2API, s stsAPI) (*dataRow, error) {
+func (r *Results) run(ctx context.Context, c ec2API, s cleanup.STSAPI) (*dataRow, error) {
 	vpc, err := defaultVPC(ctx, c)
 	if err != nil || vpc == nil {
 		return nil, err
 	}
 	row := &dataRow{VpcID: aws.ToString(vpc.VpcId), CidrBlock: aws.ToString(vpc.CidrBlock)}
 
-	account, err := callerAccount(ctx, s)
+	account, err := cleanup.CallerAccount(ctx, s)
 	if err != nil {
 		return nil, err
 	}
@@ -199,14 +198,14 @@ func (r *Results) run(ctx context.Context, c ec2API, s stsAPI) (*dataRow, error)
 // DeleteVpc says the role may not delete it.
 func (r *Results) preview(ctx context.Context, c ec2API, row *dataRow) (*dataRow, error) {
 	_, err := c.DeleteVpc(ctx, &ec2.DeleteVpcInput{VpcId: aws.String(row.VpcID), DryRun: aws.Bool(true)})
-	switch errorCode(err) {
-	case "DryRunOperation":
-		row.Status = StatusDeletable
-	case "UnauthorizedOperation":
+	allowed, err := cleanup.DryRunAllowed(err)
+	if err != nil {
+		return nil, fmt.Errorf("checking the permission to delete %s: %w", row.VpcID, err)
+	}
+	row.Status = StatusDeletable
+	if !allowed {
 		row.Status = StatusDenied
 		row.Details = []string{"this role may not delete VPCs (ec2:DeleteVpc); --apply needs a role that can"}
-	default:
-		return nil, fmt.Errorf("checking the permission to delete %s: %w", row.VpcID, err)
 	}
 	return row, nil
 }
@@ -223,24 +222,6 @@ func defaultVPC(ctx context.Context, c ec2API) (*types.Vpc, error) {
 		return nil, nil
 	}
 	return &vpcs[0], nil
-}
-
-// callerAccount returns the account ID of the profile.
-func callerAccount(ctx context.Context, s stsAPI) (string, error) {
-	out, err := s.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
-	if err != nil {
-		return "", fmt.Errorf("error getting the account of the profile: %w", err)
-	}
-	return aws.ToString(out.Account), nil
-}
-
-// errorCode returns the AWS error code of err, or "" when err is nil or not an AWS API error.
-func errorCode(err error) string {
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
-		return apiErr.ErrorCode()
-	}
-	return ""
 }
 
 // Len returns the length of the results.
