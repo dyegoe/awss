@@ -657,7 +657,8 @@ cp awss /usr/local/bin
 
 ## Configuration
 
-AWSS uses a YAML configuration file to set defaults. The default path is `~/.awss/config.yaml`, overridable with `--config`.
+AWSS uses a YAML configuration file to set defaults. The default path is `~/.awss/config.yaml`, overridable with `--config`
+or the `AWSS_CONFIG` environment variable (see [Several config files](#several-config-files)).
 
 ```yaml
 profiles:
@@ -721,6 +722,40 @@ empty or missing, `--profiles all` uses every `[default]` and `[profile ...]` se
 AWS config file (`AWS_CONFIG_FILE`, or `~/.aws/config`). Set it when that file holds profiles you
 do not want to search, such as several privilege variants per account or MFA source profiles.
 Each entry must exist in the AWS config file.
+
+### Several config files
+
+When the accounts are split, for example by permission level (admin, regular user) and by
+landing zone (legacy, LZ2), keep one config file per combination in `~/.awss/`. Each has its own
+`all-profiles`, `accounts` and defaults, so `--profiles all` stays inside one landing zone and one
+permission level.
+
+```text
+~/.awss/config.yaml             # the default
+~/.awss/devops-lz2.yaml
+~/.awss/devops-legacy.yaml
+~/.awss/godpowers-lz2.yaml
+```
+
+Pick one by **name**: a `--config` value with no `/` and no `.yaml` or `.yml` extension is read as
+`~/.awss/<name>.yaml`. Any other value is a path, as before.
+
+```bash
+awss --config devops-lz2 vpc --all --profiles all     # ~/.awss/devops-lz2.yaml
+awss --config ./team.yaml vpc --all                   # a path
+
+# Every awss command of this shell session uses devops-lz2; --config still wins
+export AWSS_CONFIG=devops-lz2
+awss vpc --all --profiles all
+```
+
+- `AWSS_CONFIG` takes a name or a path too. A leading `~/` is the home directory, also inside the
+  variable.
+- A config asked for by name or path must exist: a missing name fails and lists the configs
+  available, so a mistyped `AWSS_CONFIG` never falls back to the default silently. Only the
+  default `~/.awss/config.yaml` may be missing.
+- `--config <TAB>` completes the names in `~/.awss/`, and YAML file names once the value looks
+  like a path (it has a `/`, or starts with `.` or `~`).
 
 ## Usage
 
@@ -789,7 +824,7 @@ names, it completes the values of these flags, one item after another in a comma
 | `--output` | `json`, `json-pretty`, `table` |
 | `--profiles`, `--org-profile` | the profiles of the AWS config file, and `all` for `--profiles` |
 | `--regions` | the `all-regions` list of the config file (or its default), and `all` |
-| `--config` | YAML file names |
+| `--config` | the config names in `~/.awss/`, or YAML file names for a path |
 | `-z` / `--availability-zones` | the zone letters `a` to `f` |
 | `ec2 --instance-states` | the EC2 instance states, such as `running`, `stopped` |
 | `ebs --statuses`, `ebs --volume-types` | the EBS volume states and types |

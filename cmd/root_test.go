@@ -65,6 +65,8 @@ func TestInitConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("HOME", t.TempDir())
+			t.Setenv(envConfig, "")
 			if err := initConfig(tt.cfg); (err != nil) != tt.wantErr {
 				t.Errorf("initConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}

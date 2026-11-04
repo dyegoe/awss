@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/dyegoe/awss/common"
@@ -244,7 +243,8 @@ func initFlags() {
 	validOutputs, _ := common.ValidOutputs("")
 
 	rootCmd.PersistentFlags().String(labelConfig, "",
-		"config file path (default is $HOME/.awss/config.yaml)")
+		"Config file: a `name` such as devops-lz2, read as ~/.awss/devops-lz2.yaml, or a path to a YAML "+
+			"file. AWSS_CONFIG sets it for every command; this flag wins. Default ~/.awss/config.yaml.")
 	rootCmd.PersistentFlags().StringSlice(labelProfiles, []string{},
 		"Select the profile from the AWS config file (AWS_CONFIG_FILE, or ~/.aws/config). --profile works too. You can pass "+
 			"multiple profiles separated by comma. e.g. `profile1,profile2`. `all` uses the all-profiles list of "+
@@ -336,44 +336,33 @@ func initViper() error {
 	return nil
 }
 
-// initConfig reads the config file.
-//
-// It will search for the config file in the following order:
-// 1. --config flag absolute/relative path to a file.
-// 2. $HOME/.awss/config.yaml file
+// initConfig reads the config file of the run: the --config value cfg, or AWSS_CONFIG, as a
+// name or a path, or ~/.awss/config.yaml (see resolveConfig). A config that was asked for must
+// exist; the default one may be missing.
 func initConfig(cfg string) error {
-	var f string
-
-	if cfg == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("finding the home directory for the config file: %w", err)
-		}
-		f = filepath.Join(home, ".awss", "config.yaml")
-	}
-	if cfg != "" {
-		f = cfg
+	c, err := resolveConfig(cfg)
+	if err != nil {
+		return err
 	}
 
-	info, err := os.Stat(f)
-	if os.IsNotExist(err) && cfg == "" {
+	info, err := os.Stat(c.path)
+	if os.IsNotExist(err) && !c.required {
 		return nil
 	}
-	if os.IsNotExist(err) && cfg != "" {
-		return fmt.Errorf("config file not found: %s", f)
+	if os.IsNotExist(err) {
+		return c.notFound()
 	}
 	if err != nil {
-		return fmt.Errorf("reading config file %s: %w", f, err)
+		return fmt.Errorf("reading config file %s: %w", c.path, err)
 	}
-	// check if the path is a directory
 	if info.IsDir() {
-		return fmt.Errorf("config file is a directory: %s", f)
+		return fmt.Errorf("config file is a directory: %s", c.path)
 	}
 
-	viper.SetConfigFile(f)
+	viper.SetConfigFile(c.path)
 
 	if err := viper.ReadInConfig(); err != nil {
-		return fmt.Errorf("reading config file %s: %w", f, err)
+		return fmt.Errorf("reading config file %s: %w", c.path, err)
 	}
 	return nil
 }
