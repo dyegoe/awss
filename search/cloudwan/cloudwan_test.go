@@ -594,8 +594,8 @@ func TestRouteCall_input(t *testing.T) {
 			want: "prod@eu-west-1 exact=10.0.0.0/8",
 		},
 		{
-			name: "longest", call: routeCall{table: seg, cidr: "10.0.0.1/32", mode: MatchLongest},
-			want: "prod@eu-west-1 longest=10.0.0.1/32",
+			name: "longest reads the whole table", call: routeCall{table: seg, cidr: "10.0.0.1/32", mode: MatchLongest},
+			want: "prod@eu-west-1",
 		},
 		{
 			name: "subnet-of", call: routeCall{table: seg, cidr: "10.0.0.0/8", mode: MatchSubnetOf},
@@ -703,6 +703,85 @@ func TestRouteTables(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("routeTables(%v) = %q, want %q", tt.filters, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestLongestMatches checks that the most specific route covering the CIDR wins, that a route more
+// specific than the CIDR, a route of the other address family and a prefix list route never match,
+// and that several routes of the same longest prefix are all kept.
+func TestLongestMatches(t *testing.T) {
+	all := []types.NetworkRoute{
+		{DestinationCidrBlock: aws.String("0.0.0.0/0")},
+		{DestinationCidrBlock: aws.String("10.0.0.0/8")},
+		{DestinationCidrBlock: aws.String("10.1.0.0/16"), State: types.RouteStateActive},
+		{DestinationCidrBlock: aws.String("10.1.0.0/16"), State: types.RouteStateBlackhole},
+		{DestinationCidrBlock: aws.String("10.1.2.0/28")},
+		{DestinationCidrBlock: aws.String("::/0")},
+		{PrefixListId: aws.String("pl-0123")},
+	}
+	tests := []struct {
+		name string
+		cidr string
+		want []string
+	}{
+		{name: "host", cidr: "10.1.2.200/32", want: []string{"10.1.0.0/16", "10.1.0.0/16"}},
+		{name: "exact prefix", cidr: "10.1.2.0/28", want: []string{"10.1.2.0/28"}},
+		{name: "only the default", cidr: "192.168.0.0/16", want: []string{"0.0.0.0/0"}},
+		{name: "wider than every route", cidr: "10.0.0.0/7", want: []string{"0.0.0.0/0"}},
+		{name: "ipv6", cidr: "2001:db8::/32", want: []string{"::/0"}},
+		{name: "bad cidr", cidr: "x", want: []string{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := []string{}
+			for _, r := range longestMatches(all, tt.cidr) {
+				got = append(got, aws.ToString(r.DestinationCidrBlock))
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("longestMatches(%q) = %q, want %q", tt.cidr, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestResults_collect_longest checks that --match longest reads the whole route table, as AWS
+// rejects LongestPrefixMatches, and keeps only the route traffic takes, before --target-types.
+func TestResults_collect_longest(t *testing.T) {
+	tests := []struct {
+		name        string
+		targetTypes []string
+		want        []string
+	}{
+		{name: "match", want: []string{"10.0.5.1/32 10.0.0.0/16 direct-connect-gateway"}},
+		{name: "target type of another route", targetTypes: []string{"vpc"}, want: []string{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := awsFixture(t)
+			q, err := newQuery(map[string][]string{
+				FilterKeyCIDR: {"10.0.5.1"}, FilterKeyMatch: {MatchLongest}, FilterKeyTargetType: tt.targetTypes,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			r := New("network", Region, nil, "cidr")
+			r.collect(context.Background(), client, q)
+			if len(r.Errors) != 0 {
+				t.Fatalf("collect() errors = %q, want none", r.Errors)
+			}
+			got := []string{}
+			for i := range r.Data {
+				got = append(got, r.Data[i].Query+" "+r.Data[i].CIDR+" "+r.Data[i].TargetType)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("collect() rows = %q, want %q", got, tt.want)
+			}
+			for _, in := range client.routeInputs {
+				if in.LongestPrefixMatches != nil {
+					t.Errorf("collect() sent LongestPrefixMatches %q, want none", in.LongestPrefixMatches)
+				}
 			}
 		})
 	}

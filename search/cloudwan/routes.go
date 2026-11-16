@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -132,6 +133,10 @@ func calls(tables []routeTable, q *query) []routeCall {
 }
 
 // input returns the GetNetworkRoutes input of the call.
+//
+// A longest call sends no match field and reads the whole route table: AWS answers
+// LongestPrefixMatches with "ValidationException: Invalid input. Filter value is invalid.", so
+// routes picks the longest match itself.
 func (c *routeCall) input(globalNetworkID string, q *query) *networkmanager.GetNetworkRoutesInput {
 	in := &networkmanager.GetNetworkRoutesInput{
 		GlobalNetworkId:      aws.String(globalNetworkID),
@@ -144,8 +149,6 @@ func (c *routeCall) input(globalNetworkID string, q *query) *networkmanager.GetN
 	switch c.mode {
 	case MatchExact:
 		in.ExactCidrMatches = match
-	case MatchLongest:
-		in.LongestPrefixMatches = match
 	case MatchSubnetOf:
 		in.SubnetOfMatches = match
 	case MatchSupernetOf:
@@ -246,18 +249,45 @@ func (r *Results) addCallErrors(coreNetworkID string, cs []routeCall, errs []err
 func routes(
 	ctx context.Context, client networkmanager.GetNetworkRoutesAPIClient, cn *coreNetwork, c *routeCall, q *query,
 ) ([]dataRow, error) {
-	var rows []dataRow
+	var found []types.NetworkRoute
 	paginator := networkmanager.NewGetNetworkRoutesPaginator(client, c.input(cn.globalNetworkID, q))
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("getting the network routes: %w", err)
 		}
-		for i := range page.NetworkRoutes {
-			rows = appendTargets(rows, parseRoute(&page.NetworkRoutes[i], cn, c), q)
-		}
+		found = append(found, page.NetworkRoutes...)
+	}
+	if c.mode == MatchLongest {
+		found = longestMatches(found, c.cidr)
+	}
+	var rows []dataRow
+	for i := range found {
+		rows = appendTargets(rows, parseRoute(&found[i], cn, c), q)
 	}
 	return rows, nil
+}
+
+// longestMatches returns the routes whose CIDR is the longest prefix covering cidr: the routes the
+// traffic to cidr takes. A route without a CIDR, such as a prefix list route, never matches.
+func longestMatches(all []types.NetworkRoute, cidr string) []types.NetworkRoute {
+	want, err := netip.ParsePrefix(cidr)
+	if err != nil {
+		return nil
+	}
+	best := -1
+	var out []types.NetworkRoute
+	for i := range all {
+		p, err := netip.ParsePrefix(aws.ToString(all[i].DestinationCidrBlock))
+		if err != nil || p.Bits() > want.Bits() || !p.Contains(want.Addr()) || p.Bits() < best {
+			continue
+		}
+		if p.Bits() > best {
+			best, out = p.Bits(), nil
+		}
+		out = append(out, all[i])
+	}
+	return out
 }
 
 // appendTargets appends to rows the rows whose target type passes --target-types.
