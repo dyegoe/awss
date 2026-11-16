@@ -18,22 +18,12 @@ package cloudwan
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/netip"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/networkmanager"
 	"github.com/aws/aws-sdk-go-v2/service/networkmanager/types"
 )
-
-// routeWorkers caps the GetNetworkRoutes calls of one core network running at the same time.
-//
-// AWS has no call that reads several route tables at once: a core network has one route table per
-// segment and edge location, and per network function group and edge location, and each is read on
-// its own. The cap keeps a large core network from being throttled.
-const routeWorkers = 5
 
 // targetBlackhole is the target type of a blackhole route, which has no destination.
 const targetBlackhole = "blackhole"
@@ -157,93 +147,6 @@ func (c *routeCall) input(globalNetworkID string, q *query) *networkmanager.GetN
 	return in
 }
 
-// runCalls makes the route calls of one core network, at most routeWorkers at once, and adds their
-// rows without duplicates: a route can match a CIDR in several modes.
-//
-// The first AccessDenied stops the core network: the profile is not the core network owner, and
-// every other call would be denied too. It is reported once. When parent ends first, the calls
-// not made are reported, so partial rows never look complete.
-func (r *Results) runCalls(
-	parent context.Context, client networkmanager.GetNetworkRoutesAPIClient, cn *coreNetwork, cs []routeCall, q *query,
-) {
-	ctx, cancel := context.WithCancel(parent)
-	defer cancel()
-
-	rows := make([][]dataRow, len(cs))
-	errs := make([]error, len(cs))
-	sem := make(chan struct{}, routeWorkers)
-	var wg sync.WaitGroup
-	for i := range cs {
-		if !acquire(ctx, sem) {
-			break
-		}
-		wg.Go(func() {
-			defer func() { <-sem }()
-			rows[i], errs[i] = routes(ctx, client, cn, &cs[i], q)
-			if isAccessDenied(errs[i]) {
-				cancel()
-			}
-		})
-	}
-	wg.Wait()
-
-	r.addRows(rows)
-	if !r.addCallErrors(cn.id, cs, errs) && parent.Err() != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("stopped before reading every route table of core network %s: %v",
-			cn.id, parent.Err()))
-	}
-}
-
-// acquire takes a slot of sem, and reports false when ctx ends first.
-func acquire(ctx context.Context, sem chan struct{}) bool {
-	if ctx.Err() != nil {
-		return false
-	}
-	select {
-	case sem <- struct{}{}:
-		return true
-	case <-ctx.Done():
-		return false
-	}
-}
-
-// addRows appends the rows of every call in call order, skipping the duplicates.
-func (r *Results) addRows(rows [][]dataRow) {
-	seen := make(map[dataRow]bool, len(r.Data))
-	for i := range r.Data {
-		seen[r.Data[i]] = true
-	}
-	for _, callRows := range rows {
-		for i := range callRows {
-			if !seen[callRows[i]] {
-				seen[callRows[i]] = true
-				r.Data = append(r.Data, callRows[i])
-			}
-		}
-	}
-}
-
-// addCallErrors appends the errors of the calls in call order, and reports whether one was
-// AccessDenied: that one is reported once for the core network, without the calls it cancelled.
-// A call stopped by the end of the parent context is left to runCalls, which reports it once.
-func (r *Results) addCallErrors(coreNetworkID string, cs []routeCall, errs []error) bool {
-	for _, err := range errs {
-		if isAccessDenied(err) {
-			r.Errors = append(r.Errors, fmt.Sprintf("access denied reading the routes of core network %s: "+
-				"run it with a profile of the account that owns the core network: %v", coreNetworkID, err))
-			return true
-		}
-	}
-	for i, err := range errs {
-		if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			continue
-		}
-		t := &cs[i].table
-		r.Errors = append(r.Errors, fmt.Sprintf("error reading the routes of %s at %s: %v", t.label(), t.edge, err))
-	}
-	return false
-}
-
 // routes reads the routes of one call, following every page, and returns its rows: one per route
 // destination that passes --target-types.
 func routes(
@@ -259,35 +162,13 @@ func routes(
 		found = append(found, page.NetworkRoutes...)
 	}
 	if c.mode == MatchLongest {
-		found = longestMatches(found, c.cidr)
+		found = longestMatches(found, c.cidr, func(r *types.NetworkRoute) *string { return r.DestinationCidrBlock })
 	}
 	var rows []dataRow
 	for i := range found {
 		rows = appendTargets(rows, parseRoute(&found[i], cn, c), q)
 	}
 	return rows, nil
-}
-
-// longestMatches returns the routes whose CIDR is the longest prefix covering cidr: the routes the
-// traffic to cidr takes. A route without a CIDR, such as a prefix list route, never matches.
-func longestMatches(all []types.NetworkRoute, cidr string) []types.NetworkRoute {
-	want, err := netip.ParsePrefix(cidr)
-	if err != nil {
-		return nil
-	}
-	best := -1
-	var out []types.NetworkRoute
-	for i := range all {
-		p, err := netip.ParsePrefix(aws.ToString(all[i].DestinationCidrBlock))
-		if err != nil || p.Bits() > want.Bits() || !p.Contains(want.Addr()) || p.Bits() < best {
-			continue
-		}
-		if p.Bits() > best {
-			best, out = p.Bits(), nil
-		}
-		out = append(out, all[i])
-	}
-	return out
 }
 
 // appendTargets appends to rows the rows whose target type passes --target-types.

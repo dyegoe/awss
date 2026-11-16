@@ -21,7 +21,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Run stats: `--stats` prints elapsed time, peak memory, search counts and AWS API calls on stderr; see [Run report and stats](#run-report-and-stats)
 - Account names next to owner account IDs, from the `accounts` map of the config file or, with `--org-profile`, from AWS Organizations; see [Account names](#account-names)
 - Shell completion of commands, flags and the values of the flags that take a known list (sort fields, profiles, regions, states); see [Shell completion](#shell-completion)
-- AWS Cloud WAN: find a CIDR in the route tables of the segments and see where it points (`awss cloudwan routes`), and list the attachments (`awss cloudwan attachments`); see [Cloud WAN routes](#cloud-wan-routes-awss-cloudwan-routes)
+- AWS Cloud WAN: find a CIDR in the route tables of the segments and see where it points (`awss cloudwan routes`), see the BGP routes before the routing policies with their AS path and communities (`awss cloudwan bgp`), and list the attachments (`awss cloudwan attachments`); see [Cloud WAN routes](#cloud-wan-routes-awss-cloudwan-routes)
 - Cleanup of the default VPCs with no workload (`awss cleanup default-vpc`) and of the unused DHCP options sets (`awss cleanup dhcp-options`), a preview unless `--apply`; see [Cleanup](#cleanup)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
@@ -429,7 +429,8 @@ attachments of the core network.
   fields of one call combine, so awss sends one each. `--segments`, `--edges` and `--match` cut
   the calls. `--types` and `--states` are filtered by AWS, `--target-types` by awss.
 - **What it shows:** the routes Cloud WAN installed, after its routing policies. A prefix the data
-  centre advertised but a policy dropped is not there.
+  centre advertised but a policy dropped is not there: look for it with
+  [`awss cloudwan bgp`](#cloud-wan-bgp-routes-awss-cloudwan-bgp).
 - **Transit Gateway:** behind a Transit Gateway route table attachment, the route points to the
   Transit Gateway route table; the VPC behind it is in the Transit Gateway's own route tables.
 - **JSON only:** `core_network_id`, `prefix_list_id`, `attachment_id`, `target_edge`,
@@ -439,6 +440,53 @@ attachments of the core network.
   names and owners.
 
 Sort by: `--sort segment|edge|cidr|query|type|state|target-type|target-id|target-segment|attachment|attachment-name|owner|owner-name|core-network` (default: `segment`)
+
+#### Cloud WAN BGP routes (`awss cloudwan bgp`)
+
+Shows the BGP routes each segment learned at each edge location **before** the routing policies
+of the core network, with their AS path, communities, local preference, MED and next hop. Compared
+with `cloudwan routes` (after the policies), it tells "the data centre never advertised the prefix"
+(in neither) from "a routing policy dropped or summarised it" (here, not in `cloudwan routes`).
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--cidrs` | `-c` | CIDRs or IP addresses to find, as in `cloudwan routes`. Without it, every BGP route of the selected segments is listed |
+| `--match` | `-m` | `any` (default), `exact`, `longest`, `subnet-of`, `supernet-of`, as in `cloudwan routes` |
+| `--segments` | `-s` | Segments only (globs) |
+| `--edges` | `-e` | Edge locations only (globs) |
+| `--next-hop-types` | | Next hop types, such as `direct-connect-gateway`, `vpc`, `vpn`, `connect-peer` |
+| `--communities` | | Keep the routes that carry any of these BGP communities, exact (`65000:100`) |
+| `--asns` | | Keep the routes whose AS path has any of these AS numbers (`65010`) |
+| `--core-network-ids` | | Core networks to search; default every core network the profile sees |
+
+```bash
+# What does the data centre advertise over Direct Connect to the prod segment?
+awss cloudwan bgp --profile network -s prod --next-hop-types direct-connect-gateway
+
+# Did 10.50.0.0/16 arrive, with which AS path, and is it also installed?
+awss cloudwan bgp --profile network --cidrs 10.50.0.0/16
+awss cloudwan routes --profile network --cidrs 10.50.0.0/16
+
+# The routes originated by the data centre AS 65010
+awss cloudwan bgp --profile network --asns 65010
+```
+
+One row per BGP route: **Query**, **Segment**, **Edge**, **Prefix**, **AS Path**, **Communities**,
+**Local Pref**, **MED**, **Next Hop Type**, **Next Hop ID**, **Attachment**, **Next Hop Segment**
+(from the attachment when AWS does not return it), **Owner ID** and **Owner**.
+
+- One `ListCoreNetworkRoutingInformation` call per segment, edge location, CIDR and match mode, at
+  most 5 at once. Network function groups have no BGP routes. `longest` reads every route of the
+  segment and awss picks the most specific one, as in `cloudwan routes`. `--next-hop-types`,
+  `--communities` and `--asns` are filtered by awss.
+- Global, and run with the network account profile, as `cloudwan routes`.
+- **JSON only:** `core_network_id`, `next_hop_ip` (such as the BGP peer of a Connect peer),
+  `attachment_id`, `next_hop_edge`.
+- **Permission:** `networkmanager:ListCoreNetworks`, `networkmanager:GetCoreNetwork`,
+  `networkmanager:ListCoreNetworkRoutingInformation`, and `networkmanager:ListAttachments` for the
+  attachment names and owners.
+
+Sort by: `--sort segment|edge|prefix|query|as-path|communities|local-preference|med|next-hop-type|next-hop-id|next-hop-ip|next-hop-segment|attachment|attachment-name|owner|owner-name|core-network` (default: `segment`)
 
 #### Cloud WAN attachments (`awss cloudwan attachments`)
 
@@ -658,7 +706,7 @@ awss stats
 
 ### Account names
 
-`vpc`, `subnet`, `eni`, `cloudwan routes` and `cloudwan attachments` show an **Owner** column (JSON `owner_name`, sort field `owner-name`)
+`vpc`, `subnet`, `eni`, `cloudwan routes`, `cloudwan bgp` and `cloudwan attachments` show an **Owner** column (JSON `owner_name`, sort field `owner-name`)
 next to **Owner ID**: the name of the account, which matters in a shared VPC, where the owner is
 usually a network account. The names come from the `accounts` map of `~/.awss/config.yaml`, from
 account ID to name, with no AWS call:

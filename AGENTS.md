@@ -10,7 +10,7 @@ and do not add a tool-specific copy such as `.github/copilot-instructions.md`.
 
 ## Project overview
 
-**awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs, subnets, S3 buckets and objects, RDS DB instances and clusters, Organization accounts, CloudFront distributions, Cloud WAN routes and attachments) in parallel
+**awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs, subnets, S3 buckets and objects, RDS DB instances and clusters, Organization accounts, CloudFront distributions, Cloud WAN routes, BGP routes and attachments) in parallel
 across multiple profiles and regions. It wraps AWS SDK Go v2 and uses Cobra + Viper for CLI wiring.
 
 The search commands are read-only. The `cleanup` commands (`awss cleanup default-vpc`, `dhcp-options`) are the only
@@ -43,7 +43,8 @@ search/org/          — AWS Organization accounts (one profile, global), and th
 search/cloudfront/   — CloudFront distributions (global, once per profile), client-side filters, opt-in tags
 search/cloudwan/     — Cloud WAN routes (global, us-west-2 endpoint): GetNetworkRoutes per segment / function
                        group × edge, one CIDR and match mode per call; the Network Manager client and
-                       helpers the Cloud WAN searches share. Registered as "cloudwan-routes"
+                       helpers the Cloud WAN searches share. Registered as "cloudwan-routes"; bgp.go is the
+                       BGP routes before the policies (ListCoreNetworkRoutingInformation), "cloudwan-bgp"
 search/cloudwanatt/  — Cloud WAN attachments, client-side filters. Registered as "cloudwan-attachments"
 cleanup/             — what the cleanups share: statuses, CallerAccount, AWS error helpers
 cleanup/defaultvpc/  — deletes the default VPC and its plumbing, all-or-nothing on its ENIs; a plan

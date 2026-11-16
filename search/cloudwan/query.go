@@ -38,6 +38,11 @@ const (
 	FilterKeyState         = "state"
 	FilterKeyTargetType    = "target-type"
 	FilterKeyCoreNetwork   = "core-network-id"
+
+	// FilterKeyCommunity keeps the BGP routes that carry any of these communities.
+	FilterKeyCommunity = "community"
+	// FilterKeyASN keeps the BGP routes whose AS path has any of these AS numbers.
+	FilterKeyASN = "asn"
 )
 
 // The --match modes: how a route must relate to a searched CIDR.
@@ -125,6 +130,7 @@ type query struct {
 	types                     []types.RouteType
 	states                    []types.RouteState
 	targetTypes, coreNetworks []string
+	communities, asns         []string
 }
 
 // newQuery builds the query from a filters map, which it only reads: one map is shared by every
@@ -134,6 +140,8 @@ func newQuery(filters map[string][]string) (*query, error) {
 		bySegment:    len(filters[FilterKeySegment]) > 0,
 		byGroup:      len(filters[FilterKeyFunctionGroup]) > 0,
 		coreNetworks: slices.Clone(filters[FilterKeyCoreNetwork]),
+		communities:  slices.Clone(filters[FilterKeyCommunity]),
+		asns:         slices.Clone(filters[FilterKeyASN]),
 	}
 	var err error
 	if q.cidrs, err = NormalizeCIDRs(filters[FilterKeyCIDR]); err != nil {

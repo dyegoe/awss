@@ -148,6 +148,7 @@ func fixedLists() map[string]map[string]func() []string {
 			flagStates:     searchCloudWAN.StateNames,
 			"target-types": searchCloudWAN.TargetTypeNames,
 		},
+		"cloudwan-bgp":         {"match": searchCloudWAN.MatchNames, "next-hop-types": searchCloudWAN.TargetTypeNames},
 		"cloudwan-attachments": {"types": searchCloudWANAtt.TypeNames, flagStates: searchCloudWANAtt.StateNames},
 	}
 }

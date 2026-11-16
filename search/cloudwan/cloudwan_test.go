@@ -54,6 +54,10 @@ type fakeNetworkManager struct {
 	routes      map[string][][]types.NetworkRoute
 	routeErr    map[string]error
 	routeInputs []*networkmanager.GetNetworkRoutesInput
+
+	bgp       map[string][][]types.CoreNetworkRoutingInformation
+	bgpErr    map[string]error
+	bgpInputs []*networkmanager.ListCoreNetworkRoutingInformationInput
 }
 
 func (f *fakeNetworkManager) ListCoreNetworks(
@@ -98,29 +102,87 @@ func (f *fakeNetworkManager) ListAttachments(
 	return &networkmanager.ListAttachmentsOutput{Attachments: f.attachments}, nil
 }
 
+//nolint:dupl // same shape as ListCoreNetworkRoutingInformation with other SDK types; the logic is in fakeAnswer
 func (f *fakeNetworkManager) GetNetworkRoutes(
 	_ context.Context, in *networkmanager.GetNetworkRoutesInput, _ ...func(*networkmanager.Options),
 ) (*networkmanager.GetNetworkRoutesOutput, error) {
-	f.mu.Lock()
-	f.routeInputs = append(f.routeInputs, in)
-	f.mu.Unlock()
-	if aws.ToInt32(in.MaxResults) != PageSize {
-		return nil, fmt.Errorf("GetNetworkRoutes MaxResults = %d, want %d", aws.ToInt32(in.MaxResults), PageSize)
-	}
-	key := callKey(in)
-	if err := f.routeErr[key]; err != nil {
+	page, err := fakeAnswer(f, &f.routeInputs, in, fakeCall[types.NetworkRoute]{
+		maxResults: in.MaxResults, token: in.NextToken, key: callKey(in), errs: f.routeErr, pages: f.routes,
+	})
+	if err != nil {
 		return nil, err
 	}
-	pages := f.routes[key]
-	page, _ := strconv.Atoi(aws.ToString(in.NextToken))
-	out := &networkmanager.GetNetworkRoutesOutput{}
-	if page < len(pages) {
-		out.NetworkRoutes = pages[page]
+	return &networkmanager.GetNetworkRoutesOutput{NetworkRoutes: page.items, NextToken: page.next}, nil
+}
+
+//nolint:dupl // same shape as GetNetworkRoutes with other SDK types; the logic is in fakeAnswer
+func (f *fakeNetworkManager) ListCoreNetworkRoutingInformation(
+	_ context.Context, in *networkmanager.ListCoreNetworkRoutingInformationInput, _ ...func(*networkmanager.Options),
+) (*networkmanager.ListCoreNetworkRoutingInformationOutput, error) {
+	page, err := fakeAnswer(f, &f.bgpInputs, in, fakeCall[types.CoreNetworkRoutingInformation]{
+		maxResults: in.MaxResults, token: in.NextToken, key: bgpKey(in), errs: f.bgpErr, pages: f.bgp,
+	})
+	if err != nil {
+		return nil, err
 	}
-	if page < len(pages)-1 {
-		out.NextToken = aws.String(strconv.Itoa(page + 1))
+	return &networkmanager.ListCoreNetworkRoutingInformationOutput{
+		CoreNetworkRoutingInformation: page.items, NextToken: page.next,
+	}, nil
+}
+
+// fakeCall is a paginated call to the fake: its page size and token, its key, and the errors and
+// pages of every key.
+type fakeCall[T any] struct {
+	maxResults *int32
+	token      *string
+	key        string
+	errs       map[string]error
+	pages      map[string][][]T
+}
+
+// fakePage is a page the fake answers, and the token of the next one.
+type fakePage[T any] struct {
+	items []T
+	next  *string
+}
+
+// fakeAnswer records in, checks the page size, and answers the error of the key or the page the
+// token asks for.
+func fakeAnswer[I, T any](f *fakeNetworkManager, inputs *[]I, in I, c fakeCall[T]) (fakePage[T], error) {
+	f.mu.Lock()
+	*inputs = append(*inputs, in)
+	f.mu.Unlock()
+	if aws.ToInt32(c.maxResults) != PageSize {
+		return fakePage[T]{}, fmt.Errorf("MaxResults = %d, want %d", aws.ToInt32(c.maxResults), PageSize)
+	}
+	if err := c.errs[c.key]; err != nil {
+		return fakePage[T]{}, err
+	}
+	pages := c.pages[c.key]
+	n, _ := strconv.Atoi(aws.ToString(c.token))
+	var out fakePage[T]
+	if n < len(pages) {
+		out.items = pages[n]
+	}
+	if n < len(pages)-1 {
+		out.next = aws.String(strconv.Itoa(n + 1))
 	}
 	return out, nil
+}
+
+// bgpKey identifies a ListCoreNetworkRoutingInformation call: "<segment>@<edge>" and, when it
+// matches a CIDR, " <mode>=<cidr>".
+func bgpKey(in *networkmanager.ListCoreNetworkRoutingInformationInput) string {
+	key := aws.ToString(in.SegmentName) + "@" + aws.ToString(in.EdgeLocation)
+	for mode, cidrs := range map[string][]string{
+		MatchExact: in.ExactPrefixMatches, MatchLongest: in.LongestPrefixMatches,
+		MatchSubnetOf: in.SubnetOfMatches, MatchSupernetOf: in.SupernetOfMatches,
+	} {
+		for _, c := range cidrs {
+			key += " " + mode + "=" + c
+		}
+	}
+	return key
 }
 
 // callKey identifies a GetNetworkRoutes call: "<table>@<edge>" and, when it matches a CIDR,
@@ -502,20 +564,16 @@ func TestResults_collect_errors(t *testing.T) {
 	}
 }
 
-// TestResults_collect_cancelled checks that a search whose context ends before the route tables
-// are read reports it, instead of an empty result that looks complete.
-func TestResults_collect_cancelled(t *testing.T) {
-	q, err := newQuery(map[string][]string{})
-	if err != nil {
-		t.Fatal(err)
-	}
+// TestRunCalls_cancelled checks that a search whose context ends before the route tables are read
+// reports it, instead of an empty result that looks complete.
+func TestRunCalls_cancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	r := New("network", Region, map[string][]string{}, "")
-	cn := &coreNetwork{id: "core-network-1"}
-	r.runCalls(ctx, fakeFixture(nil), cn, calls([]routeTable{{segment: "dc", edge: "eu-west-1"}}, q), q)
-	if len(r.Errors) != 1 || !strings.HasPrefix(r.Errors[0], "stopped before reading every route table") {
-		t.Errorf("runCalls(cancelled) errors = %q, want one stopped error", r.Errors)
+	read := func(context.Context, *routeCall) ([]dataRow, error) { return nil, nil }
+	_, got := runCalls(ctx, "core-network-1", []routeCall{{table: routeTable{segment: "dc", edge: "eu-west-1"}}},
+		read, "hint")
+	if len(got) != 1 || !strings.HasPrefix(got[0], "stopped before reading every route table") {
+		t.Errorf("runCalls(cancelled) errors = %q, want one stopped error", got)
 	}
 }
 
@@ -708,6 +766,9 @@ func TestRouteTables(t *testing.T) {
 	}
 }
 
+// routeCIDR returns the prefix of a route, for longestMatches.
+func routeCIDR(r *types.NetworkRoute) *string { return r.DestinationCidrBlock }
+
 // TestLongestMatches checks that the most specific route covering the CIDR wins, that a route more
 // specific than the CIDR, a route of the other address family and a prefix list route never match,
 // and that several routes of the same longest prefix are all kept.
@@ -736,7 +797,7 @@ func TestLongestMatches(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := []string{}
-			for _, r := range longestMatches(all, tt.cidr) {
+			for _, r := range longestMatches(all, tt.cidr, routeCIDR) {
 				got = append(got, aws.ToString(r.DestinationCidrBlock))
 			}
 			if !reflect.DeepEqual(got, tt.want) {

@@ -217,6 +217,16 @@ var engines = map[string]engine{
 		sortFields:     searchCloudWAN.GetSortFields,
 		sortFieldNames: searchCloudWAN.SortFieldNames,
 	},
+	// cloudwan-bgp is awss cloudwan bgp, global like cloudwan-routes.
+	"cloudwan-bgp": {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
+			r := searchCloudWAN.NewBGP(profile, region, filters, opts.SortField)
+			r.AccountNames = opts.AccountNames
+			return r
+		},
+		sortFields:     searchCloudWAN.GetBGPSortFields,
+		sortFieldNames: searchCloudWAN.BGPSortFieldNames,
+	},
 	// cloudwan-attachments is awss cloudwan attachments, global like cloudwan-routes.
 	"cloudwan-attachments": {
 		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {

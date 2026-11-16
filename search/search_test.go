@@ -156,7 +156,7 @@ func TestEngines_searchKeepsFilters(t *testing.T) {
 func TestEngines_registeredCommands(t *testing.T) {
 	for _, cmd := range []string{
 		"ec2", "eni", "ebs", "vpc", "subnet", "s3", "s3obj", "org", "rds", "rds-cluster", "cloudfront",
-		"cloudwan-routes", "cloudwan-attachments",
+		"cloudwan-routes", "cloudwan-bgp", "cloudwan-attachments",
 	} {
 		eng, ok := engines[cmd]
 		if !ok {
@@ -611,6 +611,10 @@ func TestEngines_accountNames(t *testing.T) {
 		{
 			name: "cloudwan-routes",
 			get:  func(r common.Results) map[string]string { return r.(*searchCloudWAN.Results).AccountNames },
+		},
+		{
+			name: "cloudwan-bgp",
+			get:  func(r common.Results) map[string]string { return r.(*searchCloudWAN.BGPResults).AccountNames },
 		},
 		{name: "cloudwan-attachments", get: func(r common.Results) map[string]string {
 			return r.(*searchCloudWANAtt.Results).AccountNames

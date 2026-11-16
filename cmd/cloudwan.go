@@ -30,11 +30,13 @@ import (
 const (
 	labelCloudWANRoutesSort      = "cloudwan.routes.sort"
 	labelCloudWANAttachmentsSort = "cloudwan.attachments.sort"
+	labelCloudWANBGPSort         = "cloudwan.bgp.sort"
 
 	flagSegments       = "segments"
 	flagEdges          = "edges"
 	flagTypes          = "types"
 	flagCoreNetworkIDs = "core-network-ids"
+	flagMatch          = "match"
 )
 
 // cloudwanRoutesFilters represents the filters of the cloudwan routes command, keyed by the
@@ -63,15 +65,35 @@ type cloudwanAttachmentsFilters struct {
 	CoreNetworkIDs []string `filter:"core-network-id"`
 }
 
+// cloudwanBGPFilters represents the filters of the cloudwan bgp command, keyed by the
+// search/cloudwan FilterKey constants.
+type cloudwanBGPFilters struct {
+	CIDRs          []string `filter:"cidr"`
+	Match          []string `filter:"match"`
+	Segments       []string `filter:"segment"`
+	Edges          []string `filter:"edge"`
+	NextHopTypes   []string `filter:"target-type"`
+	Communities    []string `filter:"community"`
+	ASNs           []string `filter:"asn"`
+	CoreNetworkIDs []string `filter:"core-network-id"`
+}
+
 var (
 	cloudwanRoutesF      = cloudwanRoutesFilters{}
 	cloudwanAttachmentsF = cloudwanAttachmentsFilters{}
+	cloudwanBGPF         = cloudwanBGPFilters{}
 )
+
+// cloudwanBGPFilterFlags lists the cloudwan bgp filter flag names: without any, the command lists
+// every BGP route.
+var cloudwanBGPFilterFlags = []string{
+	flagCIDRs, flagMatch, flagSegments, flagEdges, "next-hop-types", "communities", "asns", flagCoreNetworkIDs,
+}
 
 // cloudwanRoutesFilterFlags lists the cloudwan routes filter flag names: without any, the command
 // lists every route.
 var cloudwanRoutesFilterFlags = []string{
-	flagCIDRs, "match", flagSegments, "function-groups", flagEdges, flagTypes, flagStates, "target-types",
+	flagCIDRs, flagMatch, flagSegments, "function-groups", flagEdges, flagTypes, flagStates, "target-types",
 	flagCoreNetworkIDs,
 }
 
@@ -133,6 +155,34 @@ Which route does traffic to 10.20.1.5 take in the prod segment at eu-west-1?
 	RunE: cloudwanRoutesRunE,
 }
 
+// cloudwanBGPCmd searches the BGP routes of the segments, before the routing policies.
+var cloudwanBGPCmd = &cobra.Command{
+	Use:         "bgp",
+	Short:       "Show the BGP routes of the Cloud WAN segments before the routing policies: AS path, communities...",
+	Annotations: map[string]string{annotationEngine: "cloudwan-bgp"},
+	Long: `
+Show the BGP routes each Cloud WAN segment learned at each edge location, before the routing
+policies of the core network, with their AS path, communities, local preference, MED and next hop.
+
+Compare with cloudwan routes, which shows the routes after the policies: a prefix here and not
+there was dropped or summarised by a routing policy; a prefix in neither was never advertised.
+Network function groups have no BGP routes.
+
+  --cidrs, --match   as in cloudwan routes.
+  --next-hop-types   next hop type, such as direct-connect-gateway or vpc.
+  --communities      keep the routes that carry any of these communities, exact.
+  --asns             keep the routes whose AS path has any of these AS numbers.
+
+What does the data centre advertise over Direct Connect to the prod segment?
+	awss cloudwan bgp --profile network -s prod --next-hop-types direct-connect-gateway
+
+Did the prefix 10.50.0.0/16 arrive, and with which AS path?
+	awss cloudwan bgp --profile network --cidrs 10.50.0.0/16
+`,
+	Args: cobra.NoArgs,
+	RunE: cloudwanBGPRunE,
+}
+
 // cloudwanAttachmentsCmd lists the attachments of the core networks.
 var cloudwanAttachmentsCmd = &cobra.Command{
 	Use:         "attachments",
@@ -164,6 +214,19 @@ func cloudwanRoutesRunE(cmd *cobra.Command, _ []string) error {
 		sortLabel: labelCloudWANRoutesSort, filterFlags: cloudwanRoutesFilterFlags, optionalFilters: true,
 		accountNames: true,
 	}, nil, nil, cloudwanRoutesF)
+}
+
+func cloudwanBGPRunE(cmd *cobra.Command, _ []string) error {
+	f := &cloudwanBGPF
+	if err := searchCloudWAN.CheckBGPFlags(f.CIDRs, f.Match, f.ASNs); err != nil {
+		return err
+	}
+	viper.Set(labelRegions, []string{searchCloudWAN.Region})
+
+	return runSearch(cmd, &cmdSpec{
+		sortLabel: labelCloudWANBGPSort, filterFlags: cloudwanBGPFilterFlags, optionalFilters: true,
+		accountNames: true,
+	}, nil, nil, cloudwanBGPF)
 }
 
 func cloudwanAttachmentsRunE(cmd *cobra.Command, _ []string) error {
@@ -200,7 +263,7 @@ func cloudwanRoutesInitFlags() {
 
 	fl.StringSliceVarP(&f.CIDRs, flagCIDRs, "c", []string{},
 		"CIDRs or IP addresses to find in the route tables; a bare IP is its /32. `10.20.0.0/16,10.30.1.5`")
-	fl.StringSliceVarP(&f.Match, "match", "m", []string{},
+	fl.StringSliceVarP(&f.Match, flagMatch, "m", []string{},
 		listHelp("How a route must relate to each CIDR (default any)", searchCloudWAN.MatchNames(), "longest"))
 	fl.StringSliceVarP(&f.Segments, flagSegments, "s", []string{},
 		"Search the route tables of these segments only (globs). `'prod,shared*'`")
@@ -247,4 +310,32 @@ func cloudwanAttachmentsInitFlags() {
 
 func cloudwanAttachmentsInitViper() error {
 	return bindFlags(cloudwanAttachmentsCmd, map[string]string{labelCloudWANAttachmentsSort: flagSort})
+}
+
+func cloudwanBGPInitFlags() {
+	addCloudWANCommand(cloudwanBGPCmd)
+	f, fl := &cloudwanBGPF, cloudwanBGPCmd.Flags()
+
+	fl.StringSliceVarP(&f.CIDRs, flagCIDRs, "c", []string{},
+		"CIDRs or IP addresses to find in the BGP routes; a bare IP is its /32. `10.20.0.0/16,10.30.1.5`")
+	fl.StringSliceVarP(&f.Match, flagMatch, "m", []string{},
+		listHelp("How a route must relate to each CIDR (default any)", searchCloudWAN.MatchNames(), "longest"))
+	fl.StringSliceVarP(&f.Segments, flagSegments, "s", []string{},
+		"Search the BGP routes of these segments only (globs). `'prod,shared*'`")
+	fl.StringSliceVarP(&f.Edges, flagEdges, "e", []string{},
+		"Search the BGP routes of these edge locations only (globs). `'eu-west-1,us-*'`")
+	fl.StringSliceVar(&f.NextHopTypes, "next-hop-types", []string{},
+		listHelp("Keep the routes of these next hop types", searchCloudWAN.TargetTypeNames(),
+			"direct-connect-gateway"))
+	fl.StringSliceVar(&f.Communities, "communities", []string{},
+		"Keep the routes that carry any of these BGP communities, exact. `65000:100`")
+	fl.StringSliceVar(&f.ASNs, "asns", []string{},
+		"Keep the routes whose AS path has any of these AS numbers. `65010`")
+	fl.StringSliceVar(&f.CoreNetworkIDs, flagCoreNetworkIDs, []string{},
+		"Search these core networks only. `core-network-0123456789abcdef0`")
+	fl.String(flagSort, "segment", sortHelp("cloudwan-bgp", "BGP routes", "segment"))
+}
+
+func cloudwanBGPInitViper() error {
+	return bindFlags(cloudwanBGPCmd, map[string]string{labelCloudWANBGPSort: flagSort})
 }
