@@ -6,6 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.48.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.13
 	github.com/aws/aws-sdk-go-v2/service/cloudfront v1.75.2
+	github.com/aws/aws-sdk-go-v2/service/directconnect v1.56.0
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.296.1
 	github.com/aws/aws-sdk-go-v2/service/networkmanager v1.51.6
 	github.com/aws/aws-sdk-go-v2/service/organizations v1.61.2

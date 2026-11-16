@@ -37,6 +37,7 @@ import (
 	"github.com/dyegoe/awss/common"
 	searchCloudWAN "github.com/dyegoe/awss/search/cloudwan"
 	searchCloudWANAtt "github.com/dyegoe/awss/search/cloudwanatt"
+	searchDXGW "github.com/dyegoe/awss/search/dxgw"
 	searchENI "github.com/dyegoe/awss/search/eni"
 	searchSubnet "github.com/dyegoe/awss/search/subnet"
 	searchVPC "github.com/dyegoe/awss/search/vpc"
@@ -156,7 +157,7 @@ func TestEngines_searchKeepsFilters(t *testing.T) {
 func TestEngines_registeredCommands(t *testing.T) {
 	for _, cmd := range []string{
 		"ec2", "eni", "ebs", "vpc", "subnet", "s3", "s3obj", "org", "rds", "rds-cluster", "cloudfront",
-		"cloudwan-routes", "cloudwan-bgp", "cloudwan-attachments",
+		"cloudwan-routes", "cloudwan-bgp", "cloudwan-attachments", "dx-gateways",
 	} {
 		eng, ok := engines[cmd]
 		if !ok {
@@ -619,6 +620,7 @@ func TestEngines_accountNames(t *testing.T) {
 		{name: "cloudwan-attachments", get: func(r common.Results) map[string]string {
 			return r.(*searchCloudWANAtt.Results).AccountNames
 		}},
+		{name: "dx-gateways", get: func(r common.Results) map[string]string { return r.(*searchDXGW.Results).AccountNames }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

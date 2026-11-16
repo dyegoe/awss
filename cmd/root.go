@@ -134,6 +134,7 @@ var subcommands = []subcommand{
 	{cloudwanRoutesCmd, cloudwanRoutesInitFlags, cloudwanRoutesInitViper},
 	{cloudwanBGPCmd, cloudwanBGPInitFlags, cloudwanBGPInitViper},
 	{cloudwanAttachmentsCmd, cloudwanAttachmentsInitFlags, cloudwanAttachmentsInitViper},
+	{dxGatewaysCmd, dxGatewaysInitFlags, dxGatewaysInitViper},
 	{defaultVpcCmd, defaultVpcInitFlags, cleanupInitViper},
 	{dhcpOptionsCmd, dhcpOptionsInitFlags, cleanupInitViper},
 }
@@ -274,7 +275,7 @@ func initFlags() {
 	rootCmd.PersistentFlags().Int(labelConcurrency, search.DefaultConcurrency,
 		"How many profile and region searches run at once. The others wait for a free slot.")
 	rootCmd.PersistentFlags().String(labelOrgProfile, "",
-		"Add the account names of the AWS Organization to the Owner column of vpc, subnet, eni and cloudwan, "+
+		"Add the account names of the AWS Organization to the Owner column of vpc, subnet, eni, cloudwan and dx, "+
 			"listed with this `profile` (it needs organizations:ListAccounts). The accounts map of the "+
 			"config file wins. Off by default.")
 	rootCmd.PersistentFlags().Bool(labelStats, false,
