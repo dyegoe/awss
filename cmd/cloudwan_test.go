@@ -41,6 +41,42 @@ func TestCloudwanAttachmentsFilterFlags_coversStruct(t *testing.T) {
 		reflect.TypeOf(cloudwanAttachmentsFilters{}).NumField(), cloudwanAttachmentsFilterFlags)
 }
 
+// TestCloudwanBGPFilterFlags_coversStruct checks every cloudwanBGPFilters field has a registered
+// flag in the filter flag list.
+func TestCloudwanBGPFilterFlags_coversStruct(t *testing.T) {
+	resetCLI(t, nil)
+	checkFilterFlags(t, "cloudwanBGP", cloudwanBGPCmd, reflect.TypeOf(cloudwanBGPFilters{}).NumField(),
+		cloudwanBGPFilterFlags)
+}
+
+// TestExecute_cloudwanBGP checks the filters every cloudwan bgp flag sends to the search, and the
+// invalid values rejected before any search.
+func TestExecute_cloudwanBGP(t *testing.T) {
+	runFilterCases(t, "cloudwan-bgp", "segment", []filterCase{
+		{name: "no filter lists every route", args: []string{"cloudwan", "bgp"}, wantFilters: map[string][]string{}},
+		{
+			name: "every filter",
+			args: []string{
+				"cloudwan", "bgp", "-c", "10.0.0.0/8", "-m", "exact", "-s", "prod", "-e", "eu-*",
+				"--next-hop-types", "direct-connect-gateway", "--communities", "65000:100", "--asns", "65010,65020",
+				"--core-network-ids", "cn-1",
+			},
+			wantFilters: map[string][]string{
+				"cidr": {"10.0.0.0/8"}, "match": {"exact"}, "segment": {"prod"}, "edge": {"eu-*"},
+				"target-type": {"direct-connect-gateway"}, "community": {"65000:100"}, "asn": {"65010", "65020"},
+				"core-network-id": {"cn-1"},
+			},
+		},
+		{
+			name: "--sort", args: []string{"cloudwan", "bgp", "--sort", "as-path"}, wantFilters: map[string][]string{},
+			wantSort: "as-path",
+		},
+		{name: "bad asn", args: []string{"cloudwan", "bgp", "--asns", "AS65010"}, wantErr: "invalid AS number"},
+		{name: "bad cidr", args: []string{"cloudwan", "bgp", "-c", "x"}, wantErr: "invalid CIDR"},
+		{name: "no function groups", args: []string{"cloudwan", "bgp", "--function-groups", "x"}, wantErr: "unknown flag"},
+	})
+}
+
 // TestExecute_cloudwanRoutes checks the filters every cloudwan routes flag sends to the search,
 // and the invalid values rejected before any search.
 func TestExecute_cloudwanRoutes(t *testing.T) {
@@ -118,6 +154,7 @@ func TestExecute_cloudwanRegions(t *testing.T) {
 			name: "attachments",
 			args: []string{"cloudwan", "attachments", "--profiles", "dev,prod", "--regions", "eu-west-1"},
 		},
+		{name: "bgp", args: []string{"cloudwan", "bgp", "--profiles", "dev,prod", "--regions", "eu-west-1"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

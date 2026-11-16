@@ -132,6 +132,7 @@ var subcommands = []subcommand{
 	{rdsClusterCmd, rdsClusterInitFlags, rdsClusterInitViper},
 	{cloudfrontCmd, cloudfrontInitFlags, cloudfrontInitViper},
 	{cloudwanRoutesCmd, cloudwanRoutesInitFlags, cloudwanRoutesInitViper},
+	{cloudwanBGPCmd, cloudwanBGPInitFlags, cloudwanBGPInitViper},
 	{cloudwanAttachmentsCmd, cloudwanAttachmentsInitFlags, cloudwanAttachmentsInitViper},
 	{defaultVpcCmd, defaultVpcInitFlags, cleanupInitViper},
 	{dhcpOptionsCmd, dhcpOptionsInitFlags, cleanupInitViper},

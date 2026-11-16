@@ -163,14 +163,15 @@ func (r *Results) Search(ctx context.Context) {
 
 // collect searches every core network of the query with client, then sorts the rows.
 func (r *Results) collect(ctx context.Context, client routesAPI, q *query) {
-	nets, err := CoreNetworks(ctx, client, q.coreNetworks)
-	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
-		return
+	s := search[dataRow]{
+		tables: func(id string, c *types.CoreNetwork) []routeTable { return routeTables(id, c, q) },
+		read: func(ctx context.Context, cn *coreNetwork, c *routeCall) ([]dataRow, error) {
+			return routes(ctx, client, cn, c, q)
+		},
+		denied: "run it with a profile of the account that owns the core network",
 	}
-	for i := range nets {
-		r.searchCoreNetwork(ctx, client, &nets[i], q)
-	}
+	rows, msgs := s.run(ctx, client, q, r.AccountNames)
+	r.Data, r.Errors = append(r.Data, rows...), append(r.Errors, msgs...)
 
 	if r.SortField == "" {
 		return
@@ -196,39 +197,48 @@ type coreNetwork struct {
 // segment is how a route reached a segment it is shared with.
 type attachmentInfo struct{ name, owner, segment, edges string }
 
-// searchCoreNetwork reads the route tables of one core network and adds the routes that match q.
-// A failure is recorded in Errors and the run goes on with the next core network.
-func (r *Results) searchCoreNetwork(ctx context.Context, client routesAPI, s *types.CoreNetworkSummary, q *query) {
-	cn := coreNetwork{id: aws.ToString(s.CoreNetworkId), globalNetworkID: aws.ToString(s.GlobalNetworkId)}
+// coreNetworkAPI is the part of the Network Manager client that reads a core network and its
+// attachments.
+type coreNetworkAPI interface {
+	networkmanager.ListAttachmentsAPIClient
+	getCoreNetworkAPI
+}
+
+// loadCoreNetwork reads one core network, and returns what its calls need, the route tables
+// tablesOf picks, and the error messages. No tables means there is nothing to read: the core
+// network could not be read, or no table passes the filters.
+func loadCoreNetwork(
+	ctx context.Context, client coreNetworkAPI, s *types.CoreNetworkSummary, accountNames map[string]string,
+	tablesOf func(coreNetworkID string, c *types.CoreNetwork) []routeTable,
+) (*coreNetwork, []routeTable, []string) {
+	cn := &coreNetwork{id: aws.ToString(s.CoreNetworkId), globalNetworkID: aws.ToString(s.GlobalNetworkId)}
 
 	out, err := client.GetCoreNetwork(ctx, &networkmanager.GetCoreNetworkInput{CoreNetworkId: aws.String(cn.id)})
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error reading core network %s: %v", cn.id, err))
-		return
+		return cn, nil, []string{fmt.Sprintf("error reading core network %s: %v", cn.id, err)}
 	}
 	if out == nil || out.CoreNetwork == nil {
-		return
+		return cn, nil, nil
 	}
 	if gid := aws.ToString(out.CoreNetwork.GlobalNetworkId); gid != "" {
 		cn.globalNetworkID = gid
 	}
-
-	tables := routeTables(cn.id, out.CoreNetwork, q)
+	tables := tablesOf(cn.id, out.CoreNetwork)
 	if len(tables) == 0 {
-		return
+		return cn, nil, nil
 	}
 
 	// The names are a convenience: without them the rows still show the attachment IDs.
-	cn.attachments, cn.accountNames = map[string]attachmentInfo{}, r.AccountNames
+	var msgs []string
+	cn.attachments, cn.accountNames = map[string]attachmentInfo{}, accountNames
 	atts, err := Attachments(ctx, client, cn.id)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("no attachment names: %v", err))
+		msgs = append(msgs, fmt.Sprintf("no attachment names: %v", err))
 	}
 	for i := range atts {
 		cn.attachments[aws.ToString(atts[i].AttachmentId)] = newAttachmentInfo(&atts[i])
 	}
-
-	r.runCalls(ctx, client, &cn, calls(tables, q), q)
+	return cn, tables, msgs
 }
 
 // newAttachmentInfo returns what a route row shows of an attachment.

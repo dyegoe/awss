@@ -1,0 +1,35 @@
+{
+    "CoreNetworkRoutingInformation": [
+        {
+            "Prefix": "10.216.0.0/16",
+            "NextHop": {
+                "CoreNetworkAttachmentId": "attachment-0000000000000dev1",
+                "ResourceId": "vpc-0000000000000dev1",
+                "ResourceType": "vpc"
+            }
+        },
+        {
+            "Prefix": "10.0.0.0/16",
+            "AsPath": ["65100", "65201", "65201", "64700"],
+            "LocalPreference": "0",
+            "Med": "0",
+            "NextHop": {
+                "CoreNetworkAttachmentId": "attachment-00000000000000dx1",
+                "ResourceId": "00000000-0000-0000-0000-000000000dx1",
+                "ResourceType": "direct-connect-gateway"
+            }
+        },
+        {
+            "Prefix": "10.0.4.0/22",
+            "AsPath": ["64512", "65300", "64700"],
+            "LocalPreference": "0",
+            "Med": "100",
+            "NextHop": {
+                "CoreNetworkAttachmentId": "attachment-00000000000000tg1",
+                "ResourceId": "tgw-rtb-000000000000000s1",
+                "ResourceType": "transit-gateway-route-table"
+            }
+        }
+    ],
+    "NextToken": null
+}
