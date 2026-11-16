@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/networkmanager"
 	"github.com/aws/aws-sdk-go-v2/service/networkmanager/types"
 )
 
@@ -413,5 +414,64 @@ func TestGetBGPSortFields(t *testing.T) {
 	r.collect(context.Background(), bgpFixture(nil), q)
 	if len(r.Errors) != 1 {
 		t.Errorf("collect(sort cidr) errors = %q, want one", r.Errors)
+	}
+}
+
+// TestBGPResults_collect_awsFixtures checks the BGP routes of a segment from the shape AWS really
+// returns: an AS path of one AS number per item, no communities, a VPC route without BGP
+// attributes, and a next hop that names only the attachment, its type and resource, so its
+// segment comes from the attachments. A more specific prefix of the data centre arrives through a
+// legacy Transit Gateway route table.
+func TestBGPResults_collect_awsFixtures(t *testing.T) {
+	var bgp networkmanager.ListCoreNetworkRoutingInformationOutput
+	loadFixture(t, "list-core-network-routing-information.json", &bgp)
+	tests := []struct {
+		name    string
+		filters map[string][]string
+		want    []string
+	}{
+		{
+			name:    "segment",
+			filters: map[string][]string{FilterKeySegment: {"dev"}},
+			want: []string{
+				"10.216.0.0/16 vpc dev   ",
+				"10.0.0.0/16 direct-connect-gateway sharedsvc 65100 65201 65201 64700 0 0",
+				"10.0.4.0/22 transit-gateway-route-table sharedsvc 64512 65300 64700 0 100",
+			},
+		},
+		{
+			name:    "asn of the data centre",
+			filters: map[string][]string{FilterKeySegment: {"dev"}, FilterKeyASN: {"65201"}},
+			want:    []string{"10.0.0.0/16 direct-connect-gateway sharedsvc 65100 65201 65201 64700 0 0"},
+		},
+		{
+			name: "longest",
+			filters: map[string][]string{
+				FilterKeySegment: {"dev"}, FilterKeyCIDR: {"10.0.5.1"}, FilterKeyMatch: {MatchLongest},
+			},
+			want: []string{"10.0.4.0/22 transit-gateway-route-table sharedsvc 64512 65300 64700 0 100"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := awsFixture(t)
+			client.bgp = map[string][][]types.CoreNetworkRoutingInformation{
+				"dev@eu-central-1": {bgp.CoreNetworkRoutingInformation},
+			}
+			r := collectBGP(t, client, tt.filters)
+			if len(r.Errors) != 0 {
+				t.Fatalf("collect() errors = %q, want none", r.Errors)
+			}
+			got := []string{}
+			for i := range r.Data {
+				d := &r.Data[i]
+				got = append(got, strings.Join([]string{
+					d.Prefix, d.NextHopType, d.NextHopSegment, d.ASPath, d.LocalPreference, d.MED,
+				}, " "))
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("collect(%v) rows =\n%q\nwant\n%q", tt.filters, got, tt.want)
+			}
+		})
 	}
 }

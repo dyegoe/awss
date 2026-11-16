@@ -479,6 +479,10 @@ One row per BGP route: **Query**, **Segment**, **Edge**, **Prefix**, **AS Path**
   most 5 at once. Network function groups have no BGP routes. `longest` reads every route of the
   segment and awss picks the most specific one, as in `cloudwan routes`. `--next-hop-types`,
   `--communities` and `--asns` are filtered by awss.
+- **What it shows:** every candidate path, so a prefix advertised over several attachments (two
+  Direct Connect gateways, many Transit Gateway route tables) has one row per path, and a segment
+  can have many more rows here than in `cloudwan routes`. VPC routes have no AS path, local
+  preference or MED. Narrow it with `--cidrs`, `--next-hop-types` or `--asns`.
 - Global, and run with the network account profile, as `cloudwan routes`.
 - **JSON only:** `core_network_id`, `next_hop_ip` (such as the BGP peer of a Connect peer),
   `attachment_id`, `next_hop_edge`.
