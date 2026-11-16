@@ -35,6 +35,7 @@ import (
 	searchCloudFront "github.com/dyegoe/awss/search/cloudfront"
 	searchCloudWAN "github.com/dyegoe/awss/search/cloudwan"
 	searchCloudWANAtt "github.com/dyegoe/awss/search/cloudwanatt"
+	searchDXGW "github.com/dyegoe/awss/search/dxgw"
 	searchEBS "github.com/dyegoe/awss/search/ebs"
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
 	searchENI "github.com/dyegoe/awss/search/eni"
@@ -236,6 +237,17 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchCloudWANAtt.GetSortFields,
 		sortFieldNames: searchCloudWANAtt.SortFieldNames,
+	},
+	// dx-gateways is awss dx gateways. A Direct Connect gateway is global: the command passes the
+	// region searchDXGW.Region.
+	"dx-gateways": {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
+			r := searchDXGW.New(profile, region, filters, opts.SortField)
+			r.AccountNames = opts.AccountNames
+			return r
+		},
+		sortFields:     searchDXGW.GetSortFields,
+		sortFieldNames: searchDXGW.SortFieldNames,
 	},
 	// default-vpc is the cleanup of the default VPCs (awss cleanup default-vpc). It deletes only
 	// with opts.Apply; otherwise it reports the plan.

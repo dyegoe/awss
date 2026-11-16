@@ -140,8 +140,8 @@ func TestExecute_cloudwanAttachments(t *testing.T) {
 	})
 }
 
-// TestExecute_cloudwanRegions checks that the cloudwan commands search every profile once, in the
-// global region whatever --regions says, with the account names for the Owner column.
+// TestExecute_cloudwanRegions checks that the cloudwan and dx commands search every profile once, in
+// the global region whatever --regions says, with the account names for the Owner column.
 func TestExecute_cloudwanRegions(t *testing.T) {
 	tests := []struct {
 		name string
@@ -156,6 +156,7 @@ func TestExecute_cloudwanRegions(t *testing.T) {
 			args: []string{"cloudwan", "attachments", "--profiles", "dev,prod", "--regions", "eu-west-1"},
 		},
 		{name: "bgp", args: []string{"cloudwan", "bgp", "--profiles", "dev,prod", "--regions", "eu-west-1"}},
+		{name: "dx gateways", args: []string{"dx", "gateways", "--profiles", "dev,prod", "--regions", "eu-west-1"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -22,6 +22,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Account names next to owner account IDs, from the `accounts` map of the config file or, with `--org-profile`, from AWS Organizations; see [Account names](#account-names)
 - Shell completion of commands, flags and the values of the flags that take a known list (sort fields, profiles, regions, states); see [Shell completion](#shell-completion)
 - AWS Cloud WAN: find a CIDR in the route tables of the segments and see where it points (`awss cloudwan routes`), see the BGP routes before the routing policies with their AS path and communities (`awss cloudwan bgp`), and list the attachments (`awss cloudwan attachments`); see [Cloud WAN routes](#cloud-wan-routes-awss-cloudwan-routes)
+- AWS Direct Connect: list the gateways, what they are associated with and the prefixes they advertise to the data centres (`awss dx gateways`); see [Direct Connect gateways](#direct-connect-gateways-awss-dx-gateways)
 - Cleanup of the default VPCs with no workload (`awss cleanup default-vpc`) and of the unused DHCP options sets (`awss cleanup dhcp-options`), a preview unless `--apply`; see [Cleanup](#cleanup)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
@@ -546,6 +547,61 @@ attached resource, from its ARN), **Owner ID**, **Owner** and, with `--show-tags
 
 Sort by: `--sort segment|id|name|type|edge|state|resource|owner|owner-name|created|core-network` (default: `segment`)
 
+#### Direct Connect gateways (`awss dx gateways`)
+
+Lists the Direct Connect gateways, what each one is associated with (a transit gateway, a virtual
+private gateway or a Cloud WAN core network), the prefixes it advertises to the data centres, and
+the virtual interfaces (VIFs) attached to it: the BGP sessions to the data centres.
+
+The allowed prefixes of an association to a transit gateway or a virtual private gateway are what
+the data centres learn over Direct Connect from that gateway. An association to a Cloud WAN core
+network has none: Cloud WAN advertises the routes of the segment the gateway is attached to, which
+`awss cloudwan routes` shows.
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--ids` | `-i` | Gateway IDs, exact |
+| `--names` | `-n` | Gateway names (globs) |
+| `--cidrs` | `-c` | CIDRs or IP addresses to find in the allowed prefixes; a bare IP is its /32 |
+| `--match` | `-m` | How an allowed prefix must relate to each CIDR: `any` (default: exact, subnet-of and supernet-of), `exact`, `subnet-of` (inside the CIDR), `supernet-of` (covering it: the prefixes that carry an address) |
+| `--associated-types` | | `core-network`, `transit-gateway`, `virtual-private-gateway` |
+| `--associated-ids` | | Transit gateway, virtual private gateway or core network IDs, exact |
+| `--states` | | Association states: `associating`, `associated`, `disassociating`, `disassociated`, `updating` |
+
+```bash
+# Is 10.20.1.5 advertised to the data centres, and by which gateway and association?
+awss dx gateways --profile network --cidrs 10.20.1.5 --match supernet-of
+
+# The gateways attached to Cloud WAN, and their VIFs
+awss dx gateways --profile network --associated-types core-network
+
+# Everything one transit gateway advertises over Direct Connect, in address order
+awss dx gateways --profile network --associated-ids tgw-0123456789abcdef0 --sort prefix
+```
+
+Columns: **Query**, **Gateway ID**, **Gateway**, **Amazon ASN**, **Associated Type**,
+**Associated ID**, **Region** (of the associated gateway), **Owner ID**, **Owner**, **State** (of
+the association), **Allowed Prefix** and **VIFs**.
+
+- One row per allowed prefix of each association, or per allowed prefix and searched CIDR with
+  `--cidrs`. An association without allowed prefixes, and a gateway without associations, is one
+  row with those columns empty; `--cidrs` and the association filters leave them out.
+- Every filter is matched by awss on the results. Filters combine with AND.
+- A Direct Connect gateway is global: the command searches each profile once, in the region of the
+  profile (us-east-1 when it names none), and ignores `--regions`. Run it with a profile of the
+  account that owns the gateways, usually the network account.
+- AWS lists the associations and the VIFs of one gateway per call, so the command makes two calls
+  per gateway.
+- **JSON only:** `gateway_state`, `gateway_owner_id`, `association_id`,
+  `core_network_attachment_id` (the Cloud WAN attachment of the gateway), `state_change_error` and
+  `vif_attachments` (each VIF with its region, owner and state).
+- **Permission:** `directconnect:DescribeDirectConnectGateways`,
+  `directconnect:DescribeDirectConnectGatewayAssociations` and
+  `directconnect:DescribeDirectConnectGatewayAttachments`.
+
+Sort by: `--sort gateway|gateway-id|amazon-asn|associated-type|associated-id|region|owner|owner-name|state|prefix|query` (default: `gateway`). Rows equal
+on the sort field stay grouped by gateway and association, the prefixes in address order.
+
 ### Cleanup
 
 The cleanup commands are the only ones that change your AWS accounts. Each one shows its plan
@@ -725,7 +781,7 @@ awss stats
 
 ### Account names
 
-`vpc`, `subnet`, `eni`, `cloudwan routes`, `cloudwan bgp` and `cloudwan attachments` show an **Owner** column (JSON `owner_name`, sort field `owner-name`)
+`vpc`, `subnet`, `eni`, `cloudwan routes`, `cloudwan bgp`, `cloudwan attachments` and `dx gateways` show an **Owner** column (JSON `owner_name`, sort field `owner-name`)
 next to **Owner ID**: the name of the account, which matters in a shared VPC, where the owner is
 usually a network account. The names come from the `accounts` map of `~/.awss/config.yaml`, from
 account ID to name, with no AWS call:

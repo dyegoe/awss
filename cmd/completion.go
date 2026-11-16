@@ -28,6 +28,7 @@ import (
 	"github.com/dyegoe/awss/search"
 	searchCloudWAN "github.com/dyegoe/awss/search/cloudwan"
 	searchCloudWANAtt "github.com/dyegoe/awss/search/cloudwanatt"
+	searchDXGW "github.com/dyegoe/awss/search/dxgw"
 	searchOrg "github.com/dyegoe/awss/search/org"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -143,13 +144,17 @@ func fixedLists() map[string]map[string]func() []string {
 		},
 		"org": {flagStatuses: searchOrg.StatusNames},
 		"cloudwan-routes": {
-			"match":        searchCloudWAN.MatchNames,
+			flagMatch:      searchCloudWAN.MatchNames,
 			"types":        searchCloudWAN.TypeNames,
 			flagStates:     searchCloudWAN.StateNames,
 			"target-types": cloudwanTargetTypes,
 		},
-		"cloudwan-bgp":         {"match": searchCloudWAN.MatchNames, "next-hop-types": searchCloudWAN.TargetTypeNames},
+		"cloudwan-bgp":         {flagMatch: searchCloudWAN.MatchNames, "next-hop-types": searchCloudWAN.TargetTypeNames},
 		"cloudwan-attachments": {"types": searchCloudWANAtt.TypeNames, flagStates: searchCloudWANAtt.StateNames},
+		"dx-gateways": {
+			flagMatch: searchDXGW.MatchNames, "associated-types": searchDXGW.AssociatedTypeNames,
+			flagStates: searchDXGW.StateNames,
+		},
 	}
 }
 
