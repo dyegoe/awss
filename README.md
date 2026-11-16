@@ -21,6 +21,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Run stats: `--stats` prints elapsed time, peak memory, search counts and AWS API calls on stderr; see [Run report and stats](#run-report-and-stats)
 - Account names next to owner account IDs, from the `accounts` map of the config file or, with `--org-profile`, from AWS Organizations; see [Account names](#account-names)
 - Shell completion of commands, flags and the values of the flags that take a known list (sort fields, profiles, regions, states); see [Shell completion](#shell-completion)
+- AWS Cloud WAN: find a CIDR in the route tables of the segments and see where it points (`awss cloudwan routes`), and list the attachments (`awss cloudwan attachments`); see [Cloud WAN routes](#cloud-wan-routes-awss-cloudwan-routes)
 - Cleanup of the default VPCs with no workload (`awss cleanup default-vpc`) and of the unused DHCP options sets (`awss cleanup dhcp-options`), a preview unless `--apply`; see [Cleanup](#cleanup)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
@@ -373,6 +374,108 @@ with AND.
 
 Sort by: `--sort id|domain|status|modified` (default: `id`)
 
+#### Cloud WAN routes (`awss cloudwan routes`)
+
+Finds which segments and edge locations of an AWS Cloud WAN core network have a route to a CIDR,
+and where each route points: a VPC, a Direct Connect gateway, a VPN, a Connect peer, a Transit
+Gateway route table, or nowhere (blackhole). It answers reachability questions such as "is the
+data centre prefix learned over Direct Connect in the prod segment at every edge?" without going
+through the route table of every segment in the console.
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--cidrs` | `-c` | CIDRs or IP addresses to find; a bare IP is its `/32` (IPv6 too). Without it, every route of the selected route tables is listed |
+| `--match` | `-m` | How a route must relate to each CIDR: `any` (default: `exact`, `subnet-of` and `supernet-of` together), `exact`, `longest` (the route traffic takes), `subnet-of` (routes inside the CIDR), `supernet-of` (routes covering it) |
+| `--segments` | `-s` | Route tables of these segments only (globs) |
+| `--function-groups` | | Route tables of these network function groups only (globs) |
+| `--edges` | `-e` | Route tables of these edge locations only (globs) |
+| `--types` | `-T` | Route types: `propagated`, `static`, `system` |
+| `--states` | | Route states: `active`, `blackhole` |
+| `--target-types` | | Next hop types, such as `direct-connect-gateway`, `vpc`, `vpn`, `connect-peer`, `transit-gateway-route-table`, `blackhole` |
+| `--core-network-ids` | | Core networks to search; default every core network the profile sees |
+
+```bash
+# Is the data centre prefix learned over Direct Connect, and in which segments and edges?
+awss cloudwan routes -p network --cidrs 10.50.0.0/16 --target-types direct-connect-gateway
+
+# Which route does traffic to 10.20.1.5 take in the prod segment at eu-west-1?
+awss cloudwan routes -p network --cidrs 10.20.1.5 --match longest -s prod -e eu-west-1
+
+# Every route of the prod segment, by CIDR
+awss cloudwan routes -p network -s prod --sort cidr
+
+# The blackholes of every route table
+awss cloudwan routes -p network --states blackhole
+```
+
+One row per route destination: **Query** (the CIDR searched), **Segment** (`nfg:<name>` for a
+network function group), **Edge**, **CIDR**, **Type**, **State**, **Target Type**, **Target ID**,
+**Attachment** (the Name tag of the attachment), **Target Segment** (another segment for a route
+shared between segments), **Owner ID** and **Owner** (the account of the attachment; see
+[Account names](#account-names)).
+
+- **Profile:** run it with a profile of the account that owns the core network, usually the
+  network account. An account the core network is shared with gets AccessDenied, reported once
+  per core network.
+- **Global:** Network Manager is global and answers in `us-west-2`, so the command searches each
+  profile once, in no region; `--regions` is ignored and the result set shows the region
+  `global`. Use `--edges` to pick edge locations.
+- **Calls:** one `GetNetworkRoutes` call per route table (each segment and each network function
+  group, at each edge location), per CIDR and per match mode (`any` is three), at most 5 at once.
+  AWS has no call that reads several route tables, and does not document how several match
+  fields of one call combine, so awss sends one each. `--segments`, `--edges` and `--match` cut
+  the calls. `--types` and `--states` are filtered by AWS, `--target-types` by awss.
+- **What it shows:** the routes Cloud WAN installed, after its routing policies. A prefix the data
+  centre advertised but a policy dropped is not there.
+- **Transit Gateway:** behind a Transit Gateway route table attachment, the route points to the
+  Transit Gateway route table; the VPC behind it is in the Transit Gateway's own route tables.
+- **JSON only:** `core_network_id`, `prefix_list_id`, `attachment_id`, `target_edge`,
+  `transit_gateway_attachment_id`.
+- **Permission:** `networkmanager:ListCoreNetworks`, `networkmanager:GetCoreNetwork`,
+  `networkmanager:GetNetworkRoutes`, and `networkmanager:ListAttachments` for the attachment
+  names and owners.
+
+Sort by: `--sort segment|edge|cidr|query|type|state|target-type|target-id|target-segment|attachment|attachment-name|owner|owner-name|core-network` (default: `segment`)
+
+#### Cloud WAN attachments (`awss cloudwan attachments`)
+
+Lists the attachments of the Cloud WAN core networks: which VPC, Direct Connect gateway,
+Site-to-Site VPN, Connect or Transit Gateway route table is attached to which segment, at which
+edge locations, owned by which account.
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--ids` | `-i` | Attachment IDs, exact |
+| `--names` | `-n` | Name tags (globs) |
+| `--types` | `-T` | `vpc`, `direct-connect-gateway`, `site-to-site-vpn`, `connect`, `transit-gateway-route-table` |
+| `--segments` | `-s` | Segments, or `nfg:<name>` for a network function group (globs) |
+| `--edges` | `-e` | Edge locations (globs); a Direct Connect gateway spans several and matches when any does |
+| `--states` | | States, such as `available`, `pending-attachment-acceptance`, `failed` |
+| `--core-network-ids` | | Core networks to list; default every core network the profile sees |
+
+```bash
+# The Direct Connect gateways, and the segments and edges they serve
+awss cloudwan attachments -p network --types direct-connect-gateway
+
+# What is attached to the prod segment, with the account names of the organization
+awss cloudwan attachments -p network -s prod --org-profile org-management
+
+# Attachments waiting for acceptance or failed
+awss cloudwan attachments -p network --states pending-attachment-acceptance,failed
+```
+
+Columns: **ID**, **Name**, **Type**, **Segment**, **Edges**, **State**, **Resource** (the ID of the
+attached resource, from its ARN), **Owner ID**, **Owner** and, with `--show-tags`, **Tags**.
+
+- `ListAttachments` filters on one value at most, so awss lists every attachment of the core
+  network and matches the filters on the results. Filters combine with AND.
+- Global, and run with the network account profile, as `cloudwan routes`.
+- **JSON only:** `core_network_id`, `resource_arn`, `policy_rule` (the attachment policy rule that
+  placed it in its segment) and `created` (RFC 3339 in UTC).
+- **Permission:** `networkmanager:ListCoreNetworks` and `networkmanager:ListAttachments`.
+
+Sort by: `--sort segment|id|name|type|edge|state|resource|owner|owner-name|created|core-network` (default: `segment`)
+
 ### Cleanup
 
 The cleanup commands are the only ones that change your AWS accounts. Each one shows its plan
@@ -552,7 +655,7 @@ awss stats
 
 ### Account names
 
-`vpc`, `subnet` and `eni` show an **Owner** column (JSON `owner_name`, sort field `owner-name`)
+`vpc`, `subnet`, `eni`, `cloudwan routes` and `cloudwan attachments` show an **Owner** column (JSON `owner_name`, sort field `owner-name`)
 next to **Owner ID**: the name of the account, which matters in a shared VPC, where the owner is
 usually a network account. The names come from the `accounts` map of `~/.awss/config.yaml`, from
 account ID to name, with no AWS call:
@@ -571,7 +674,7 @@ accounts:
   used: a profile name such as `admins-network-prd` names a role in an account, not the account.
 
 **Names from AWS Organizations (opt-in).** `--org-profile <profile>`, or `org-profile:` in the
-config file, makes `vpc`, `subnet` and `eni` call `organizations:ListAccounts` once per run with
+config file, makes the commands with an **Owner** column call `organizations:ListAccounts` once per run with
 that profile and name every account of the organization:
 
 ```bash
@@ -802,6 +905,9 @@ awss --regions all s3obj -b my-logs -K 'logs/2024-01/*.gz' --sort size
 
 # Every PostgreSQL 13 instance, everywhere
 awss rds -e postgres -V '13*' --profiles all --regions all
+
+# Is a data centre prefix learned over Direct Connect in the Cloud WAN segments?
+awss cloudwan routes -p network --cidrs 10.50.0.0/16 --target-types direct-connect-gateway
 
 # The plan to delete the default VPCs of one account, in every region (nothing changes)
 awss cleanup default-vpc --profiles sandbox --regions all

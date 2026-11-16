@@ -70,10 +70,10 @@ func TestRegisterCompletions_sort(t *testing.T) {
 		if sub.cmd.Flags().Lookup(flagSort) == nil {
 			continue
 		}
-		name := sub.cmd.Name()
+		name := engineName(sub.cmd)
 		t.Run(name, func(t *testing.T) {
 			resetCLI(t, nil)
-			got, directive := complete(t, name, "--sort", "")
+			got, directive := complete(t, append(commandArgs(sub.cmd), "--sort", "")...)
 			if want := search.SortFieldNames(name); len(want) == 0 || !reflect.DeepEqual(got, want) {
 				t.Errorf("complete(%s --sort) = %v, want %v", name, got, want)
 			}
@@ -193,7 +193,7 @@ func TestFixedLists_inHelp(t *testing.T) {
 	resetCLI(t, nil)
 	for _, sub := range subcommands {
 		lists := map[string]func() []string{}
-		maps.Copy(lists, fixedLists()[sub.cmd.Name()])
+		maps.Copy(lists, fixedLists()[engineName(sub.cmd)])
 		if sub.cmd.Flags().Lookup(flagAvailabilityZones) != nil {
 			lists[flagAvailabilityZones] = common.AvailabilityZoneLetters
 		}

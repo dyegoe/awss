@@ -33,6 +33,8 @@ import (
 	"github.com/dyegoe/awss/cleanup/dhcpoptions"
 	"github.com/dyegoe/awss/common"
 	searchCloudFront "github.com/dyegoe/awss/search/cloudfront"
+	searchCloudWAN "github.com/dyegoe/awss/search/cloudwan"
+	searchCloudWANAtt "github.com/dyegoe/awss/search/cloudwanatt"
 	searchEBS "github.com/dyegoe/awss/search/ebs"
 	searchEC2 "github.com/dyegoe/awss/search/ec2"
 	searchENI "github.com/dyegoe/awss/search/eni"
@@ -203,6 +205,27 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchCloudFront.GetSortFields,
 		sortFieldNames: searchCloudFront.SortFieldNames,
+	},
+	// cloudwan-routes is awss cloudwan routes. Network Manager is global: the command passes the
+	// region searchCloudWAN.Region.
+	"cloudwan-routes": {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
+			r := searchCloudWAN.New(profile, region, filters, opts.SortField)
+			r.AccountNames = opts.AccountNames
+			return r
+		},
+		sortFields:     searchCloudWAN.GetSortFields,
+		sortFieldNames: searchCloudWAN.SortFieldNames,
+	},
+	// cloudwan-attachments is awss cloudwan attachments, global like cloudwan-routes.
+	"cloudwan-attachments": {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
+			r := searchCloudWANAtt.New(profile, region, filters, opts.SortField)
+			r.AccountNames = opts.AccountNames
+			return r
+		},
+		sortFields:     searchCloudWANAtt.GetSortFields,
+		sortFieldNames: searchCloudWANAtt.SortFieldNames,
 	},
 	// default-vpc is the cleanup of the default VPCs (awss cleanup default-vpc). It deletes only
 	// with opts.Apply; otherwise it reports the plan.

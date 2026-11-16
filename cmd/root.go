@@ -131,6 +131,8 @@ var subcommands = []subcommand{
 	{rdsCmd, rdsInitFlags, rdsInitViper},
 	{rdsClusterCmd, rdsClusterInitFlags, rdsClusterInitViper},
 	{cloudfrontCmd, cloudfrontInitFlags, cloudfrontInitViper},
+	{cloudwanRoutesCmd, cloudwanRoutesInitFlags, cloudwanRoutesInitViper},
+	{cloudwanAttachmentsCmd, cloudwanAttachmentsInitFlags, cloudwanAttachmentsInitViper},
 	{defaultVpcCmd, defaultVpcInitFlags, cleanupInitViper},
 	{dhcpOptionsCmd, dhcpOptionsInitFlags, cleanupInitViper},
 }
@@ -271,7 +273,7 @@ func initFlags() {
 	rootCmd.PersistentFlags().Int(labelConcurrency, search.DefaultConcurrency,
 		"How many profile and region searches run at once. The others wait for a free slot.")
 	rootCmd.PersistentFlags().String(labelOrgProfile, "",
-		"Add the account names of the AWS Organization to the Owner column of vpc, subnet and eni, "+
+		"Add the account names of the AWS Organization to the Owner column of vpc, subnet, eni and cloudwan, "+
 			"listed with this `profile` (it needs organizations:ListAccounts). The accounts map of the "+
 			"config file wins. Off by default.")
 	rootCmd.PersistentFlags().Bool(labelStats, false,
@@ -465,6 +467,19 @@ func intLabel(label string) int {
 	return viper.GetInt(label)
 }
 
+// annotationEngine is the cobra annotation that names the search engine of a command whose name is
+// not its engine key: a command of a group, such as cloudwan routes, whose engine is
+// cloudwan-routes.
+const annotationEngine = "awss-engine"
+
+// engineName returns the key of the search engine of cmd: its annotationEngine, or its name.
+func engineName(cmd *cobra.Command) string {
+	if e := cmd.Annotations[annotationEngine]; e != "" {
+		return e
+	}
+	return cmd.Name()
+}
+
 // executeSearch runs the search. It is a variable so tests can replace the AWS calls.
 var executeSearch = search.Execute
 
@@ -474,7 +489,7 @@ var executeSearch = search.Execute
 // writes on stderr a line when a search failed, and the stats of the run with --stats: stdout
 // stays only the results, so JSON output still parses. A failed search does not fail the command.
 func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStruct interface{}) error {
-	if err := search.CheckSortField(cmd.Name(), viper.GetString(spec.sortLabel)); err != nil {
+	if err := search.CheckSortField(engineName(cmd), viper.GetString(spec.sortLabel)); err != nil {
 		return err
 	}
 
@@ -495,7 +510,7 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 
 	start := time.Now()
 	summary, err := executeSearch(
-		cmd.Name(),
+		engineName(cmd),
 		viper.GetStringSlice(labelProfiles),
 		viper.GetStringSlice(labelRegions),
 		filters,
