@@ -391,7 +391,7 @@ through the route table of every segment in the console.
 | `--edges` | `-e` | Route tables of these edge locations only (globs) |
 | `--types` | `-T` | Route types: `propagated`, `static`, `system` |
 | `--states` | | Route states: `active`, `blackhole` |
-| `--target-types` | | Next hop types, such as `direct-connect-gateway`, `vpc`, `vpn`, `connect-peer`, `transit-gateway-route-table`, `blackhole` |
+| `--target-types` | | Next hop types, such as `direct-connect-gateway`, `vpc`, `vpn`, `connect-peer`, `transit-gateway-route-table`, `blackhole`; `dx`, `tgw` and `connect` for short |
 | `--core-network-ids` | | Core networks to search; default every core network the profile sees |
 
 ```bash
@@ -439,14 +439,22 @@ attachments of the core network.
   `networkmanager:GetNetworkRoutes`, and `networkmanager:ListAttachments` for the attachment
   names and owners.
 
-Sort by: `--sort segment|edge|cidr|query|type|state|target-type|target-id|target-segment|attachment|attachment-name|owner|owner-name|core-network` (default: `segment`)
+Sort by: `--sort segment|edge|cidr|query|type|state|target-type|target-id|target-segment|attachment|attachment-name|owner|owner-name|core-network` (default: `segment`). `cidr` sorts by address (`10.2.0.0/16` before `10.100.0.0/16`, a supernet before its subnets), and rows equal on the sort field stay in route table order: segment, edge, CIDR.
 
 #### Cloud WAN BGP routes (`awss cloudwan bgp`)
 
 Shows the BGP routes each segment learned at each edge location **before** the routing policies
-of the core network, with their AS path, communities, local preference, MED and next hop. Compared
-with `cloudwan routes` (after the policies), it tells "the data centre never advertised the prefix"
-(in neither) from "a routing policy dropped or summarised it" (here, not in `cloudwan routes`).
+of the core network, with their AS path, communities, local preference, MED and next hop, and
+whether each made it into the route table (**Installed**, from `cloudwan routes`):
+
+- `yes`: the installed route of the prefix points to this path's attachment;
+- `no`: the installed route of the prefix points to another attachment, such as the backup Direct
+  Connect gateway;
+- `none`: no route of the prefix is installed: a routing policy dropped or summarised it.
+
+A prefix the data centre never advertised is in neither command. AWS names only the attachment of
+an installed route, so every path through that attachment (two VPN tunnels, two Connect peers) is
+`yes`: awss does not guess the BGP winner.
 
 | Flag | Short | Description |
 | --- | --- | --- |
@@ -454,14 +462,18 @@ with `cloudwan routes` (after the policies), it tells "the data centre never adv
 | `--match` | `-m` | `any` (default), `exact`, `longest`, `subnet-of`, `supernet-of`, as in `cloudwan routes` |
 | `--segments` | `-s` | Segments only (globs) |
 | `--edges` | `-e` | Edge locations only (globs) |
-| `--next-hop-types` | | Next hop types, such as `direct-connect-gateway`, `vpc`, `vpn`, `connect-peer` |
+| `--next-hop-types` | | Next hop types, such as `direct-connect-gateway`, `vpc`, `vpn`, `connect-peer`; `dx`, `tgw` and `connect` for short |
 | `--communities` | | Keep the routes that carry any of these BGP communities, exact (`65000:100`) |
 | `--asns` | | Keep the routes whose AS path has any of these AS numbers (`65010`) |
+| `--installed` | | Keep the routes with these **Installed** values: `yes`, `no`, `none` |
 | `--core-network-ids` | | Core networks to search; default every core network the profile sees |
 
 ```bash
 # What does the data centre advertise over Direct Connect to the prod segment?
-awss cloudwan bgp --profile network -s prod --next-hop-types direct-connect-gateway
+awss cloudwan bgp --profile network -s prod --next-hop-types dx
+
+# What does the data centre advertise that never reaches the prod route table?
+awss cloudwan bgp --profile network -s prod --installed none
 
 # Did 10.50.0.0/16 arrive, with which AS path, and is it also installed?
 awss cloudwan bgp --profile network --cidrs 10.50.0.0/16
@@ -471,12 +483,13 @@ awss cloudwan routes --profile network --cidrs 10.50.0.0/16
 awss cloudwan bgp --profile network --asns 65010
 ```
 
-One row per BGP route: **Query**, **Segment**, **Edge**, **Prefix**, **AS Path**, **Communities**,
+One row per BGP route: **Query**, **Segment**, **Edge**, **Prefix**, **Installed**, **AS Path**, **Communities**,
 **Local Pref**, **MED**, **Next Hop Type**, **Next Hop ID**, **Attachment**, **Next Hop Segment**
 (from the attachment when AWS does not return it), **Owner ID** and **Owner**.
 
 - One `ListCoreNetworkRoutingInformation` call per segment, edge location, CIDR and match mode, at
-  most 5 at once. Network function groups have no BGP routes. `longest` reads every route of the
+  most 5 at once, and one `GetNetworkRoutes` call with the same match for **Installed** (skipped
+  when there is no BGP route). Network function groups have no BGP routes. `longest` reads every route of the
   segment and awss picks the most specific one, as in `cloudwan routes`. `--next-hop-types`,
   `--communities` and `--asns` are filtered by awss.
 - **What it shows:** every candidate path, so a prefix advertised over several attachments (two
@@ -487,10 +500,12 @@ One row per BGP route: **Query**, **Segment**, **Edge**, **Prefix**, **AS Path**
 - **JSON only:** `core_network_id`, `next_hop_ip` (such as the BGP peer of a Connect peer),
   `attachment_id`, `next_hop_edge`.
 - **Permission:** `networkmanager:ListCoreNetworks`, `networkmanager:GetCoreNetwork`,
-  `networkmanager:ListCoreNetworkRoutingInformation`, and `networkmanager:ListAttachments` for the
-  attachment names and owners.
+  `networkmanager:ListCoreNetworkRoutingInformation`, `networkmanager:GetNetworkRoutes`, and
+  `networkmanager:ListAttachments` for the attachment names and owners.
 
-Sort by: `--sort segment|edge|prefix|query|as-path|communities|local-preference|med|next-hop-type|next-hop-id|next-hop-ip|next-hop-segment|attachment|attachment-name|owner|owner-name|core-network` (default: `segment`)
+Sort by: `--sort segment|edge|prefix|installed|query|as-path|communities|local-preference|med|next-hop-type|next-hop-id|next-hop-ip|next-hop-segment|attachment|attachment-name|owner|owner-name|core-network` (default: `segment`). Rows
+equal on the sort field stay in route table order: segment, edge, prefix by address, the installed
+path first.
 
 #### Cloud WAN attachments (`awss cloudwan attachments`)
 

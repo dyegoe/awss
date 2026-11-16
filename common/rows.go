@@ -19,6 +19,7 @@ package common
 import (
 	"cmp"
 	"fmt"
+	"net/netip"
 	"reflect"
 	"sort"
 	"strings"
@@ -104,13 +105,21 @@ func SortByField[T any](data []T, fieldName string) {
 // 13.4 before 13.15. It prints and marshals as a plain string.
 type Version string
 
+// CIDR is a CIDR block that sorts by address: 10.2.0.0/16 before 10.100.0.0/16, and a supernet
+// before its subnets. It prints and marshals as a plain string.
+type CIDR string
+
 // Less reports whether a sorts before b.
 //
-// Integers compare numerically, a Version compares naturally (see NaturalLess), slices compare by
-// their sorted comma-joined elements, and everything else compares by its string form.
+// Integers compare numerically, a Version compares naturally (see NaturalLess), a CIDR by address
+// (see CIDRLess), slices compare by their sorted comma-joined elements, and everything else
+// compares by its string form.
 func Less(a, b reflect.Value) bool {
-	if a.Type() == reflect.TypeFor[Version]() {
+	switch a.Type() {
+	case reflect.TypeFor[Version]():
 		return NaturalLess(a.String(), b.String())
+	case reflect.TypeFor[CIDR]():
+		return CIDRLess(a.String(), b.String())
 	}
 	switch a.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -122,6 +131,37 @@ func Less(a, b reflect.Value) bool {
 	default:
 		return a.String() < b.String()
 	}
+}
+
+// CIDRLess reports whether the CIDR block a sorts before b: IPv4 before IPv6, then by address,
+// then the shorter prefix (the supernet) first. A bare IP address counts as its host prefix. A
+// value that is neither, such as a prefix list ID, sorts after every CIDR, by text.
+func CIDRLess(a, b string) bool {
+	pa, okA := parseCIDR(a)
+	pb, okB := parseCIDR(b)
+	switch {
+	case !okA || !okB:
+		if okA != okB {
+			return okA
+		}
+		return a < b
+	case pa.Addr().Is4() != pb.Addr().Is4():
+		return pa.Addr().Is4()
+	case pa.Addr() != pb.Addr():
+		return pa.Addr().Less(pb.Addr())
+	}
+	return pa.Bits() < pb.Bits()
+}
+
+// parseCIDR parses a CIDR block, or a bare IP address as its host prefix.
+func parseCIDR(s string) (netip.Prefix, bool) {
+	if p, err := netip.ParsePrefix(s); err == nil {
+		return p.Masked(), true
+	}
+	if a, err := netip.ParseAddr(s); err == nil {
+		return netip.PrefixFrom(a, a.BitLen()), true
+	}
+	return netip.Prefix{}, false
 }
 
 // NaturalLess reports whether a sorts before b when the runs of digits compare as numbers: 13.4

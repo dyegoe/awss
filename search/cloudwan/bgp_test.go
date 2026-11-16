@@ -71,19 +71,23 @@ func collectBGP(t *testing.T, client bgpAPI, filters map[string][]string) *BGPRe
 func bgpPrefixes(rows []bgpRow) []string {
 	out := []string{}
 	for i := range rows {
-		out = append(out, rows[i].Segment+" "+rows[i].Edge+" "+rows[i].Prefix)
+		out = append(out, rows[i].Segment+" "+rows[i].Edge+" "+string(rows[i].Prefix))
 	}
 	return out
 }
 
-// TestBGPResults_collect checks a BGP route row: its BGP attributes, its next hop, and the segment,
-// edges and owner of the next hop taken from the attachment. Only segments are read, at every edge
+// TestBGPResults_collect checks a BGP route row: its BGP attributes, its next hop, the segment,
+// edges and owner of the next hop taken from the attachment, and Installed from the installed
+// route of its prefix. Only segments are read, at every edge
 // location, never the network function groups.
 func TestBGPResults_collect(t *testing.T) {
 	client := bgpFixture(map[string][][]types.CoreNetworkRoutingInformation{
 		"prod@eu-west-1": {{bgpRoute("10.50.0.0/16", "DIRECT_CONNECT_GATEWAY:dxgw-1:attachment-dx",
 			[]string{"65010", "65020"}, []string{"65000:100", "65000:200"})}},
 	})
+	client.routes = map[string][][]types.NetworkRoute{
+		"prod@eu-west-1": {{route("10.50.0.0/16", "DIRECT_CONNECT_GATEWAY:dxgw-1:attachment-dx")}},
+	}
 	r := NewBGP("network", Region, nil, "")
 	r.AccountNames = map[string]string{"111111111111": "network"}
 	q, err := newBGPQuery(map[string][]string{})
@@ -96,7 +100,7 @@ func TestBGPResults_collect(t *testing.T) {
 		t.Fatalf("collect() errors = %q, want none", r.Errors)
 	}
 	want := []bgpRow{{
-		CoreNetworkID: "core-network-1", Segment: "prod", Edge: "eu-west-1", Prefix: "10.50.0.0/16",
+		CoreNetworkID: "core-network-1", Segment: "prod", Edge: "eu-west-1", Prefix: "10.50.0.0/16", Installed: "yes",
 		ASPath: "65010 65020", Communities: "65000:100,65000:200", LocalPreference: "100", MED: "0",
 		NextHopType: "direct-connect-gateway", NextHopID: "dxgw-1", NextHopIP: "169.254.0.1",
 		AttachmentID: "attachment-dx", AttachmentName: "dc-link", NextHopSegment: "dc", NextHopEdge: "eu-west-1",
@@ -314,20 +318,25 @@ func TestParseBGPRoute(t *testing.T) {
 // TestCheckBGPFlags checks the AS numbers on top of the CIDR and match checks.
 func TestCheckBGPFlags(t *testing.T) {
 	tests := []struct {
-		name    string
-		cidrs   []string
-		match   []string
-		asns    []string
-		wantErr string
+		name      string
+		cidrs     []string
+		match     []string
+		asns      []string
+		installed []string
+		wantErr   string
 	}{
-		{name: "valid", cidrs: []string{"10.0.0.0/8"}, match: []string{"longest"}, asns: []string{"65010", "4200000000"}},
+		{
+			name: "valid", cidrs: []string{"10.0.0.0/8"}, match: []string{"longest"}, asns: []string{"65010", "4200000000"},
+			installed: []string{"yes", "none"},
+		},
+		{name: "bad installed", installed: []string{"maybe"}, wantErr: `invalid installed "maybe"`},
 		{name: "bad cidr", cidrs: []string{"x"}, wantErr: "invalid CIDR"},
 		{name: "bad asn", asns: []string{"AS65010"}, wantErr: `invalid AS number "AS65010"`},
 		{name: "asn too large", asns: []string{"4294967296"}, wantErr: "invalid AS number"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := CheckBGPFlags(tt.cidrs, tt.match, tt.asns)
+			err := CheckBGPFlags(tt.cidrs, tt.match, tt.asns, tt.installed)
 			if (err == nil) != (tt.wantErr == "") || (err != nil && !strings.Contains(err.Error(), tt.wantErr)) {
 				t.Errorf("CheckBGPFlags() error = %v, want %q", err, tt.wantErr)
 			}
@@ -387,8 +396,8 @@ func TestBGPResults_accessors(t *testing.T) {
 	if r.GetProfile() != "network" || r.GetRegion() != Region || r.GetSortField() != "prefix" {
 		t.Errorf("getters = %q %q %q, want network %s prefix", r.GetProfile(), r.GetRegion(), r.GetSortField(), Region)
 	}
-	if got := len(r.GetHeaders()); got != 14 {
-		t.Errorf("len(GetHeaders()) = %d, want 14", got)
+	if got := len(r.GetHeaders()); got != 15 {
+		t.Errorf("len(GetHeaders()) = %d, want 15", got)
 	}
 	if got := len(r.GetRows()); got != 2 {
 		t.Errorf("len(GetRows()) = %d, want 2", got)
@@ -417,11 +426,25 @@ func TestGetBGPSortFields(t *testing.T) {
 	}
 }
 
+// bgpSummary returns "prefix installed next-hop-type next-hop-segment as-path local-pref med" of
+// each row, in order.
+func bgpSummary(rows []bgpRow) []string {
+	out := []string{}
+	for i := range rows {
+		d := &rows[i]
+		out = append(out, strings.Join([]string{
+			string(d.Prefix), d.Installed, d.NextHopType, d.NextHopSegment, d.ASPath, d.LocalPreference, d.MED,
+		}, " "))
+	}
+	return out
+}
+
 // TestBGPResults_collect_awsFixtures checks the BGP routes of a segment from the shape AWS really
 // returns: an AS path of one AS number per item, no communities, a VPC route without BGP
 // attributes, and a next hop that names only the attachment, its type and resource, so its
 // segment comes from the attachments. A more specific prefix of the data centre arrives through a
-// legacy Transit Gateway route table.
+// legacy Transit Gateway route table, and is not installed: no installed route of
+// get-network-routes.json has that prefix.
 func TestBGPResults_collect_awsFixtures(t *testing.T) {
 	var bgp networkmanager.ListCoreNetworkRoutingInformationOutput
 	loadFixture(t, "list-core-network-routing-information.json", &bgp)
@@ -434,22 +457,32 @@ func TestBGPResults_collect_awsFixtures(t *testing.T) {
 			name:    "segment",
 			filters: map[string][]string{FilterKeySegment: {"dev"}},
 			want: []string{
-				"10.216.0.0/16 vpc dev   ",
-				"10.0.0.0/16 direct-connect-gateway sharedsvc 65100 65201 65201 64700 0 0",
-				"10.0.4.0/22 transit-gateway-route-table sharedsvc 64512 65300 64700 0 100",
+				"10.216.0.0/16 yes vpc dev   ",
+				"10.0.0.0/16 yes direct-connect-gateway sharedsvc 65100 65201 65201 64700 0 0",
+				"10.0.4.0/22 none transit-gateway-route-table sharedsvc 64512 65300 64700 0 100",
 			},
 		},
 		{
 			name:    "asn of the data centre",
 			filters: map[string][]string{FilterKeySegment: {"dev"}, FilterKeyASN: {"65201"}},
-			want:    []string{"10.0.0.0/16 direct-connect-gateway sharedsvc 65100 65201 65201 64700 0 0"},
+			want:    []string{"10.0.0.0/16 yes direct-connect-gateway sharedsvc 65100 65201 65201 64700 0 0"},
+		},
+		{
+			name:    "dropped by a policy",
+			filters: map[string][]string{FilterKeySegment: {"dev"}, FilterKeyInstalled: {"none"}},
+			want:    []string{"10.0.4.0/22 none transit-gateway-route-table sharedsvc 64512 65300 64700 0 100"},
+		},
+		{
+			name:    "short next hop name",
+			filters: map[string][]string{FilterKeySegment: {"dev"}, FilterKeyTargetType: {"dx"}},
+			want:    []string{"10.0.0.0/16 yes direct-connect-gateway sharedsvc 65100 65201 65201 64700 0 0"},
 		},
 		{
 			name: "longest",
 			filters: map[string][]string{
 				FilterKeySegment: {"dev"}, FilterKeyCIDR: {"10.0.5.1"}, FilterKeyMatch: {MatchLongest},
 			},
-			want: []string{"10.0.4.0/22 transit-gateway-route-table sharedsvc 64512 65300 64700 0 100"},
+			want: []string{"10.0.4.0/22 none transit-gateway-route-table sharedsvc 64512 65300 64700 0 100"},
 		},
 	}
 	for _, tt := range tests {
@@ -462,16 +495,75 @@ func TestBGPResults_collect_awsFixtures(t *testing.T) {
 			if len(r.Errors) != 0 {
 				t.Fatalf("collect() errors = %q, want none", r.Errors)
 			}
-			got := []string{}
-			for i := range r.Data {
-				d := &r.Data[i]
-				got = append(got, strings.Join([]string{
-					d.Prefix, d.NextHopType, d.NextHopSegment, d.ASPath, d.LocalPreference, d.MED,
-				}, " "))
-			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if got := bgpSummary(r.Data); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("collect(%v) rows =\n%q\nwant\n%q", tt.filters, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestInstalled_state checks the Installed value of a path: its attachment is the installed one,
+// another attachment is, or no route of the prefix is installed.
+func TestInstalled_state(t *testing.T) {
+	in := installed{"10.0.0.0/16": {"attachment-dx1": true}, "10.9.0.0/16": {}}
+	tests := []struct {
+		name       string
+		prefix     string
+		attachment string
+		want       string
+	}{
+		{name: "installed", prefix: "10.0.0.0/16", attachment: "attachment-dx1", want: InstalledYes},
+		{name: "backup", prefix: "10.0.0.0/16", attachment: "attachment-dx2", want: InstalledNo},
+		{name: "no attachment", prefix: "10.0.0.0/16", want: InstalledNo},
+		{name: "blackhole installed", prefix: "10.9.0.0/16", attachment: "attachment-dx1", want: InstalledNo},
+		{name: "dropped", prefix: "10.1.0.0/16", attachment: "attachment-dx1", want: InstalledNone},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := in.state(tt.prefix, tt.attachment); got != tt.want {
+				t.Errorf("state(%q, %q) = %q, want %q", tt.prefix, tt.attachment, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestBGPResults_collect_installedError checks that a failed read of the installed routes fails
+// the route table, with what was read.
+func TestBGPResults_collect_installedError(t *testing.T) {
+	client := bgpFixture(map[string][][]types.CoreNetworkRoutingInformation{
+		"dc@eu-west-1": {{bgpRoute("10.0.0.0/8", "vpc:vpc-1:attachment-dx", nil, nil)}},
+	})
+	client.routeErr = map[string]error{"dc@eu-west-1": errors.New("boom")}
+	r := collectBGP(t, client, map[string][]string{FilterKeySegment: {"dc"}})
+	want := "error reading the routes of dc at eu-west-1: reading the installed routes: getting the network routes: boom"
+	if len(r.Errors) != 1 || r.Errors[0] != want {
+		t.Errorf("collect() errors = %q, want [%q]", r.Errors, want)
+	}
+}
+
+// TestBGPResults_sortResults checks the route table order under the sort field: prefixes by
+// address, and the installed path of a prefix first.
+func TestBGPResults_sortResults(t *testing.T) {
+	r := NewBGP("network", Region, nil, "segment")
+	r.Data = []bgpRow{
+		{Segment: "prod", Prefix: "10.100.0.0/16", Installed: InstalledYes},
+		{Segment: "dev", Prefix: "10.2.0.0/16", Installed: InstalledNone},
+		{Segment: "prod", Prefix: "10.2.0.0/16", Installed: InstalledNo},
+		{Segment: "prod", Prefix: "10.2.0.0/16", Installed: InstalledYes},
+		{Segment: "prod", Prefix: "10.0.0.0/8", Installed: ""},
+	}
+	if err := r.sortResults("segment"); err != nil {
+		t.Fatal(err)
+	}
+	got := []string{}
+	for i := range r.Data {
+		got = append(got, r.Data[i].Segment+" "+string(r.Data[i].Prefix)+" "+r.Data[i].Installed)
+	}
+	want := []string{
+		"dev 10.2.0.0/16 none", "prod 10.0.0.0/8 ", "prod 10.2.0.0/16 yes", "prod 10.2.0.0/16 no",
+		"prod 10.100.0.0/16 yes",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("sortResults(segment) = %q, want %q", got, want)
 	}
 }

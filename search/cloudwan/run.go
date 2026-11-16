@@ -17,11 +17,15 @@ limitations under the License.
 package cloudwan
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"net/netip"
+	"slices"
 	"sync"
+
+	"github.com/dyegoe/awss/common"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/networkmanager"
@@ -191,4 +195,38 @@ func longestMatches[R any](all []R, cidr string, prefix func(*R) *string) []R {
 		out = append(out, all[i])
 	}
 	return out
+}
+
+// tableKey is where a row sits in route table order: core network, segment, edge location, prefix
+// by address, then rank, such as the installed path first.
+type tableKey struct {
+	coreNetwork, segment, edge string
+	prefix                     common.CIDR
+	rank                       int
+}
+
+// compare orders two keys in route table order.
+func (k *tableKey) compare(o *tableKey) int {
+	if c := cmp.Or(
+		cmp.Compare(k.coreNetwork, o.coreNetwork), cmp.Compare(k.segment, o.segment), cmp.Compare(k.edge, o.edge),
+	); c != 0 {
+		return c
+	}
+	switch {
+	case common.CIDRLess(string(k.prefix), string(o.prefix)):
+		return -1
+	case common.CIDRLess(string(o.prefix), string(k.prefix)):
+		return 1
+	}
+	return cmp.Compare(k.rank, o.rank)
+}
+
+// sortRows sorts data by the struct field, keeping the rows equal on it in route table order, so
+// the default sort by segment reads as route tables.
+func sortRows[R any](data []R, field string, key func(*R) tableKey) {
+	slices.SortStableFunc(data, func(a, b R) int {
+		ka, kb := key(&a), key(&b)
+		return ka.compare(&kb)
+	})
+	common.SortByField(data, field)
 }

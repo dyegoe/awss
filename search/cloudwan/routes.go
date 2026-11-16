@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dyegoe/awss/common"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/networkmanager"
 	"github.com/aws/aws-sdk-go-v2/service/networkmanager/types"
@@ -152,14 +154,9 @@ func (c *routeCall) input(globalNetworkID string, q *query) *networkmanager.GetN
 func routes(
 	ctx context.Context, client networkmanager.GetNetworkRoutesAPIClient, cn *coreNetwork, c *routeCall, q *query,
 ) ([]dataRow, error) {
-	var found []types.NetworkRoute
-	paginator := networkmanager.NewGetNetworkRoutesPaginator(client, c.input(cn.globalNetworkID, q))
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("getting the network routes: %w", err)
-		}
-		found = append(found, page.NetworkRoutes...)
+	found, err := networkRoutes(ctx, client, c.input(cn.globalNetworkID, q))
+	if err != nil {
+		return nil, err
 	}
 	if c.mode == MatchLongest {
 		found = longestMatches(found, c.cidr, func(r *types.NetworkRoute) *string { return r.DestinationCidrBlock })
@@ -169,6 +166,22 @@ func routes(
 		rows = appendTargets(rows, parseRoute(&found[i], cn, c), q)
 	}
 	return rows, nil
+}
+
+// networkRoutes returns the routes of a GetNetworkRoutes call, following every page.
+func networkRoutes(
+	ctx context.Context, client networkmanager.GetNetworkRoutesAPIClient, in *networkmanager.GetNetworkRoutesInput,
+) ([]types.NetworkRoute, error) {
+	var found []types.NetworkRoute
+	paginator := networkmanager.NewGetNetworkRoutesPaginator(client, in)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("getting the network routes: %w", err)
+		}
+		found = append(found, page.NetworkRoutes...)
+	}
+	return found, nil
 }
 
 // appendTargets appends to rows the rows whose target type passes --target-types.
@@ -189,7 +202,7 @@ func parseRoute(route *types.NetworkRoute, cn *coreNetwork, c *routeCall) []data
 		CoreNetworkID: cn.id,
 		Segment:       c.table.label(),
 		Edge:          c.table.edge,
-		CIDR:          aws.ToString(route.DestinationCidrBlock),
+		CIDR:          common.CIDR(aws.ToString(route.DestinationCidrBlock)),
 		PrefixListID:  aws.ToString(route.PrefixListId),
 		Type:          Kebab(string(route.Type)),
 		State:         Kebab(string(route.State)),
