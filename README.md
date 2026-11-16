@@ -396,16 +396,16 @@ through the route table of every segment in the console.
 
 ```bash
 # Is the data centre prefix learned over Direct Connect, and in which segments and edges?
-awss cloudwan routes -p network --cidrs 10.50.0.0/16 --target-types direct-connect-gateway
+awss cloudwan routes --profile network --cidrs 10.50.0.0/16 --target-types direct-connect-gateway
 
 # Which route does traffic to 10.20.1.5 take in the prod segment at eu-west-1?
-awss cloudwan routes -p network --cidrs 10.20.1.5 --match longest -s prod -e eu-west-1
+awss cloudwan routes --profile network --cidrs 10.20.1.5 --match longest -s prod -e eu-west-1
 
 # Every route of the prod segment, by CIDR
-awss cloudwan routes -p network -s prod --sort cidr
+awss cloudwan routes --profile network -s prod --sort cidr
 
 # The blackholes of every route table
-awss cloudwan routes -p network --states blackhole
+awss cloudwan routes --profile network --states blackhole
 ```
 
 One row per route destination: **Query** (the CIDR searched), **Segment** (`nfg:<name>` for a
@@ -458,13 +458,13 @@ edge locations, owned by which account.
 
 ```bash
 # The Direct Connect gateways, and the segments and edges they serve
-awss cloudwan attachments -p network --types direct-connect-gateway
+awss cloudwan attachments --profile network --types direct-connect-gateway
 
 # What is attached to the prod segment, with the account names of the organization
-awss cloudwan attachments -p network -s prod --org-profile org-management
+awss cloudwan attachments --profile network -s prod --org-profile org-management
 
 # Attachments waiting for acceptance or failed
-awss cloudwan attachments -p network --states pending-attachment-acceptance,failed
+awss cloudwan attachments --profile network --states pending-attachment-acceptance,failed
 ```
 
 Columns: **ID**, **Name**, **Type**, **Segment**, **Edges**, **State**, **Resource** (the ID of the
@@ -910,7 +910,7 @@ awss --regions all s3obj -b my-logs -K 'logs/2024-01/*.gz' --sort size
 awss rds -e postgres -V '13*' --profiles all --regions all
 
 # Is a data centre prefix learned over Direct Connect in the Cloud WAN segments?
-awss cloudwan routes -p network --cidrs 10.50.0.0/16 --target-types direct-connect-gateway
+awss cloudwan routes --profile network --cidrs 10.50.0.0/16 --target-types direct-connect-gateway
 
 # The plan to delete the default VPCs of one account, in every region (nothing changes)
 awss cleanup default-vpc --profiles sandbox --regions all

@@ -124,10 +124,10 @@ nfg:<name>), at every edge location. One row per route destination.
   --target-types     next hop type, such as direct-connect-gateway or vpc.
 
 Is the data centre prefix 10.50.0.0/16 learned over Direct Connect in every segment?
-	awss cloudwan routes -p network --cidrs 10.50.0.0/16 --target-types direct-connect-gateway
+	awss cloudwan routes --profile network --cidrs 10.50.0.0/16 --target-types direct-connect-gateway
 
 Which route does traffic to 10.20.1.5 take in the prod segment at eu-west-1?
-	awss cloudwan routes -p network --cidrs 10.20.1.5 --match longest -s prod -e eu-west-1
+	awss cloudwan routes --profile network --cidrs 10.20.1.5 --match longest -s prod -e eu-west-1
 `,
 	Args: cobra.NoArgs,
 	RunE: cloudwanRoutesRunE,
@@ -147,7 +147,7 @@ Direct Connect gateway spans several edge locations and matches when any of them
 The Owner column names the accounts with the accounts map of the config file or --org-profile.
 
 The Direct Connect gateways and the segments they are in:
-	awss cloudwan attachments -p network --types direct-connect-gateway
+	awss cloudwan attachments --profile network --types direct-connect-gateway
 `,
 	Args: cobra.NoArgs,
 	RunE: cloudwanAttachmentsRunE,
