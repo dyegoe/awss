@@ -43,6 +43,8 @@ const (
 	FilterKeyCommunity = "community"
 	// FilterKeyASN keeps the BGP routes whose AS path has any of these AS numbers.
 	FilterKeyASN = "asn"
+	// FilterKeyInstalled keeps the BGP routes whose Installed value is one of these.
+	FilterKeyInstalled = "installed"
 )
 
 // The --match modes: how a route must relate to a searched CIDR.
@@ -78,6 +80,32 @@ func TargetTypeNames() []string {
 		"attachment", "blackhole", "connect-peer", "direct-connect-gateway", "transit-gateway-route-table",
 		"vpc", "vpn",
 	}
+}
+
+// targetAliases maps the short next hop names to the AWS resource types.
+var targetAliases = map[string]string{
+	"dx": "direct-connect-gateway", "tgw": "transit-gateway-route-table", "connect": "connect-peer",
+}
+
+// TargetAliasNames returns the short next hop names --target-types and --next-hop-types take
+// alongside the AWS types: connect, dx, tgw.
+func TargetAliasNames() []string {
+	out := make([]string, 0, len(targetAliases))
+	for short := range targetAliases {
+		out = append(out, short)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// targetType returns the AWS resource type of a next hop filter value: an AWS type in any case, or
+// a short name such as dx.
+func targetType(v string) string {
+	v = Kebab(v)
+	if long, ok := targetAliases[v]; ok {
+		return long
+	}
+	return v
 }
 
 // KebabNames returns the values of an AWS enum in kebab case.
@@ -131,6 +159,7 @@ type query struct {
 	states                    []types.RouteState
 	targetTypes, coreNetworks []string
 	communities, asns         []string
+	installed                 []string
 }
 
 // newQuery builds the query from a filters map, which it only reads: one map is shared by every
@@ -142,6 +171,7 @@ func newQuery(filters map[string][]string) (*query, error) {
 		coreNetworks: slices.Clone(filters[FilterKeyCoreNetwork]),
 		communities:  slices.Clone(filters[FilterKeyCommunity]),
 		asns:         slices.Clone(filters[FilterKeyASN]),
+		installed:    slices.Clone(filters[FilterKeyInstalled]),
 	}
 	var err error
 	if q.cidrs, err = NormalizeCIDRs(filters[FilterKeyCIDR]); err != nil {
@@ -160,7 +190,7 @@ func newQuery(filters map[string][]string) (*query, error) {
 		return nil, err
 	}
 	for _, t := range filters[FilterKeyTargetType] {
-		q.targetTypes = append(q.targetTypes, Kebab(t))
+		q.targetTypes = append(q.targetTypes, targetType(t))
 	}
 	return q, nil
 }
@@ -219,6 +249,11 @@ func (q *query) wantSegments() bool { return q.bySegment || !q.byGroup }
 // wantGroups reports whether the network function group route tables are searched: always,
 // unless only segments were asked.
 func (q *query) wantGroups() bool { return q.byGroup || !q.bySegment }
+
+// wantInstalled reports whether a BGP route of this Installed value passes --installed.
+func (q *query) wantInstalled(v string) bool {
+	return len(q.installed) == 0 || slices.Contains(q.installed, v)
+}
 
 // wantTarget reports whether a route destination of targetType passes --target-types.
 func (q *query) wantTarget(targetType string) bool {

@@ -146,11 +146,16 @@ func fixedLists() map[string]map[string]func() []string {
 			"match":        searchCloudWAN.MatchNames,
 			"types":        searchCloudWAN.TypeNames,
 			flagStates:     searchCloudWAN.StateNames,
-			"target-types": searchCloudWAN.TargetTypeNames,
+			"target-types": cloudwanTargetTypes,
 		},
 		"cloudwan-bgp":         {"match": searchCloudWAN.MatchNames, "next-hop-types": searchCloudWAN.TargetTypeNames},
 		"cloudwan-attachments": {"types": searchCloudWANAtt.TypeNames, flagStates: searchCloudWANAtt.StateNames},
 	}
+}
+
+// cloudwanTargetTypes returns the next hop types of Cloud WAN and their short names.
+func cloudwanTargetTypes() []string {
+	return append(searchCloudWAN.TargetTypeNames(), searchCloudWAN.TargetAliasNames()...)
 }
 
 // instanceStateNames returns the EC2 instance states of the AWS SDK.

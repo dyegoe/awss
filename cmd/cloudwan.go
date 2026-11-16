@@ -37,6 +37,9 @@ const (
 	flagTypes          = "types"
 	flagCoreNetworkIDs = "core-network-ids"
 	flagMatch          = "match"
+
+	// aliasHelp names the short next hop types of --target-types and --next-hop-types.
+	aliasHelp = "connect, dx and tgw are short for connect-peer, direct-connect-gateway and transit-gateway-route-table"
 )
 
 // cloudwanRoutesFilters represents the filters of the cloudwan routes command, keyed by the
@@ -75,6 +78,7 @@ type cloudwanBGPFilters struct {
 	NextHopTypes   []string `filter:"target-type"`
 	Communities    []string `filter:"community"`
 	ASNs           []string `filter:"asn"`
+	Installed      []string `filter:"installed"`
 	CoreNetworkIDs []string `filter:"core-network-id"`
 }
 
@@ -87,7 +91,8 @@ var (
 // cloudwanBGPFilterFlags lists the cloudwan bgp filter flag names: without any, the command lists
 // every BGP route.
 var cloudwanBGPFilterFlags = []string{
-	flagCIDRs, flagMatch, flagSegments, flagEdges, "next-hop-types", "communities", "asns", flagCoreNetworkIDs,
+	flagCIDRs, flagMatch, flagSegments, flagEdges, "next-hop-types", "communities", "asns", "installed",
+	flagCoreNetworkIDs,
 }
 
 // cloudwanRoutesFilterFlags lists the cloudwan routes filter flag names: without any, the command
@@ -143,7 +148,7 @@ nfg:<name>), at every edge location. One row per route destination.
   --segments, --function-groups, --edges   pick route tables (globs). Only --segments skips the
                      function groups, only --function-groups skips the segments.
   --types, --states  route type and state, filtered by AWS.
-  --target-types     next hop type, such as direct-connect-gateway or vpc.
+  --target-types     next hop type, such as direct-connect-gateway (dx) or vpc.
 
 Is the data centre prefix 10.50.0.0/16 learned over Direct Connect in every segment?
 	awss cloudwan routes --profile network --cidrs 10.50.0.0/16 --target-types direct-connect-gateway
@@ -164,17 +169,23 @@ var cloudwanBGPCmd = &cobra.Command{
 Show the BGP routes each Cloud WAN segment learned at each edge location, before the routing
 policies of the core network, with their AS path, communities, local preference, MED and next hop.
 
-Compare with cloudwan routes, which shows the routes after the policies: a prefix here and not
-there was dropped or summarised by a routing policy; a prefix in neither was never advertised.
-Network function groups have no BGP routes.
+Installed says whether each path made it into the route table (cloudwan routes):
+  yes   the installed route of the prefix points to this path's attachment
+  no    the installed route of the prefix points to another attachment, such as the backup DX
+  none  no route of the prefix is installed: a routing policy dropped or summarised it
+A prefix in neither command was never advertised. Network function groups have no BGP routes.
 
   --cidrs, --match   as in cloudwan routes.
-  --next-hop-types   next hop type, such as direct-connect-gateway or vpc.
+  --next-hop-types   next hop type, such as direct-connect-gateway (dx) or vpc.
   --communities      keep the routes that carry any of these communities, exact.
   --asns             keep the routes whose AS path has any of these AS numbers.
+  --installed        keep the routes with these Installed values.
 
 What does the data centre advertise over Direct Connect to the prod segment?
-	awss cloudwan bgp --profile network -s prod --next-hop-types direct-connect-gateway
+	awss cloudwan bgp --profile network -s prod --next-hop-types dx
+
+What does the data centre advertise that never reaches the prod route table?
+	awss cloudwan bgp --profile network -s prod --installed none
 
 Did the prefix 10.50.0.0/16 arrive, and with which AS path?
 	awss cloudwan bgp --profile network --cidrs 10.50.0.0/16
@@ -218,7 +229,7 @@ func cloudwanRoutesRunE(cmd *cobra.Command, _ []string) error {
 
 func cloudwanBGPRunE(cmd *cobra.Command, _ []string) error {
 	f := &cloudwanBGPF
-	if err := searchCloudWAN.CheckBGPFlags(f.CIDRs, f.Match, f.ASNs); err != nil {
+	if err := searchCloudWAN.CheckBGPFlags(f.CIDRs, f.Match, f.ASNs, f.Installed); err != nil {
 		return err
 	}
 	viper.Set(labelRegions, []string{searchCloudWAN.Region})
@@ -276,8 +287,7 @@ func cloudwanRoutesInitFlags() {
 	fl.StringSliceVar(&f.States, flagStates, []string{},
 		listHelp("Keep the routes in these states", searchCloudWAN.StateNames(), "blackhole"))
 	fl.StringSliceVar(&f.TargetTypes, "target-types", []string{},
-		listHelp("Keep the route destinations of these next hop types", searchCloudWAN.TargetTypeNames(),
-			"direct-connect-gateway"))
+		listHelp("Keep the route destinations of these next hop types ("+aliasHelp+")", cloudwanTargetTypes(), "dx"))
 	fl.StringSliceVar(&f.CoreNetworkIDs, flagCoreNetworkIDs, []string{},
 		"Search these core networks only. `core-network-0123456789abcdef0`")
 	fl.String(flagSort, "segment", sortHelp("cloudwan-routes", "routes", "segment"))
@@ -325,8 +335,9 @@ func cloudwanBGPInitFlags() {
 	fl.StringSliceVarP(&f.Edges, flagEdges, "e", []string{},
 		"Search the BGP routes of these edge locations only (globs). `'eu-west-1,us-*'`")
 	fl.StringSliceVar(&f.NextHopTypes, "next-hop-types", []string{},
-		listHelp("Keep the routes of these next hop types", searchCloudWAN.TargetTypeNames(),
-			"direct-connect-gateway"))
+		listHelp("Keep the routes of these next hop types ("+aliasHelp+")", cloudwanTargetTypes(), "dx"))
+	fl.StringSliceVar(&f.Installed, "installed", []string{},
+		listHelp("Keep the routes with these Installed values", searchCloudWAN.InstalledNames(), "none"))
 	fl.StringSliceVar(&f.Communities, "communities", []string{},
 		"Keep the routes that carry any of these BGP communities, exact. `65000:100`")
 	fl.StringSliceVar(&f.ASNs, "asns", []string{},

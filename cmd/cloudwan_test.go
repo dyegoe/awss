@@ -58,13 +58,13 @@ func TestExecute_cloudwanBGP(t *testing.T) {
 			name: "every filter",
 			args: []string{
 				"cloudwan", "bgp", "-c", "10.0.0.0/8", "-m", "exact", "-s", "prod", "-e", "eu-*",
-				"--next-hop-types", "direct-connect-gateway", "--communities", "65000:100", "--asns", "65010,65020",
-				"--core-network-ids", "cn-1",
+				"--next-hop-types", "dx", "--communities", "65000:100", "--asns", "65010,65020",
+				"--installed", "none", "--core-network-ids", "cn-1",
 			},
 			wantFilters: map[string][]string{
 				"cidr": {"10.0.0.0/8"}, "match": {"exact"}, "segment": {"prod"}, "edge": {"eu-*"},
-				"target-type": {"direct-connect-gateway"}, "community": {"65000:100"}, "asn": {"65010", "65020"},
-				"core-network-id": {"cn-1"},
+				"target-type": {"dx"}, "community": {"65000:100"}, "asn": {"65010", "65020"},
+				"installed": {"none"}, "core-network-id": {"cn-1"},
 			},
 		},
 		{
@@ -72,6 +72,7 @@ func TestExecute_cloudwanBGP(t *testing.T) {
 			wantSort: "as-path",
 		},
 		{name: "bad asn", args: []string{"cloudwan", "bgp", "--asns", "AS65010"}, wantErr: "invalid AS number"},
+		{name: "bad installed", args: []string{"cloudwan", "bgp", "--installed", "maybe"}, wantErr: "invalid installed"},
 		{name: "bad cidr", args: []string{"cloudwan", "bgp", "-c", "x"}, wantErr: "invalid CIDR"},
 		{name: "no function groups", args: []string{"cloudwan", "bgp", "--function-groups", "x"}, wantErr: "unknown flag"},
 	})

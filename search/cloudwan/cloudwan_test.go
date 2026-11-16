@@ -275,7 +275,9 @@ func summary(rows []dataRow) []string {
 	out := []string{}
 	for i := range rows {
 		r := &rows[i]
-		out = append(out, strings.Join([]string{r.Segment, r.Edge, r.CIDR, r.TargetType, r.TargetID, r.AttachmentName}, " "))
+		out = append(out, strings.Join([]string{
+			r.Segment, r.Edge, string(r.CIDR), r.TargetType, r.TargetID, r.AttachmentName,
+		}, " "))
 	}
 	return out
 }
@@ -834,7 +836,7 @@ func TestResults_collect_longest(t *testing.T) {
 			}
 			got := []string{}
 			for i := range r.Data {
-				got = append(got, r.Data[i].Query+" "+r.Data[i].CIDR+" "+r.Data[i].TargetType)
+				got = append(got, r.Data[i].Query+" "+string(r.Data[i].CIDR)+" "+r.Data[i].TargetType)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("collect() rows = %q, want %q", got, tt.want)
@@ -1149,5 +1151,43 @@ func TestNewClient(t *testing.T) {
 	}
 	if got := client.Options().Retryer.MaxAttempts(); got != maxAttempts {
 		t.Errorf("NewClient() MaxAttempts = %d, want %d", got, maxAttempts)
+	}
+}
+
+// TestResults_sortResults checks that --sort cidr compares addresses, and that the default sort
+// by segment keeps each route table in prefix order.
+func TestResults_sortResults(t *testing.T) {
+	tests := []struct {
+		name  string
+		field string
+		want  []string
+	}{
+		{
+			name: "cidr", field: "cidr",
+			want: []string{"prod 10.0.0.0/8", "dev 10.2.0.0/16", "prod 10.2.0.0/16", "prod 10.100.0.0/16"},
+		},
+		{
+			name: "segment", field: "segment",
+			want: []string{"dev 10.2.0.0/16", "prod 10.0.0.0/8", "prod 10.2.0.0/16", "prod 10.100.0.0/16"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := New("network", Region, nil, tt.field)
+			r.Data = []dataRow{
+				{Segment: "prod", CIDR: "10.100.0.0/16"}, {Segment: "prod", CIDR: "10.2.0.0/16"},
+				{Segment: "dev", CIDR: "10.2.0.0/16"}, {Segment: "prod", CIDR: "10.0.0.0/8"},
+			}
+			if err := r.sortResults(tt.field); err != nil {
+				t.Fatal(err)
+			}
+			got := []string{}
+			for i := range r.Data {
+				got = append(got, r.Data[i].Segment+" "+string(r.Data[i].CIDR))
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("sortResults(%s) = %q, want %q", tt.field, got, tt.want)
+			}
+		})
 	}
 }

@@ -65,7 +65,7 @@ type dataRow struct {
 	Edge string `json:"edge,omitempty" header:"Edge" sort:"edge"`
 
 	// CIDR is the destination CIDR block of the route.
-	CIDR string `json:"cidr,omitempty" header:"CIDR" sort:"cidr"`
+	CIDR common.CIDR `json:"cidr,omitempty" header:"CIDR" sort:"cidr"`
 
 	// PrefixListID is the prefix list of the route, when the route comes from one.
 	PrefixListID string `json:"prefix_list_id,omitempty"`
@@ -256,13 +256,16 @@ func newAttachmentInfo(a *types.Attachment) attachmentInfo {
 	return info
 }
 
-// sortResults sorts the results by the given field.
+// sortResults sorts the results by the given field. Rows equal on it stay in route table order
+// (tableKey).
 func (r *Results) sortResults(field string) error {
 	sortFields, err := GetSortFields(field)
 	if err != nil {
 		return err
 	}
-	common.SortByField(r.Data, sortFields[field])
+	sortRows(r.Data, sortFields[field], func(d *dataRow) tableKey {
+		return tableKey{coreNetwork: d.CoreNetworkID, segment: d.Segment, edge: d.Edge, prefix: d.CIDR}
+	})
 	return nil
 }
 

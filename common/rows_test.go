@@ -182,6 +182,46 @@ func TestNaturalLess(t *testing.T) {
 	}
 }
 
+// TestCIDRLess checks that CIDR blocks compare by address, the supernet first, IPv4 before IPv6,
+// and that a value that is not a CIDR sorts last.
+func TestCIDRLess(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b string
+		want bool
+	}{
+		{name: "by address, not text", a: "10.2.0.0/16", b: "10.100.0.0/16", want: true},
+		{name: "after by address", a: "10.100.0.0/16", b: "10.2.0.0/16", want: false},
+		{name: "supernet first", a: "10.0.0.0/8", b: "10.0.0.0/16", want: true},
+		{name: "subnet after", a: "10.0.0.0/16", b: "10.0.0.0/8", want: false},
+		{name: "default route first", a: "0.0.0.0/0", b: "10.0.0.0/8", want: true},
+		{name: "bare ip is its host prefix", a: "10.0.0.0/24", b: "10.0.0.1", want: true},
+		{name: "ipv4 before ipv6", a: "192.168.0.0/16", b: "::/0", want: true},
+		{name: "cidr before prefix list", a: "10.0.0.0/8", b: "pl-0123", want: true},
+		{name: "prefix list after cidr", a: "pl-0123", b: "10.0.0.0/8", want: false},
+		{name: "two non cidrs as text", a: "pl-a", b: "pl-b", want: true},
+		{name: "equal", a: "10.0.0.0/8", b: "10.0.0.0/8", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CIDRLess(tt.a, tt.b); got != tt.want {
+				t.Errorf("CIDRLess(%q, %q) = %v, want %v", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestSortByField_cidr checks that a CIDR field sorts by address.
+func TestSortByField_cidr(t *testing.T) {
+	type row struct{ C CIDR }
+	data := []row{{"10.100.0.0/16"}, {"10.2.0.0/16"}, {"10.0.0.0/8"}}
+	SortByField(data, "C")
+	want := []CIDR{"10.0.0.0/8", "10.2.0.0/16", "10.100.0.0/16"}
+	if got := []CIDR{data[0].C, data[1].C, data[2].C}; !reflect.DeepEqual(got, want) {
+		t.Errorf("SortByField(C) = %v, want [10.0.0.0/8 10.2.0.0/16 10.100.0.0/16]", got)
+	}
+}
+
 // TestSortByField_version checks that a Version field sorts naturally and a plain string as text.
 func TestSortByField_version(t *testing.T) {
 	type row struct {

@@ -63,7 +63,14 @@ type bgpRow struct {
 	Edge string `json:"edge,omitempty" header:"Edge" sort:"edge"`
 
 	// Prefix is the IP prefix of the route.
-	Prefix string `json:"prefix,omitempty" header:"Prefix" sort:"prefix"`
+	Prefix common.CIDR `json:"prefix,omitempty" header:"Prefix" sort:"prefix"`
+
+	// Installed tells whether the route is installed in the route table (GetNetworkRoutes): yes
+	// when an installed route of the prefix points to its attachment, no when the installed route
+	// of the prefix points elsewhere, none when no route of the prefix is installed, such as a
+	// prefix a routing policy drops. AWS names only the attachment of an installed route, so every
+	// path through that attachment is yes.
+	Installed string `json:"installed,omitempty" header:"Installed" sort:"installed"`
 
 	// ASPath is the BGP AS path, its AS numbers separated by spaces.
 	ASPath string `json:"as_path,omitempty" header:"AS Path" sort:"as-path"`
@@ -122,10 +129,17 @@ func NewBGP(profile, region string, filters map[string][]string, sortField strin
 	}
 }
 
+// bgpRoutesAPI is the part of the Network Manager client that reads the BGP routes of a route
+// table and its installed routes.
+type bgpRoutesAPI interface {
+	networkmanager.ListCoreNetworkRoutingInformationAPIClient
+	networkmanager.GetNetworkRoutesAPIClient
+}
+
 // bgpAPI is the part of the Network Manager client used by the BGP search.
 type bgpAPI interface {
 	networkmanager.ListCoreNetworksAPIClient
-	networkmanager.ListCoreNetworkRoutingInformationAPIClient
+	bgpRoutesAPI
 	coreNetworkAPI
 }
 
@@ -135,11 +149,27 @@ var newBGPClient = func(profile string) (bgpAPI, error) { return NewClient(profi
 
 // deniedBGP is the hint of an AccessDenied on ListCoreNetworkRoutingInformation.
 const deniedBGP = "run it with a profile of the account that owns the core network, allowed " +
-	"networkmanager:ListCoreNetworkRoutingInformation"
+	"networkmanager:ListCoreNetworkRoutingInformation and networkmanager:GetNetworkRoutes"
 
-// CheckBGPFlags validates the CIDRs, the match mode and the AS numbers before any AWS call.
-func CheckBGPFlags(cidrs, match, asns []string) error {
-	_, err := newBGPQuery(map[string][]string{FilterKeyCIDR: cidrs, FilterKeyMatch: match, FilterKeyASN: asns})
+// The values of the Installed column, in route table order.
+const (
+	// InstalledYes is a path whose attachment the installed route of its prefix points to.
+	InstalledYes = "yes"
+	// InstalledNo is a path to a prefix whose installed route points to another attachment.
+	InstalledNo = "no"
+	// InstalledNone is a path to a prefix with no installed route, such as one a policy drops.
+	InstalledNone = "none"
+)
+
+// InstalledNames returns the values of the Installed column, for --installed.
+func InstalledNames() []string { return []string{InstalledYes, InstalledNo, InstalledNone} }
+
+// CheckBGPFlags validates the CIDRs, the match mode, the AS numbers and the installed values before
+// any AWS call.
+func CheckBGPFlags(cidrs, match, asns, installed []string) error {
+	_, err := newBGPQuery(map[string][]string{
+		FilterKeyCIDR: cidrs, FilterKeyMatch: match, FilterKeyASN: asns, FilterKeyInstalled: installed,
+	})
 	return err
 }
 
@@ -152,6 +182,11 @@ func newBGPQuery(filters map[string][]string) (*query, error) {
 	for _, a := range q.asns {
 		if _, err := strconv.ParseUint(a, 10, 32); err != nil {
 			return nil, fmt.Errorf("invalid AS number %q", a)
+		}
+	}
+	for _, v := range q.installed {
+		if !slices.Contains(InstalledNames(), v) {
+			return nil, fmt.Errorf("invalid installed %q; valid: %s", v, strings.Join(InstalledNames(), ", "))
 		}
 	}
 	return q, nil
@@ -229,8 +264,7 @@ func (c *routeCall) bgpInput() *networkmanager.ListCoreNetworkRoutingInformation
 // bgpRoutes reads the BGP routes of one call, following every page, and returns the rows that
 // pass --next-hop-types, --communities and --asns.
 func bgpRoutes(
-	ctx context.Context, client networkmanager.ListCoreNetworkRoutingInformationAPIClient, cn *coreNetwork,
-	c *routeCall, q *query,
+	ctx context.Context, client bgpRoutesAPI, cn *coreNetwork, c *routeCall, q *query,
 ) ([]bgpRow, error) {
 	var found []types.CoreNetworkRoutingInformation
 	paginator := networkmanager.NewListCoreNetworkRoutingInformationPaginator(client, c.bgpInput())
@@ -244,14 +278,71 @@ func bgpRoutes(
 	if c.mode == MatchLongest {
 		found = longestMatches(found, c.cidr, func(r *types.CoreNetworkRoutingInformation) *string { return r.Prefix })
 	}
+	if len(found) == 0 {
+		return nil, nil
+	}
+	installed, err := installedRoutes(ctx, client, cn, c)
+	if err != nil {
+		return nil, err
+	}
 	var rows []bgpRow
 	for i := range found {
 		row := parseBGPRoute(&found[i], cn, c)
-		if q.wantTarget(row.NextHopType) && q.wantBGP(&found[i]) {
+		row.Installed = installed.state(string(row.Prefix), row.AttachmentID)
+		if q.wantTarget(row.NextHopType) && q.wantBGP(&found[i]) && q.wantInstalled(row.Installed) {
 			rows = append(rows, row)
 		}
 	}
 	return rows, nil
+}
+
+// installed maps the prefix of each installed route to the attachments its destinations point to.
+type installed map[string]map[string]bool
+
+// installedRoutes returns the installed routes of the call's route table, read with the same match
+// as the BGP routes (GetNetworkRoutes), whatever --next-hop-types says: a prefix installed through
+// another type of next hop is still installed.
+func installedRoutes(
+	ctx context.Context, client networkmanager.GetNetworkRoutesAPIClient, cn *coreNetwork, c *routeCall,
+) (installed, error) {
+	routes, err := networkRoutes(ctx, client, c.input(cn.globalNetworkID, &query{}))
+	if err != nil {
+		return nil, fmt.Errorf("reading the installed routes: %w", err)
+	}
+	out := installed{}
+	for i := range routes {
+		prefix := aws.ToString(routes[i].DestinationCidrBlock)
+		if prefix == "" {
+			continue
+		}
+		if out[prefix] == nil {
+			out[prefix] = map[string]bool{}
+		}
+		for _, d := range routes[i].Destinations {
+			out[prefix][aws.ToString(d.CoreNetworkAttachmentId)] = true
+		}
+	}
+	return out, nil
+}
+
+// state returns the Installed value of a path to prefix through attachment.
+func (in installed) state(prefix, attachment string) string {
+	attachments, ok := in[prefix]
+	switch {
+	case !ok:
+		return InstalledNone
+	case attachment != "" && attachments[attachment]:
+		return InstalledYes
+	}
+	return InstalledNo
+}
+
+// installedRank orders the Installed values: the installed path first.
+func installedRank(v string) int {
+	if i := slices.Index(InstalledNames(), v); i >= 0 {
+		return i
+	}
+	return len(InstalledNames())
 }
 
 // wantBGP reports whether a BGP route passes --communities and --asns: it carries one of the
@@ -276,7 +367,7 @@ func parseBGPRoute(route *types.CoreNetworkRoutingInformation, cn *coreNetwork, 
 		CoreNetworkID:   cn.id,
 		Segment:         c.table.segment,
 		Edge:            c.table.edge,
-		Prefix:          aws.ToString(route.Prefix),
+		Prefix:          common.CIDR(aws.ToString(route.Prefix)),
 		ASPath:          strings.Join(route.AsPath, " "),
 		Communities:     strings.Join(route.Communities, ","),
 		LocalPreference: aws.ToString(route.LocalPreference),
@@ -297,13 +388,19 @@ func parseBGPRoute(route *types.CoreNetworkRoutingInformation, cn *coreNetwork, 
 	return row
 }
 
-// sortResults sorts the results by the given field.
+// sortResults sorts the results by the given field. Rows equal on it stay in route table order,
+// the installed path of a prefix first (tableKey).
 func (r *BGPResults) sortResults(field string) error {
 	sortFields, err := GetBGPSortFields(field)
 	if err != nil {
 		return err
 	}
-	common.SortByField(r.Data, sortFields[field])
+	sortRows(r.Data, sortFields[field], func(d *bgpRow) tableKey {
+		return tableKey{
+			coreNetwork: d.CoreNetworkID, segment: d.Segment, edge: d.Edge, prefix: d.Prefix,
+			rank: installedRank(d.Installed),
+		}
+	})
 	return nil
 }
 
