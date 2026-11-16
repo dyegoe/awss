@@ -410,9 +410,12 @@ awss cloudwan routes -p network --states blackhole
 
 One row per route destination: **Query** (the CIDR searched), **Segment** (`nfg:<name>` for a
 network function group), **Edge**, **CIDR**, **Type**, **State**, **Target Type**, **Target ID**,
-**Attachment** (the Name tag of the attachment), **Target Segment** (another segment for a route
-shared between segments), **Owner ID** and **Owner** (the account of the attachment; see
-[Account names](#account-names)).
+**Attachment** (the Name tag of the attachment), **Target Segment** (the segment of that
+attachment: for a route shared from another segment, the segment it came from, such as a Direct
+Connect route in `dev` whose gateway is in `sharedsvc`), **Owner ID** and **Owner** (the account
+of the attachment; see [Account names](#account-names)). AWS returns only the attachment, type
+and resource of a route destination, so the name, segment, owner and edges come from the
+attachments of the core network.
 
 - **Profile:** run it with a profile of the account that owns the core network, usually the
   network account. An account the core network is shared with gets AccessDenied, reported once

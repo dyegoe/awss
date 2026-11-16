@@ -1,0 +1,73 @@
+{
+    "Attachments": [
+        {
+            "CoreNetworkId": "core-network-0aaaaaaaaaaaaaaaa",
+            "CoreNetworkArn": "arn:aws:networkmanager::111111111111:core-network/core-network-0aaaaaaaaaaaaaaaa",
+            "AttachmentId": "attachment-0000000000000dev1",
+            "OwnerAccountId": "222222222222",
+            "AttachmentType": "VPC",
+            "State": "AVAILABLE",
+            "EdgeLocation": "eu-central-1",
+            "ResourceArn": "arn:aws:ec2:eu-central-1:222222222222:vpc/vpc-0000000000000dev1",
+            "AttachmentPolicyRuleNumber": 500,
+            "SegmentName": "dev",
+            "NatGatewaySupport": "DISABLED",
+            "NatSystemRouteSupport": true,
+            "Tags": [{"Key": "Name", "Value": "app-dev"}, {"Key": "managed_by", "Value": "terraform"}],
+            "ProposedSegmentChange": {},
+            "ProposedNetworkFunctionGroupChange": {},
+            "CreatedAt": "2026-07-04T10:00:00+03:00",
+            "UpdatedAt": "2026-07-04T10:05:00+03:00"
+        },
+        {
+            "CoreNetworkId": "core-network-0aaaaaaaaaaaaaaaa",
+            "CoreNetworkArn": "arn:aws:networkmanager::111111111111:core-network/core-network-0aaaaaaaaaaaaaaaa",
+            "AttachmentId": "attachment-00000000000000dx1",
+            "OwnerAccountId": "111111111111",
+            "AttachmentType": "DIRECT_CONNECT_GATEWAY",
+            "State": "AVAILABLE",
+            "EdgeLocations": ["eu-central-1"],
+            "ResourceArn": "arn:aws:directconnect::111111111111:dx-gateway/00000000-0000-0000-0000-000000000dx1",
+            "AttachmentPolicyRuleNumber": 100,
+            "SegmentName": "sharedsvc",
+            "Tags": [{"Key": "Name", "Value": "dc-primary"}],
+            "ProposedSegmentChange": {},
+            "ProposedNetworkFunctionGroupChange": {},
+            "CreatedAt": "2026-07-03T13:00:00+03:00",
+            "UpdatedAt": "2026-07-03T13:10:00+03:00"
+        },
+        {
+            "CoreNetworkId": "core-network-0aaaaaaaaaaaaaaaa",
+            "CoreNetworkArn": "arn:aws:networkmanager::111111111111:core-network/core-network-0aaaaaaaaaaaaaaaa",
+            "AttachmentId": "attachment-00000000000000tg1",
+            "OwnerAccountId": "111111111111",
+            "AttachmentType": "TRANSIT_GATEWAY_ROUTE_TABLE",
+            "State": "AVAILABLE",
+            "EdgeLocation": "eu-central-1",
+            "ResourceArn": "arn:aws:ec2:eu-central-1:111111111111:transit-gateway-route-table/tgw-rtb-000000000000000s1",
+            "AttachmentPolicyRuleNumber": 300,
+            "SegmentName": "sharedsvc",
+            "Tags": [{"Key": "Name", "Value": "legacy-shared"}],
+            "ProposedSegmentChange": {},
+            "ProposedNetworkFunctionGroupChange": {},
+            "CreatedAt": "2026-07-03T14:00:00+03:00",
+            "UpdatedAt": "2026-07-03T14:10:00+03:00"
+        },
+        {
+            "CoreNetworkId": "core-network-0aaaaaaaaaaaaaaaa",
+            "CoreNetworkArn": "arn:aws:networkmanager::111111111111:core-network/core-network-0aaaaaaaaaaaaaaaa",
+            "AttachmentId": "attachment-00000000000000tg2",
+            "OwnerAccountId": "111111111111",
+            "AttachmentType": "TRANSIT_GATEWAY_ROUTE_TABLE",
+            "State": "AVAILABLE",
+            "EdgeLocation": "eu-central-1",
+            "ResourceArn": "arn:aws:ec2:eu-central-1:111111111111:transit-gateway-route-table/tgw-rtb-000000000000000n1",
+            "AttachmentPolicyRuleNumber": 300,
+            "Tags": [{"Key": "Name", "Value": "legacy-unmapped"}],
+            "ProposedSegmentChange": {},
+            "ProposedNetworkFunctionGroupChange": {},
+            "CreatedAt": "2026-07-03T15:00:00+03:00",
+            "UpdatedAt": "2026-07-03T15:10:00+03:00"
+        }
+    ]
+}

@@ -18,6 +18,7 @@ package cloudwan
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -250,6 +251,121 @@ func TestResults_collect(t *testing.T) {
 		if got := aws.ToString(in.GlobalNetworkId); got != "global-network-1" {
 			t.Errorf("GetNetworkRoutes GlobalNetworkId = %q, want global-network-1", got)
 		}
+	}
+}
+
+// loadFixture decodes testdata/name, a sanitized AWS CLI output of the call, into v. The AWS CLI
+// writes the API field names, which encoding/json matches to the SDK struct fields.
+func loadFixture(t *testing.T, name string, v any) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, v); err != nil {
+		t.Fatalf("decoding %s: %v", name, err)
+	}
+}
+
+// awsFixture returns a fake client that answers with the testdata outputs: a core network with the
+// segments sharedsvc, prd and dev at eu-central-1, its attachments, and the routes of dev.
+func awsFixture(t *testing.T) *fakeNetworkManager {
+	t.Helper()
+	var list networkmanager.ListCoreNetworksOutput
+	var core networkmanager.GetCoreNetworkOutput
+	var atts networkmanager.ListAttachmentsOutput
+	var routes networkmanager.GetNetworkRoutesOutput
+	loadFixture(t, "list-core-networks.json", &list)
+	loadFixture(t, "get-core-network.json", &core)
+	loadFixture(t, "list-attachments.json", &atts)
+	loadFixture(t, "get-network-routes.json", &routes)
+	return &fakeNetworkManager{
+		coreNetworks: [][]types.CoreNetworkSummary{list.CoreNetworks},
+		coreNetwork:  map[string]*types.CoreNetwork{aws.ToString(core.CoreNetwork.CoreNetworkId): core.CoreNetwork},
+		attachments:  atts.Attachments,
+		routes:       map[string][][]types.NetworkRoute{"dev@eu-central-1": {routes.NetworkRoutes}},
+	}
+}
+
+// TestResults_collect_awsFixtures checks the routes of a segment from the shapes AWS really
+// returns: the destinations name only the attachment, its type and resource, so the target segment
+// and edges come from the attachments. A route learned over Direct Connect reaches dev through the
+// shared segment sharedsvc.
+func TestResults_collect_awsFixtures(t *testing.T) {
+	client := awsFixture(t)
+	q, err := newQuery(map[string][]string{FilterKeySegment: {"dev"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := New("network", Region, nil, "cidr")
+	r.AccountNames = map[string]string{"222222222222": "app-dev"}
+	r.collect(context.Background(), client, q)
+
+	if len(r.Errors) != 0 {
+		t.Fatalf("collect() errors = %q, want none", r.Errors)
+	}
+	core, dev := "core-network-0aaaaaaaaaaaaaaaa", "dev"
+	want := []dataRow{
+		{
+			CoreNetworkID: core, Segment: dev, Edge: "eu-central-1", CIDR: "10.0.0.0/16", Type: "propagated",
+			State: "active", TargetType: "direct-connect-gateway", TargetID: "00000000-0000-0000-0000-000000000dx1",
+			AttachmentID: "attachment-00000000000000dx1", AttachmentName: "dc-primary", TargetSegment: "sharedsvc",
+			TargetEdge: "eu-central-1", OwnerID: "111111111111",
+		},
+		{
+			CoreNetworkID: core, Segment: dev, Edge: "eu-central-1", CIDR: "10.100.0.0/16", Type: "propagated",
+			State: "active", TargetType: "transit-gateway-route-table", TargetID: "tgw-rtb-000000000000000s1",
+			AttachmentID: "attachment-00000000000000tg1", AttachmentName: "legacy-shared", TargetSegment: "sharedsvc",
+			TargetEdge: "eu-central-1", OwnerID: "111111111111",
+		},
+		{
+			CoreNetworkID: core, Segment: dev, Edge: "eu-central-1", CIDR: "10.216.0.0/16", Type: "propagated",
+			State: "active", TargetType: "vpc", TargetID: "vpc-0000000000000dev1",
+			AttachmentID: "attachment-0000000000000dev1", AttachmentName: "app-dev", TargetSegment: "dev",
+			TargetEdge: "eu-central-1", OwnerID: "222222222222", OwnerName: "app-dev",
+		},
+	}
+	if !reflect.DeepEqual(r.Data, want) {
+		t.Errorf("collect() rows =\n%+v\nwant\n%+v", r.Data, want)
+	}
+	if got := callKey(client.routeInputs[0]); len(client.routeInputs) != 1 || got != "dev@eu-central-1" {
+		t.Errorf("collect() calls = %d, first %q, want one for dev@eu-central-1", len(client.routeInputs), got)
+	}
+}
+
+// TestNewAttachmentInfo checks the segment and edges a route row takes from its attachment: one
+// edge, several (a Direct Connect gateway), and a network function group.
+func TestNewAttachmentInfo(t *testing.T) {
+	tests := []struct {
+		name string
+		att  types.Attachment
+		want attachmentInfo
+	}{
+		{
+			name: "vpc",
+			att: types.Attachment{
+				SegmentName: aws.String("dev"), EdgeLocation: aws.String("eu-central-1"), OwnerAccountId: aws.String("2"),
+				Tags: []types.Tag{{Key: aws.String("Name"), Value: aws.String("app")}},
+			},
+			want: attachmentInfo{name: "app", owner: "2", segment: "dev", edges: "eu-central-1"},
+		},
+		{
+			name: "direct connect gateway",
+			att:  types.Attachment{SegmentName: aws.String("sharedsvc"), EdgeLocations: []string{"eu-central-1", "eu-west-1"}},
+			want: attachmentInfo{segment: "sharedsvc", edges: "eu-central-1,eu-west-1"},
+		},
+		{
+			name: "function group",
+			att:  types.Attachment{NetworkFunctionGroupName: aws.String("inspection")},
+			want: attachmentInfo{segment: "nfg:inspection"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := newAttachmentInfo(&tt.att); got != tt.want {
+				t.Errorf("newAttachmentInfo() = %+v, want %+v", got, tt.want)
+			}
+		})
 	}
 }
 

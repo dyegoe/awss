@@ -18,7 +18,10 @@ package cloudwanatt
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
@@ -155,6 +158,56 @@ func TestResults_collect_filters(t *testing.T) {
 				t.Errorf("collect(%v) = %q, want %q", tt.filters, got, tt.want)
 			}
 		})
+	}
+}
+
+// loadFixture decodes name, a sanitized AWS CLI output in the testdata of search/cloudwan, into v.
+func loadFixture(t *testing.T, name string, v any) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "cloudwan", "testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, v); err != nil {
+		t.Fatalf("decoding %s: %v", name, err)
+	}
+}
+
+// TestResults_collect_awsFixtures checks the attachments from the shapes AWS really returns: a
+// Direct Connect gateway with EdgeLocations and no EdgeLocation, and a Transit Gateway route table
+// attachment in no segment.
+func TestResults_collect_awsFixtures(t *testing.T) {
+	var list networkmanager.ListCoreNetworksOutput
+	var atts networkmanager.ListAttachmentsOutput
+	loadFixture(t, "list-core-networks.json", &list)
+	loadFixture(t, "list-attachments.json", &atts)
+	client := &fakeNetworkManager{
+		coreNetworks: list.CoreNetworks,
+		attachments:  map[string][][]types.Attachment{"core-network-0aaaaaaaaaaaaaaaa": {atts.Attachments}},
+	}
+
+	r := collectWith(t, client, map[string][]string{}, "")
+
+	if len(r.Errors) != 0 {
+		t.Fatalf("collect() errors = %q, want none", r.Errors)
+	}
+	got := []string{}
+	for i := range r.Data {
+		d := &r.Data[i]
+		fields := []string{d.ID, d.Name, d.Type, d.Segment, strings.Join(d.Edges, ","), d.Resource}
+		got = append(got, strings.Join(fields, " "))
+	}
+	want := []string{
+		"attachment-0000000000000dev1 app-dev vpc dev eu-central-1 vpc-0000000000000dev1",
+		"attachment-00000000000000dx1 dc-primary direct-connect-gateway sharedsvc eu-central-1 " +
+			"00000000-0000-0000-0000-000000000dx1",
+		"attachment-00000000000000tg1 legacy-shared transit-gateway-route-table sharedsvc eu-central-1 " +
+			"tgw-rtb-000000000000000s1",
+		"attachment-00000000000000tg2 legacy-unmapped transit-gateway-route-table  eu-central-1 " +
+			"tgw-rtb-000000000000000n1",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("collect() =\n%q\nwant\n%q", got, want)
 	}
 }
 

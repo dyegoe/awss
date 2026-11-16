@@ -304,6 +304,12 @@ func parseRoute(route *types.NetworkRoute, cn *coreNetwork, c *routeCall) []data
 			row.TargetSegment = FunctionGroupPrefix + g
 		}
 		row.TargetEdge = aws.ToString(d.EdgeLocation)
+		if row.TargetSegment == "" {
+			row.TargetSegment = att.segment
+		}
+		if row.TargetEdge == "" {
+			row.TargetEdge = att.edges
+		}
 		row.TransitGatewayAttachmentID = aws.ToString(d.TransitGatewayAttachmentId)
 		rows = append(rows, row)
 	}

@@ -1,0 +1,48 @@
+{
+    "RouteTableArn": "arn:aws:networkmanager::111111111111:core-network/core-network-0aaaaaaaaaaaaaaaa/segment/dev/eu-central-1",
+    "CoreNetworkSegmentEdge": {
+        "CoreNetworkId": "core-network-0aaaaaaaaaaaaaaaa",
+        "SegmentName": "dev",
+        "EdgeLocation": "eu-central-1"
+    },
+    "RouteTableType": "segment",
+    "RouteTableTimestamp": "2026-11-16T10:27:00+02:00",
+    "NetworkRoutes": [
+        {
+            "DestinationCidrBlock": "10.216.0.0/16",
+            "Destinations": [
+                {
+                    "CoreNetworkAttachmentId": "attachment-0000000000000dev1",
+                    "ResourceType": "vpc",
+                    "ResourceId": "vpc-0000000000000dev1"
+                }
+            ],
+            "State": "ACTIVE",
+            "Type": "PROPAGATED"
+        },
+        {
+            "DestinationCidrBlock": "10.0.0.0/16",
+            "Destinations": [
+                {
+                    "CoreNetworkAttachmentId": "attachment-00000000000000dx1",
+                    "ResourceType": "direct-connect-gateway",
+                    "ResourceId": "00000000-0000-0000-0000-000000000dx1"
+                }
+            ],
+            "State": "ACTIVE",
+            "Type": "PROPAGATED"
+        },
+        {
+            "DestinationCidrBlock": "10.100.0.0/16",
+            "Destinations": [
+                {
+                    "CoreNetworkAttachmentId": "attachment-00000000000000tg1",
+                    "ResourceType": "transit-gateway-route-table",
+                    "ResourceId": "tgw-rtb-000000000000000s1"
+                }
+            ],
+            "State": "ACTIVE",
+            "Type": "PROPAGATED"
+        }
+    ]
+}

@@ -25,6 +25,7 @@ package cloudwan
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/dyegoe/awss/common"
 
@@ -89,10 +90,12 @@ type dataRow struct {
 	AttachmentName string `json:"attachment_name,omitempty" header:"Attachment" sort:"attachment-name"`
 
 	// TargetSegment is the segment of the next hop (nfg:<name> for a function group): another
-	// segment for a route shared between segments.
+	// segment for a route shared between segments. AWS does not return it for most routes, so it
+	// comes from the attachment when the destination has none.
 	TargetSegment string `json:"target_segment,omitempty" header:"Target Segment" sort:"target-segment"`
 
-	// TargetEdge is the edge location of the next hop.
+	// TargetEdge is the edge location of the next hop, or the edges of its attachment, such as the
+	// several edges of a Direct Connect gateway.
 	TargetEdge string `json:"target_edge,omitempty"`
 
 	// OwnerID is the account that owns the attachment of the next hop, such as the account of a
@@ -188,8 +191,10 @@ type coreNetwork struct {
 	accountNames map[string]string
 }
 
-// attachmentInfo is what a route row shows of its attachment.
-type attachmentInfo struct{ name, owner string }
+// attachmentInfo is what a route row shows of its attachment. GetNetworkRoutes returns only the
+// attachment ID, type and resource of a destination, so its segment and edges come from here: the
+// segment is how a route reached a segment it is shared with.
+type attachmentInfo struct{ name, owner, segment, edges string }
 
 // searchCoreNetwork reads the route tables of one core network and adds the routes that match q.
 // A failure is recorded in Errors and the run goes on with the next core network.
@@ -220,12 +225,25 @@ func (r *Results) searchCoreNetwork(ctx context.Context, client routesAPI, s *ty
 		r.Errors = append(r.Errors, fmt.Sprintf("no attachment names: %v", err))
 	}
 	for i := range atts {
-		cn.attachments[aws.ToString(atts[i].AttachmentId)] = attachmentInfo{
-			name: TagName(atts[i].Tags), owner: aws.ToString(atts[i].OwnerAccountId),
-		}
+		cn.attachments[aws.ToString(atts[i].AttachmentId)] = newAttachmentInfo(&atts[i])
 	}
 
 	r.runCalls(ctx, client, &cn, calls(tables, q), q)
+}
+
+// newAttachmentInfo returns what a route row shows of an attachment.
+func newAttachmentInfo(a *types.Attachment) attachmentInfo {
+	info := attachmentInfo{
+		name: TagName(a.Tags), owner: aws.ToString(a.OwnerAccountId), segment: aws.ToString(a.SegmentName),
+		edges: strings.Join(a.EdgeLocations, ","),
+	}
+	if g := aws.ToString(a.NetworkFunctionGroupName); g != "" && info.segment == "" {
+		info.segment = FunctionGroupPrefix + g
+	}
+	if info.edges == "" {
+		info.edges = aws.ToString(a.EdgeLocation)
+	}
+	return info
 }
 
 // sortResults sorts the results by the given field.
