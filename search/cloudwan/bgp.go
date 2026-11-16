@@ -241,7 +241,7 @@ func segmentTables(coreNetworkID string, cn *types.CoreNetwork, q *query) []rout
 }
 
 // bgpInput returns the ListCoreNetworkRoutingInformation input of the call. A longest call sends
-// no match field and reads every route of the segment, as for GetNetworkRoutes (longestMatches).
+// no match field and reads every route of the segment, as for GetNetworkRoutes (LongestMatches).
 func (c *routeCall) bgpInput() *networkmanager.ListCoreNetworkRoutingInformationInput {
 	in := &networkmanager.ListCoreNetworkRoutingInformationInput{
 		CoreNetworkId: aws.String(c.table.coreNetworkID),
@@ -276,7 +276,7 @@ func bgpRoutes(
 		found = append(found, page.CoreNetworkRoutingInformation...)
 	}
 	if c.mode == MatchLongest {
-		found = longestMatches(found, c.cidr, func(r *types.CoreNetworkRoutingInformation) *string { return r.Prefix })
+		found = LongestMatches(found, c.cidr, func(r *types.CoreNetworkRoutingInformation) *string { return r.Prefix })
 	}
 	if len(found) == 0 {
 		return nil, nil

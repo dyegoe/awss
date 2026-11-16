@@ -23,6 +23,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Shell completion of commands, flags and the values of the flags that take a known list (sort fields, profiles, regions, states); see [Shell completion](#shell-completion)
 - AWS Cloud WAN: find a CIDR in the route tables of the segments and see where it points (`awss cloudwan routes`), see the BGP routes before the routing policies with their AS path and communities (`awss cloudwan bgp`), and list the attachments (`awss cloudwan attachments`); see [Cloud WAN routes](#cloud-wan-routes-awss-cloudwan-routes)
 - AWS Direct Connect: list the gateways, what they are associated with and the prefixes they advertise to the data centres (`awss dx gateways`); see [Direct Connect gateways](#direct-connect-gateways-awss-dx-gateways)
+- AWS Transit Gateway: find a CIDR in the Transit Gateway route tables and see which attachment (VPC, VPN, Direct Connect, peering) holds it (`awss tgw routes`); see [Transit Gateway routes](#transit-gateway-routes-awss-tgw-routes)
 - Cleanup of the default VPCs with no workload (`awss cleanup default-vpc`) and of the unused DHCP options sets (`awss cleanup dhcp-options`), a preview unless `--apply`; see [Cleanup](#cleanup)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
@@ -433,7 +434,8 @@ attachments of the core network.
   centre advertised but a policy dropped is not there: look for it with
   [`awss cloudwan bgp`](#cloud-wan-bgp-routes-awss-cloudwan-bgp).
 - **Transit Gateway:** behind a Transit Gateway route table attachment, the route points to the
-  Transit Gateway route table; the VPC behind it is in the Transit Gateway's own route tables.
+  Transit Gateway route table; find the VPC behind it with
+  [`awss tgw routes`](#transit-gateway-routes-awss-tgw-routes).
 - **JSON only:** `core_network_id`, `prefix_list_id`, `attachment_id`, `target_edge`,
   `transit_gateway_attachment_id`.
 - **Permission:** `networkmanager:ListCoreNetworks`, `networkmanager:GetCoreNetwork`,
@@ -601,6 +603,67 @@ the association), **Allowed Prefix** and **VIFs**.
 
 Sort by: `--sort gateway|gateway-id|amazon-asn|associated-type|associated-id|region|owner|owner-name|state|prefix|query` (default: `gateway`). Rows equal
 on the sort field stay grouped by gateway and association, the prefixes in address order.
+
+#### Transit Gateway routes (`awss tgw routes`)
+
+Finds which Transit Gateway route tables have a route to a CIDR, and which attachment each route
+points to: a VPC, a VPN, a Direct Connect gateway, a peering (such as Cloud WAN) or a Connect
+attachment, or nowhere (blackhole). It is the next step after
+[`awss cloudwan routes`](#cloud-wan-routes-awss-cloudwan-routes) for the part of a network behind a
+Transit Gateway: Cloud WAN routes the CIDR to a Transit Gateway route table, and this command shows
+the VPC that holds it.
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--cidrs` | `-c` | CIDRs or IP addresses to find; a bare IP is its `/32` (IPv6 too). Without it, every route of the selected route tables is listed |
+| `--match` | `-m` | How a route must relate to each CIDR: `any` (default: `exact`, `subnet-of` and `supernet-of` together), `exact`, `longest` (the route traffic takes), `subnet-of` (routes inside the CIDR), `supernet-of` (routes covering it) |
+| `--route-table-ids` | | Route tables to search, exact |
+| `--route-table-names` | | Route tables to search, by Name tag (globs) |
+| `--transit-gateway-ids` | | Search the route tables of these transit gateways only, exact |
+| `--types` | `-T` | Route types: `propagated`, `static` |
+| `--states` | | Route states, such as `active` or `blackhole`; default both |
+| `--attachment-types` | | Attachment types: `vpc`, `vpn`, `direct-connect-gateway` (`dx` for short), `peering`, `connect`... |
+| `--attachment-ids` | | Attachment IDs, exact |
+| `--resource-ids` | | Resources of the attachments, such as VPC IDs, exact |
+
+```bash
+# Cloud WAN sends 10.20.1.5 to tgw-rtb-0123 at eu-central-1: which VPC holds it?
+awss tgw routes --profile network --regions eu-central-1 --route-table-ids tgw-rtb-0123 \
+  --cidrs 10.20.1.5 --match longest
+
+# Is the data centre prefix learned over Direct Connect in every route table?
+awss tgw routes --profile network --regions all --cidrs 10.50.0.0/16 --attachment-types dx
+
+# Every route to one VPC
+awss tgw routes --profile network --resource-ids vpc-0123456789abcdef0
+
+# The blackholes of every route table
+awss tgw routes --profile network --states blackhole
+```
+
+One row per attachment of each route (a route with several attachments, ECMP, is several rows):
+**Query** (the CIDR searched), **TGW ID**, **Route Table ID**, **Route Table** (its Name tag),
+**CIDR**, **Prefix List** (the destination of a prefix list route), **Type**, **State**,
+**Resource Type**, **Resource ID** (such as the VPC), **Attachment ID**, **Attachment** (its Name
+tag), **Owner ID** and **Owner** (the account of the resource; see [Account names](#account-names)).
+
+- **Profile:** run it with a profile of the account that owns the transit gateways, usually the
+  network account. An account a transit gateway is shared with does not see its route tables, so
+  its result set is empty.
+- **Regional:** a transit gateway is regional, so the command searches every profile and region,
+  as `ec2` does. Use `--regions` to pick the region of the transit gateway.
+- **Calls:** one `DescribeTransitGatewayRouteTables` call, then one `SearchTransitGatewayRoutes`
+  call per route table, per CIDR and per match mode (`any` is three, `longest` is two: `exact` and
+  `supernet-of`, of which awss keeps the most specific route), then one
+  `DescribeTransitGatewayAttachments` call for the names and owners. Every filter except
+  `--route-table-names` is applied by AWS. When AWS says a route table has more routes than it
+  returned, the result set reports it: narrow the search with `--cidrs`.
+- **JSON only:** `announcement_id` (the route table announcement of a route from a Cloud WAN
+  peering).
+- **Permission:** `ec2:DescribeTransitGatewayRouteTables`, `ec2:SearchTransitGatewayRoutes`, and
+  `ec2:DescribeTransitGatewayAttachments` for the attachment names and owners.
+
+Sort by: `--sort route-table|route-table-id|tgw-id|cidr|prefix-list|query|type|state|resource-type|resource-id|attachment|attachment-id|owner|owner-name` (default: `route-table`). `cidr` sorts by address, and rows equal on the sort field stay in route table order: route table, then CIDR.
 
 ### Cleanup
 
@@ -781,7 +844,7 @@ awss stats
 
 ### Account names
 
-`vpc`, `subnet`, `eni`, `cloudwan routes`, `cloudwan bgp`, `cloudwan attachments` and `dx gateways` show an **Owner** column (JSON `owner_name`, sort field `owner-name`)
+`vpc`, `subnet`, `eni`, `cloudwan routes`, `cloudwan bgp`, `cloudwan attachments`, `dx gateways` and `tgw routes` show an **Owner** column (JSON `owner_name`, sort field `owner-name`)
 next to **Owner ID**: the name of the account, which matters in a shared VPC, where the owner is
 usually a network account. The names come from the `accounts` map of `~/.awss/config.yaml`, from
 account ID to name, with no AWS call:
@@ -1034,6 +1097,9 @@ awss rds -e postgres -V '13*' --profiles all --regions all
 
 # Is a data centre prefix learned over Direct Connect in the Cloud WAN segments?
 awss cloudwan routes --profile network --cidrs 10.50.0.0/16 --target-types direct-connect-gateway
+
+# Which VPC behind the Transit Gateway holds 10.20.1.5?
+awss tgw routes --profile network --regions eu-central-1 --cidrs 10.20.1.5 --match longest
 
 # The plan to delete the default VPCs of one account, in every region (nothing changes)
 awss cleanup default-vpc --profiles sandbox --regions all

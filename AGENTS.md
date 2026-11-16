@@ -10,7 +10,7 @@ and do not add a tool-specific copy such as `.github/copilot-instructions.md`.
 
 ## Project overview
 
-**awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs, subnets, S3 buckets and objects, RDS DB instances and clusters, Organization accounts, CloudFront distributions, Cloud WAN routes, BGP routes and attachments, Direct Connect gateways) in parallel
+**awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs, subnets, S3 buckets and objects, RDS DB instances and clusters, Organization accounts, CloudFront distributions, Cloud WAN routes, BGP routes and attachments, Direct Connect gateways, Transit Gateway routes) in parallel
 across multiple profiles and regions. It wraps AWS SDK Go v2 and uses Cobra + Viper for CLI wiring.
 
 The search commands are read-only. The `cleanup` commands (`awss cleanup default-vpc`, `dhcp-options`) are the only
@@ -48,6 +48,9 @@ search/cloudwan/     — Cloud WAN routes (global, us-west-2 endpoint): GetNetwo
 search/cloudwanatt/  — Cloud WAN attachments, client-side filters. Registered as "cloudwan-attachments"
 search/dxgw/         — Direct Connect gateways (global, once per profile, in the profile's region): their
                        associations, allowed prefixes and VIFs, client-side filters. "dx-gateways"
+search/tgw/          — Transit Gateway routes (regional): SearchTransitGatewayRoutes per route table, one CIDR
+                       and match mode per call; attachment names from one DescribeTransitGatewayAttachments.
+                       Registered as "tgw-routes"
 cleanup/             — what the cleanups share: statuses, CallerAccount, AWS error helpers
 cleanup/defaultvpc/  — deletes the default VPC and its plumbing, all-or-nothing on its ENIs; a plan
                        unless Apply. Registered in the search engines map as "default-vpc"
@@ -270,7 +273,7 @@ A justified suppression names the linter and the reason:
 
 Types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test
 Scope: cmd, common, search, search/<resource> (ec2, eni, ebs, vpc, subnet, s3, s3obj, rds, rdscluster, org, cloudfront,
-       cloudwan, cloudwanatt, dxgw),
+       cloudwan, cloudwanatt, dxgw, tgw),
        cleanup, cleanup/<resource> (defaultvpc, dhcpoptions), release
 
 Reference the issue in the body or title, e.g. "(#82)". `feat` bumps the minor version and `fix`

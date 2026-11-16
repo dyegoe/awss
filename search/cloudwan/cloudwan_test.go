@@ -768,7 +768,7 @@ func TestRouteTables(t *testing.T) {
 	}
 }
 
-// routeCIDR returns the prefix of a route, for longestMatches.
+// routeCIDR returns the prefix of a route, for LongestMatches.
 func routeCIDR(r *types.NetworkRoute) *string { return r.DestinationCidrBlock }
 
 // TestLongestMatches checks that the most specific route covering the CIDR wins, that a route more
@@ -799,11 +799,11 @@ func TestLongestMatches(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := []string{}
-			for _, r := range longestMatches(all, tt.cidr, routeCIDR) {
+			for _, r := range LongestMatches(all, tt.cidr, routeCIDR) {
 				got = append(got, aws.ToString(r.DestinationCidrBlock))
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("longestMatches(%q) = %q, want %q", tt.cidr, got, tt.want)
+				t.Errorf("LongestMatches(%q) = %q, want %q", tt.cidr, got, tt.want)
 			}
 		})
 	}

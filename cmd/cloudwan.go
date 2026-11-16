@@ -150,6 +150,9 @@ nfg:<name>), at every edge location. One row per route destination.
   --types, --states  route type and state, filtered by AWS.
   --target-types     next hop type, such as direct-connect-gateway (dx) or vpc.
 
+A route to a Transit Gateway route table (tgw) ends there: find the VPC behind it with
+awss tgw routes --route-table-ids <the Target ID> in the region of the edge.
+
 Is the data centre prefix 10.50.0.0/16 learned over Direct Connect in every segment?
 	awss cloudwan routes --profile network --cidrs 10.50.0.0/16 --target-types direct-connect-gateway
 
