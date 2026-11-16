@@ -26,6 +26,8 @@ import (
 
 	"github.com/dyegoe/awss/common"
 	"github.com/dyegoe/awss/search"
+	searchCloudWAN "github.com/dyegoe/awss/search/cloudwan"
+	searchCloudWANAtt "github.com/dyegoe/awss/search/cloudwanatt"
 	searchOrg "github.com/dyegoe/awss/search/org"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -113,7 +115,7 @@ func globalCompletions() flagCompletions {
 // commandCompletions returns the completions of the flags of a command: --sort when it has one, the
 // availability zones when the command has them, and the flags of a fixed list.
 func commandCompletions(cmd *cobra.Command) flagCompletions {
-	name := cmd.Name()
+	name := engineName(cmd)
 	comps := flagCompletions{}
 	if cmd.Flags().Lookup(flagSort) != nil {
 		comps[flagSort] = fixedValues(func() []string { return search.SortFieldNames(name) })
@@ -140,6 +142,13 @@ func fixedLists() map[string]map[string]func() []string {
 			"public-ip-on-launch": trueFalse,
 		},
 		"org": {flagStatuses: searchOrg.StatusNames},
+		"cloudwan-routes": {
+			"match":        searchCloudWAN.MatchNames,
+			"types":        searchCloudWAN.TypeNames,
+			flagStates:     searchCloudWAN.StateNames,
+			"target-types": searchCloudWAN.TargetTypeNames,
+		},
+		"cloudwan-attachments": {"types": searchCloudWANAtt.TypeNames, flagStates: searchCloudWANAtt.StateNames},
 	}
 }
 

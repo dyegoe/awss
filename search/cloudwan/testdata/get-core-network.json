@@ -1,0 +1,21 @@
+{
+    "CoreNetwork": {
+        "GlobalNetworkId": "global-network-0bbbbbbbbbbbbbbbb",
+        "CoreNetworkId": "core-network-0aaaaaaaaaaaaaaaa",
+        "CoreNetworkArn": "arn:aws:networkmanager::111111111111:core-network/core-network-0aaaaaaaaaaaaaaaa",
+        "Description": "Core network of Global network 1",
+        "CreatedAt": "2026-07-03T12:54:45+03:00",
+        "State": "AVAILABLE",
+        "Segments": [
+            {"Name": "sharedsvc", "EdgeLocations": ["eu-central-1"], "SharedSegments": ["prd", "dev"]},
+            {"Name": "prd", "EdgeLocations": ["eu-central-1"], "SharedSegments": ["sharedsvc"]},
+            {"Name": "dev", "EdgeLocations": ["eu-central-1"], "SharedSegments": ["sharedsvc"]}
+        ],
+        "Edges": [
+            {"EdgeLocation": "eu-central-1", "Asn": 64520, "InsideCidrBlocks": []}
+        ],
+        "Tags": [
+            {"Key": "managed_by", "Value": "terraform"}
+        ]
+    }
+}

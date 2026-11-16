@@ -10,7 +10,7 @@ and do not add a tool-specific copy such as `.github/copilot-instructions.md`.
 
 ## Project overview
 
-**awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs, subnets, S3 buckets and objects, RDS DB instances and clusters, Organization accounts, CloudFront distributions) in parallel
+**awss** (AWS Search) is a Go CLI tool that searches AWS resources (EC2 instances, ENIs, EBS volumes, VPCs, subnets, S3 buckets and objects, RDS DB instances and clusters, Organization accounts, CloudFront distributions, Cloud WAN routes and attachments) in parallel
 across multiple profiles and regions. It wraps AWS SDK Go v2 and uses Cobra + Viper for CLI wiring.
 
 The search commands are read-only. The `cleanup` commands (`awss cleanup default-vpc`, `dhcp-options`) are the only
@@ -22,7 +22,7 @@ Viper, so the config file cannot turn it on.
 **Go version:** the project follows the latest Go release. The `go` directive in `go.mod` is the
 single source: CI and the release builds read it. When Go is upgraded locally, bump the directive
 in the same PR (`go mod edit -go=<version>`). Do not hardcode the version in docs.
-**Key dependencies:** cobra, viper, aws-sdk-go-v2 (config, ec2, s3, rds, organizations, cloudfront, sts), go-pretty, ini.v1
+**Key dependencies:** cobra, viper, aws-sdk-go-v2 (config, ec2, s3, rds, organizations, cloudfront, networkmanager, sts), go-pretty, ini.v1
 
 ### Package layout
 
@@ -41,6 +41,10 @@ search/rds/          — RDS DB instance search: AWS filters plus client-side na
 search/rdscluster/   — RDS DB cluster search, reusing the rds local filters; VPC joined from the subnet groups
 search/org/          — AWS Organization accounts (one profile, global), and their names for --org-profile
 search/cloudfront/   — CloudFront distributions (global, once per profile), client-side filters, opt-in tags
+search/cloudwan/     — Cloud WAN routes (global, us-west-2 endpoint): GetNetworkRoutes per segment / function
+                       group × edge, one CIDR and match mode per call; the Network Manager client and
+                       helpers the Cloud WAN searches share. Registered as "cloudwan-routes"
+search/cloudwanatt/  — Cloud WAN attachments, client-side filters. Registered as "cloudwan-attachments"
 cleanup/             — what the cleanups share: statuses, CallerAccount, AWS error helpers
 cleanup/defaultvpc/  — deletes the default VPC and its plumbing, all-or-nothing on its ENIs; a plan
                        unless Apply. Registered in the search engines map as "default-vpc"
@@ -262,7 +266,8 @@ A justified suppression names the linter and the reason:
 <type>(<scope>): <short description>
 
 Types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test
-Scope: cmd, common, search, search/<resource> (ec2, eni, ebs, vpc, subnet, s3, s3obj, rds, rdscluster, org, cloudfront),
+Scope: cmd, common, search, search/<resource> (ec2, eni, ebs, vpc, subnet, s3, s3obj, rds, rdscluster, org, cloudfront,
+       cloudwan, cloudwanatt),
        cleanup, cleanup/<resource> (defaultvpc, dhcpoptions), release
 
 Reference the issue in the body or title, e.g. "(#82)". `feat` bumps the minor version and `fix`

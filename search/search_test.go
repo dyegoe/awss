@@ -35,6 +35,8 @@ import (
 	"time"
 
 	"github.com/dyegoe/awss/common"
+	searchCloudWAN "github.com/dyegoe/awss/search/cloudwan"
+	searchCloudWANAtt "github.com/dyegoe/awss/search/cloudwanatt"
 	searchENI "github.com/dyegoe/awss/search/eni"
 	searchSubnet "github.com/dyegoe/awss/search/subnet"
 	searchVPC "github.com/dyegoe/awss/search/vpc"
@@ -154,6 +156,7 @@ func TestEngines_searchKeepsFilters(t *testing.T) {
 func TestEngines_registeredCommands(t *testing.T) {
 	for _, cmd := range []string{
 		"ec2", "eni", "ebs", "vpc", "subnet", "s3", "s3obj", "org", "rds", "rds-cluster", "cloudfront",
+		"cloudwan-routes", "cloudwan-attachments",
 	} {
 		eng, ok := engines[cmd]
 		if !ok {
@@ -220,7 +223,10 @@ func TestExecute_fanOut(t *testing.T) {
 		regions   []string
 		wantCalls int
 	}{
-		{name: "every profile x region", profiles: []string{"p1", "p2", "p3"}, regions: []string{"r1", "r2"}, wantCalls: 6},
+		{
+			name: "every profile x region", profiles: []string{"p1", "p2", "p3"}, regions: []string{"r1", "r2"},
+			wantCalls: 6,
+		},
 		{name: "one profile and region", profiles: []string{"p1"}, regions: []string{"r1"}, wantCalls: 1},
 		{name: "no profiles, no searches", profiles: []string{}, regions: []string{"r1"}, wantCalls: 0},
 	}
@@ -597,8 +603,18 @@ func TestEngines_accountNames(t *testing.T) {
 		get  func(common.Results) map[string]string
 	}{
 		{name: "vpc", get: func(r common.Results) map[string]string { return r.(*searchVPC.Results).AccountNames }},
-		{name: "subnet", get: func(r common.Results) map[string]string { return r.(*searchSubnet.Results).AccountNames }},
+		{
+			name: "subnet",
+			get:  func(r common.Results) map[string]string { return r.(*searchSubnet.Results).AccountNames },
+		},
 		{name: "eni", get: func(r common.Results) map[string]string { return r.(*searchENI.Results).AccountNames }},
+		{
+			name: "cloudwan-routes",
+			get:  func(r common.Results) map[string]string { return r.(*searchCloudWAN.Results).AccountNames },
+		},
+		{name: "cloudwan-attachments", get: func(r common.Results) map[string]string {
+			return r.(*searchCloudWANAtt.Results).AccountNames
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
