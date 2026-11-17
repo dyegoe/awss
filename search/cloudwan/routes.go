@@ -159,7 +159,7 @@ func routes(
 		return nil, err
 	}
 	if c.mode == MatchLongest {
-		found = longestMatches(found, c.cidr, func(r *types.NetworkRoute) *string { return r.DestinationCidrBlock })
+		found = LongestMatches(found, c.cidr, func(r *types.NetworkRoute) *string { return r.DestinationCidrBlock })
 	}
 	var rows []dataRow
 	for i := range found {

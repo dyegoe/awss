@@ -45,6 +45,7 @@ import (
 	searchS3 "github.com/dyegoe/awss/search/s3"
 	searchS3obj "github.com/dyegoe/awss/search/s3obj"
 	searchSubnet "github.com/dyegoe/awss/search/subnet"
+	searchTGW "github.com/dyegoe/awss/search/tgw"
 	searchVPC "github.com/dyegoe/awss/search/vpc"
 )
 
@@ -248,6 +249,16 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchDXGW.GetSortFields,
 		sortFieldNames: searchDXGW.SortFieldNames,
+	},
+	// tgw-routes is awss tgw routes. A transit gateway is regional: it runs per profile and region.
+	"tgw-routes": {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
+			r := searchTGW.New(profile, region, filters, opts.SortField)
+			r.AccountNames = opts.AccountNames
+			return r
+		},
+		sortFields:     searchTGW.GetSortFields,
+		sortFieldNames: searchTGW.SortFieldNames,
 	},
 	// default-vpc is the cleanup of the default VPCs (awss cleanup default-vpc). It deletes only
 	// with opts.Apply; otherwise it reports the plan.

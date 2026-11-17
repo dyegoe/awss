@@ -30,6 +30,7 @@ import (
 	searchCloudWANAtt "github.com/dyegoe/awss/search/cloudwanatt"
 	searchDXGW "github.com/dyegoe/awss/search/dxgw"
 	searchOrg "github.com/dyegoe/awss/search/org"
+	searchTGW "github.com/dyegoe/awss/search/tgw"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/spf13/cobra"
@@ -157,6 +158,10 @@ func fixedLists() map[string]map[string]func() []string {
 		"dx-gateways": {
 			flagMatch: searchDXGW.MatchNames, "associated-types": searchDXGW.AssociatedTypeNames,
 			flagStates: searchDXGW.StateNames,
+		},
+		"tgw-routes": {
+			flagMatch: searchTGW.MatchNames, flagTypes: searchTGW.TypeNames, flagStates: searchTGW.StateNames,
+			"attachment-types": tgwAttachmentTypes,
 		},
 	}
 }

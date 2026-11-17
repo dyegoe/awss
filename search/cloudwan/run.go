@@ -171,13 +171,13 @@ func callErrors(coreNetworkID string, cs []routeCall, errs []error, denied strin
 	return msgs, false
 }
 
-// longestMatches returns the routes whose prefix, given by prefix, is the longest prefix covering
+// LongestMatches returns the routes whose prefix, given by prefix, is the longest prefix covering
 // cidr: the routes the traffic to cidr takes. A route without a prefix, such as a prefix list
 // route, never matches.
 //
 // AWS answers LongestPrefixMatches with "ValidationException: Invalid input. Filter value is
 // invalid.", so a longest call reads the whole route table and awss picks the match.
-func longestMatches[R any](all []R, cidr string, prefix func(*R) *string) []R {
+func LongestMatches[R any](all []R, cidr string, prefix func(*R) *string) []R {
 	want, err := netip.ParsePrefix(cidr)
 	if err != nil {
 		return nil

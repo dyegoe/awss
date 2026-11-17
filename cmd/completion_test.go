@@ -172,6 +172,13 @@ func TestFixedLists(t *testing.T) {
 			name: "eni --availability-zones", args: []string{"eni", "-z", "a,"},
 			want: []string{"a,b", "a,c", "a,d", "a,e", "a,f"},
 		},
+		{
+			name: "tgw routes --attachment-types", args: []string{"tgw", "routes", "--attachment-types", "vpc,"},
+			want: []string{
+				"vpc,vpn", "vpc,vpn-concentrator", "vpc,direct-connect-gateway", "vpc,connect", "vpc,peering",
+				"vpc,tgw-peering", "vpc,network-function", "vpc,dx",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -247,21 +254,29 @@ func TestRegionValues(t *testing.T) {
 // TestRegisterCompletions_everyFlag checks that no flag that takes a value falls back to file
 // names, so a flag added later is covered too. --config is the one flag that takes a file.
 func TestRegisterCompletions_everyFlag(t *testing.T) {
-	type flagOf struct{ cmd, flag string }
+	// cmd is the command itself, not its name: cloudwan routes and tgw routes share one.
+	type flagOf struct {
+		cmd  *cobra.Command
+		flag string
+	}
 	resetCLI(t, nil)
 	var flags []flagOf
-	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { flags = append(flags, flagOf{"vpc", f.Name}) })
+	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
+		flags = append(flags, flagOf{mustCommand(t, "vpc"), f.Name})
+	})
 	for _, sub := range subcommands {
-		sub.cmd.NonInheritedFlags().VisitAll(func(f *pflag.Flag) { flags = append(flags, flagOf{sub.cmd.Name(), f.Name}) })
+		sub.cmd.NonInheritedFlags().VisitAll(func(f *pflag.Flag) { flags = append(flags, flagOf{sub.cmd, f.Name}) })
 	}
 	// The global flags complete on a command of a group too.
-	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { flags = append(flags, flagOf{"default-vpc", f.Name}) })
+	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
+		flags = append(flags, flagOf{mustCommand(t, "default-vpc"), f.Name})
+	})
 	for _, f := range flags {
-		t.Run(f.cmd+" --"+f.flag, func(t *testing.T) {
+		t.Run(f.cmd.CommandPath()+" --"+f.flag, func(t *testing.T) {
 			resetCLI(t, nil)
 			flag := rootCmd.PersistentFlags().Lookup(f.flag)
 			if flag == nil {
-				flag = mustCommand(t, f.cmd).Flags().Lookup(f.flag)
+				flag = f.cmd.Flags().Lookup(f.flag)
 			}
 			if flag.Value.Type() == "bool" {
 				return
@@ -270,9 +285,9 @@ func TestRegisterCompletions_everyFlag(t *testing.T) {
 			if f.flag == labelConfig {
 				want = cobra.ShellCompDirectiveFilterFileExt
 			}
-			args := append(commandArgs(mustCommand(t, f.cmd)), "--"+f.flag, "")
+			args := append(commandArgs(f.cmd), "--"+f.flag, "")
 			if _, directive := complete(t, args...); directive&want == 0 {
-				t.Errorf("complete(%s --%s) directive = %d, want %d set", f.cmd, f.flag, directive, want)
+				t.Errorf("complete(%s --%s) directive = %d, want %d set", f.cmd.CommandPath(), f.flag, directive, want)
 			}
 		})
 	}
