@@ -30,6 +30,25 @@ type testRow struct {
 	Tags   map[string]string `header:"Tags"`
 }
 
+// stackedRow is a row whose Name and Owner fields share the column of the field before them.
+type stackedRow struct {
+	ID    string `header:"ID"`
+	Name  string `header:"Name" stack:""`
+	Skip  string
+	Type  string `header:"Type" stack:""`
+	Count int    `header:"Count"`
+	Owner string `header:"Owner" stack:""`
+}
+
+// TestHeaders_stacked checks that a stack-tagged field adds its header under the column before it,
+// across a field with no header, and no column of its own.
+func TestHeaders_stacked(t *testing.T) {
+	want := []interface{}{"ID\nName\nType", "Count\nOwner"}
+	if got := Headers(stackedRow{}); !reflect.DeepEqual(got, want) {
+		t.Errorf("Headers(stackedRow{}) = %q, want %q", got, want)
+	}
+}
+
 // TestHeaders checks that only fields with a header tag become columns, in field order.
 func TestHeaders(t *testing.T) {
 	want := []interface{}{"ID", "Size", "Items", "Tags"}

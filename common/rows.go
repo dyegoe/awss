@@ -28,14 +28,22 @@ import (
 // Headers returns the `header` struct tags of row's fields, in declaration order.
 //
 // row must be a struct value (for example dataRow{}). Fields without a `header` tag are skipped.
+// A field that also has a `stack` tag has no column of its own: its header goes on a new line
+// under the header of the column before it (see stackCell).
 func Headers(row interface{}) []interface{} {
 	headers := []interface{}{}
 
 	t := reflect.TypeOf(row)
 	for i := 0; i < t.NumField(); i++ {
-		if header, ok := t.Field(i).Tag.Lookup("header"); ok {
-			headers = append(headers, header)
+		header, ok := t.Field(i).Tag.Lookup("header")
+		if !ok {
+			continue
 		}
+		if _, stacked := t.Field(i).Tag.Lookup("stack"); stacked && len(headers) > 0 {
+			headers[len(headers)-1] = fmt.Sprintf("%s\n%s", headers[len(headers)-1], header)
+			continue
+		}
+		headers = append(headers, header)
 	}
 
 	return headers

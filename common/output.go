@@ -204,27 +204,54 @@ func toTable(r Results, showEmpty, showTags bool, tagsKeys []string) string {
 // entries to those keys.
 // If the field is a slice, it joins the elements with a new line.
 // If the field is a struct, it calls structToTable.
+// A field with a `stack` tag goes on a new line in the cell of the column before it.
 func rowFromStruct(i interface{}, tagsKeys []string) table.Row {
 	row := table.Row{}
 
 	v := reflect.ValueOf(i)
 	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-
-		if _, ok := v.Type().Field(i).Tag.Lookup("header"); ok {
-			switch field.Kind() {
-			case reflect.Struct:
-				row = append(row, headerStructFieldsToString(field.Interface()))
-			case reflect.Map:
-				row = append(row, sortedStringMapToString(field.Interface().(map[string]string), tagsKeys))
-			case reflect.Slice:
-				row = append(row, sortedStringSliceToString(field.Interface().([]string)))
-			default:
-				row = append(row, field.Interface())
-			}
+		tag := v.Type().Field(i).Tag
+		if _, ok := tag.Lookup("header"); !ok {
+			continue
 		}
+		cell := cellValue(v.Field(i), tagsKeys)
+		if _, stacked := tag.Lookup("stack"); stacked && len(row) > 0 {
+			row[len(row)-1] = stackCell(row[len(row)-1], cell)
+			continue
+		}
+		row = append(row, cell)
 	}
 	return row
+}
+
+// cellValue returns the table cell of one field: a struct as its header fields, a map as its
+// sorted entries, a slice as one element per line, and anything else as it is.
+func cellValue(field reflect.Value, tagsKeys []string) interface{} {
+	switch field.Kind() {
+	case reflect.Struct:
+		return headerStructFieldsToString(field.Interface())
+	case reflect.Map:
+		return sortedStringMapToString(field.Interface().(map[string]string), tagsKeys)
+	case reflect.Slice:
+		return sortedStringSliceToString(field.Interface().([]string))
+	default:
+		return field.Interface()
+	}
+}
+
+// stackCell puts bottom on a new line under top, so two fields share one column: an ID and its
+// name, or a type and its ID. An empty value adds no line, so a cell never starts or ends with a
+// blank line.
+func stackCell(top, bottom interface{}) interface{} {
+	t, b := fmt.Sprint(top), fmt.Sprint(bottom)
+	switch {
+	case b == "":
+		return top
+	case t == "":
+		return b
+	default:
+		return t + "\n" + b
+	}
 }
 
 // headerStructFieldsToString returns a string from a struct.

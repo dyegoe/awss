@@ -184,6 +184,7 @@ provides:
 | Need                                   | Helper                                              |
 | -------------------------------------- | --------------------------------------------------- |
 | Table headers from `header` tags       | `common.Headers(dataRow{})`                         |
+| Two fields in one column (ID and name) | `stack:""` tag next to `header` on the second field |
 | Rows for the output layer              | `common.Rows(r.Data)`                               |
 | Validate a `--sort` value              | `common.SortFields(dataRow{}, f)`                   |
 | List the valid sort values (help text) | `common.SortFieldNames(dataRow{})`                  |
