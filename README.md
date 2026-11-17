@@ -510,9 +510,9 @@ return it) and **Owner ID** / **Name** (one cell).
   `networkmanager:ListCoreNetworkRoutingInformation`, `networkmanager:GetNetworkRoutes`, and
   `networkmanager:ListAttachments` for the attachment names and owners.
 
-Sort by: `--sort segment|edge|prefix|installed|query|as-path|communities|local-preference|med|next-hop-type|next-hop-id|next-hop-ip|next-hop-segment|attachment|attachment-name|owner|owner-name|core-network` (default: `segment`). Rows
-equal on the sort field stay in route table order: segment, edge, prefix by address, the installed
-path first.
+Sort by: `--sort segment|edge|prefix|installed|query|as-path|communities|local-preference|med|next-hop-type|next-hop-id|next-hop-ip|next-hop-segment|attachment|attachment-name|owner|owner-name|core-network` (default: `segment`). `installed`
+sorts `yes`, `no`, then `none`. Rows equal on the sort field stay in route table order: segment,
+edge, prefix by address, the installed path first.
 
 #### Cloud WAN attachments (`awss cloudwan attachments`)
 
