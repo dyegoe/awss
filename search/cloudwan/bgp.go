@@ -262,7 +262,7 @@ func (c *routeCall) bgpInput() *networkmanager.ListCoreNetworkRoutingInformation
 }
 
 // bgpRoutes reads the BGP routes of one call, following every page, and returns the rows that
-// pass --next-hop-types, --communities and --asns.
+// pass --next-hop-types, --communities, --asns and --installed.
 func bgpRoutes(
 	ctx context.Context, client bgpRoutesAPI, cn *coreNetwork, c *routeCall, q *query,
 ) ([]bgpRow, error) {
