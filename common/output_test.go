@@ -364,6 +364,57 @@ func TestRowFromStruct(t *testing.T) {
 	}
 }
 
+// TestRowFromStruct_stacked checks that a stack-tagged field goes on a new line in the cell before
+// it, and that an empty value adds no line.
+func TestRowFromStruct_stacked(t *testing.T) {
+	tests := []struct {
+		name string
+		i    stackedRow
+		want table.Row
+	}{
+		{
+			name: "stacked fields share the cell before them",
+			i:    stackedRow{ID: "id-1", Name: "one", Skip: "x", Type: "vpc", Count: 3, Owner: "acme"},
+			want: table.Row{"id-1\none\nvpc", "3\nacme"},
+		},
+		{
+			name: "empty stacked values add no line",
+			i:    stackedRow{Type: "vpc"},
+			want: table.Row{"vpc", 0},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := rowFromStruct(tt.i, nil); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("rowFromStruct(%+v) = %#v, want %#v", tt.i, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestStackCell checks that bottom goes on a new line under top, and an empty side adds no line.
+func TestStackCell(t *testing.T) {
+	tests := []struct {
+		name   string
+		top    interface{}
+		bottom interface{}
+		want   interface{}
+	}{
+		{name: "both", top: "tgw-attach-1", bottom: "prod", want: "tgw-attach-1\nprod"},
+		{name: "empty bottom keeps top", top: 7, bottom: "", want: 7},
+		{name: "empty top", top: "", bottom: "pl-1", want: "pl-1"},
+		{name: "both empty", top: "", bottom: "", want: ""},
+		{name: "non-string bottom", top: "a", bottom: CIDR("10.0.0.0/8"), want: "a\n10.0.0.0/8"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := stackCell(tt.top, tt.bottom); got != tt.want {
+				t.Errorf("stackCell(%v, %v) = %#v, want %#v", tt.top, tt.bottom, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestHeaderStructFieldsToString is a test function for headerStructFieldsToString.
 func TestHeaderStructFieldsToString(t *testing.T) {
 	tests := []struct {

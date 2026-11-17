@@ -12,7 +12,9 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Multiple AWS profiles: `--profiles default,dev` or `--profiles all` (scoped by `all-profiles` in the config file)
 - Multiple regions: `--regions us-east-1,eu-west-1` or `--regions all`
 - `--profile` and `--region` work too, as in the AWS CLI: they are the same flags as `--profiles` and `--regions`
-- Output formats: `--output table` (default), `--output json`, `--output json-pretty`
+- Output formats: `--output table` (default), `--output json`, `--output json-pretty`. To keep the
+  table narrow, some columns hold two or three values on separate lines, such as an ID with its name
+  under it; the header cell names each line. JSON keeps one field for each.
 - Show empty results: `--show-empty`
 - Show tags in table output: `--show-tags`
 - Restrict which tag keys are shown in table output: `--show-tags-keys Name,Environment` (implies `--show-tags`)
@@ -411,11 +413,12 @@ awss cloudwan routes --profile network --states blackhole
 ```
 
 One row per route destination: **Query** (the CIDR searched), **Segment** (`nfg:<name>` for a
-network function group), **Edge**, **CIDR**, **Type**, **State**, **Target Type**, **Target ID**,
-**Attachment** (the Name tag of the attachment), **Target Segment** (the segment of that
-attachment: for a route shared from another segment, the segment it came from, such as a Direct
-Connect route in `dev` whose gateway is in `sharedsvc`), **Owner ID** and **Owner** (the account
-of the attachment; see [Account names](#account-names)). AWS returns only the attachment, type
+network function group), **Edge**, **CIDR**, **Type**, **State**, **Target Type** / **Target ID** /
+**Attachment** (one cell: the type and ID of the next hop, and the Name tag of its attachment),
+**Target Segment** (the segment of that attachment: for a route shared from another segment, the
+segment it came from, such as a Direct Connect route in `dev` whose gateway is in `sharedsvc`), and
+**Owner ID** / **Name** (one cell: the account of the attachment and its name; see
+[Account names](#account-names)). AWS returns only the attachment, type
 and resource of a route destination, so the name, segment, owner and edges come from the
 attachments of the core network.
 
@@ -486,9 +489,10 @@ awss cloudwan routes --profile network --cidrs 10.50.0.0/16
 awss cloudwan bgp --profile network --asns 65010
 ```
 
-One row per BGP route: **Query**, **Segment**, **Edge**, **Prefix**, **Installed**, **AS Path**, **Communities**,
-**Local Pref**, **MED**, **Next Hop Type**, **Next Hop ID**, **Attachment**, **Next Hop Segment**
-(from the attachment when AWS does not return it), **Owner ID** and **Owner**.
+One row per BGP route: **Query**, **Segment** / **Edge** (one cell), **Prefix** / **Installed** (one
+cell), **AS Path**, **Communities**, **Local Pref**, **MED**, **Next Hop Type** / **Next Hop ID** /
+**Attachment** / **Next Hop Segment** (one cell; the segment comes from the attachment when AWS does not
+return it) and **Owner ID** / **Name** (one cell).
 
 - One `ListCoreNetworkRoutingInformation` call per segment, edge location, CIDR and match mode, at
   most 5 at once, and one `GetNetworkRoutes` call with the same match for **Installed** (skipped
@@ -537,8 +541,9 @@ awss cloudwan attachments --profile network -s prod --org-profile org-management
 awss cloudwan attachments --profile network --states pending-attachment-acceptance,failed
 ```
 
-Columns: **ID**, **Name**, **Type**, **Segment**, **Edges**, **State**, **Resource** (the ID of the
-attached resource, from its ARN), **Owner ID**, **Owner** and, with `--show-tags`, **Tags**.
+Columns: **ID** / **Name** (one cell), **Type**, **Segment**, **Edges**, **State**, **Resource** (the
+ID of the attached resource, from its ARN), **Owner ID** / **Name** (one cell) and, with
+`--show-tags`, **Tags**.
 
 - `ListAttachments` filters on one value at most, so awss lists every attachment of the core
   network and matches the filters on the results. Filters combine with AND.
@@ -581,9 +586,9 @@ awss dx gateways --profile network --associated-types core-network
 awss dx gateways --profile network --associated-ids tgw-0123456789abcdef0 --sort prefix
 ```
 
-Columns: **Query**, **Gateway ID**, **Gateway**, **Amazon ASN**, **Associated Type**,
-**Associated ID**, **Region** (of the associated gateway), **Owner ID**, **Owner**, **State** (of
-the association), **Allowed Prefix** and **VIFs**.
+Columns: **Query**, **Gateway ID** / **Name** (one cell), **Amazon ASN**, **Associated Type**,
+**Associated ID**, **Region** (of the associated gateway), **Owner ID** / **Name** (one cell),
+**State** (of the association), **Allowed Prefix** and **VIFs**.
 
 - One row per allowed prefix of each association, or per allowed prefix and searched CIDR with
   `--cidrs`. An association without allowed prefixes, and a gateway without associations, is one
@@ -642,10 +647,11 @@ awss tgw routes --profile network --states blackhole
 ```
 
 One row per attachment of each route (a route with several attachments, ECMP, is several rows):
-**Query** (the CIDR searched), **TGW ID**, **Route Table ID**, **Route Table** (its Name tag),
-**CIDR**, **Prefix List** (the destination of a prefix list route), **Type**, **State**,
-**Resource Type**, **Resource ID** (such as the VPC), **Attachment ID**, **Attachment** (its Name
-tag), **Owner ID** and **Owner** (the account of the resource; see [Account names](#account-names)).
+**Query** (the CIDR searched), **TGW ID**, **Route Table ID** / **Name** (its Name tag), **CIDR** /
+**Prefix List** (the destination: a CIDR, or the prefix list of a prefix list route), **Type**,
+**State**, **Resource Type** / **Resource ID** (such as the VPC), **Attachment ID** / **Name** (its
+Name tag) and **Owner ID** / **Name** (the account of the resource; see
+[Account names](#account-names)). Each pair is one cell, the second value on its own line.
 
 - **Profile:** run it with a profile of the account that owns the transit gateways, usually the
   network account. An account a transit gateway is shared with does not see its route tables, so
@@ -844,8 +850,8 @@ awss stats
 
 ### Account names
 
-`vpc`, `subnet`, `eni`, `cloudwan routes`, `cloudwan bgp`, `cloudwan attachments`, `dx gateways` and `tgw routes` show an **Owner** column (JSON `owner_name`, sort field `owner-name`)
-next to **Owner ID**: the name of the account, which matters in a shared VPC, where the owner is
+`vpc`, `subnet`, `eni`, `cloudwan routes`, `cloudwan bgp`, `cloudwan attachments`, `dx gateways` and `tgw routes` show the owner name (JSON `owner_name`, sort field `owner-name`)
+next to **Owner ID**, in its own **Owner** column or on the line under the ID: the name of the account, which matters in a shared VPC, where the owner is
 usually a network account. The names come from the `accounts` map of `~/.awss/config.yaml`, from
 account ID to name, with no AWS call:
 
@@ -863,7 +869,7 @@ accounts:
   used: a profile name such as `admins-network-prd` names a role in an account, not the account.
 
 **Names from AWS Organizations (opt-in).** `--org-profile <profile>`, or `org-profile:` in the
-config file, makes the commands with an **Owner** column call `organizations:ListAccounts` once per run with
+config file, makes the commands that show the owner name call `organizations:ListAccounts` once per run with
 that profile and name every account of the organization:
 
 ```bash

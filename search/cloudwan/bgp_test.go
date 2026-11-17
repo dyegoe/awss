@@ -396,8 +396,12 @@ func TestBGPResults_accessors(t *testing.T) {
 	if r.GetProfile() != "network" || r.GetRegion() != Region || r.GetSortField() != "prefix" {
 		t.Errorf("getters = %q %q %q, want network %s prefix", r.GetProfile(), r.GetRegion(), r.GetSortField(), Region)
 	}
-	if got := len(r.GetHeaders()); got != 15 {
-		t.Errorf("len(GetHeaders()) = %d, want 15", got)
+	wantHeaders := []interface{}{
+		"Query", "Segment\nEdge", "Prefix\nInstalled", "AS Path", "Communities", "Local Pref", "MED",
+		"Next Hop Type\nNext Hop ID\nAttachment\nNext Hop Segment", "Owner ID\nName",
+	}
+	if got := r.GetHeaders(); !reflect.DeepEqual(got, wantHeaders) {
+		t.Errorf("GetHeaders() = %q, want %q", got, wantHeaders)
 	}
 	if got := len(r.GetRows()); got != 2 {
 		t.Errorf("len(GetRows()) = %d, want 2", got)

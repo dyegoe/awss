@@ -84,7 +84,7 @@ type dataRow struct {
 	ID string `json:"id,omitempty" header:"ID" sort:"id"`
 
 	// Name is the Name tag of the attachment.
-	Name string `json:"name,omitempty" header:"Name" sort:"name"`
+	Name string `json:"name,omitempty" header:"Name" stack:"" sort:"name"`
 
 	// Type is vpc, direct-connect-gateway, site-to-site-vpn, connect or
 	// transit-gateway-route-table.
@@ -110,7 +110,7 @@ type dataRow struct {
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
 
 	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
-	OwnerName string `json:"owner_name,omitempty" header:"Owner" sort:"owner-name"`
+	OwnerName string `json:"owner_name,omitempty" header:"Name" stack:"" sort:"owner-name"`
 
 	// PolicyRule is the attachment policy rule number that placed it in its segment.
 	PolicyRule string `json:"policy_rule,omitempty"`

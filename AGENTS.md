@@ -65,6 +65,8 @@ common/              — shared: Results interface, BaseResults, AWS helpers, fi
 
 The `common.Results` interface is the central contract. Every resource type implements it.
 Output rendering (table, JSON, JSON-pretty) is driven entirely by struct tags (`header`, `sort`, `json`, `filter`).
+A field with `stack:""` as well as `header` shares the table column of the field before it, on a new line (an ID and
+its name), to keep wide tables inside the terminal.
 
 ---
 

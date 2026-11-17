@@ -60,7 +60,7 @@ type dataRow struct {
 	GatewayID string `json:"gateway_id,omitempty" header:"Gateway ID" sort:"gateway-id"`
 
 	// GatewayName is the name of the Direct Connect gateway.
-	GatewayName string `json:"gateway_name,omitempty" header:"Gateway" sort:"gateway"`
+	GatewayName string `json:"gateway_name,omitempty" header:"Name" stack:"" sort:"gateway"`
 
 	// AmazonASN is the AS number of the Amazon side of the BGP sessions.
 	AmazonASN string `json:"amazon_asn,omitempty" header:"Amazon ASN" sort:"amazon-asn"`
@@ -85,7 +85,7 @@ type dataRow struct {
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
 
 	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
-	OwnerName string `json:"owner_name,omitempty" header:"Owner" sort:"owner-name"`
+	OwnerName string `json:"owner_name,omitempty" header:"Name" stack:"" sort:"owner-name"`
 
 	// State is the state of the association, such as associated.
 	State string `json:"state,omitempty" header:"State" sort:"state"`
