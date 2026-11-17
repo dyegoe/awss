@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.22.2](https://github.com/dyegoe/awss/compare/v0.22.1...v0.22.2) (2026-11-17)
+
+
+### Bug Fixes
+
+* **search/cloudwan:** sort cloudwan bgp --sort installed by yes, no, none ([#255](https://github.com/dyegoe/awss/issues/255)) ([#256](https://github.com/dyegoe/awss/issues/256)) ([ac7560e](https://github.com/dyegoe/awss/commit/ac7560e51081fe7b9579db764468087eeeeef2e1))
+
 ## [0.22.1](https://github.com/dyegoe/awss/compare/v0.22.0...v0.22.1) (2026-11-17)
 
 
