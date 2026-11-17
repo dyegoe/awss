@@ -458,9 +458,39 @@ whether each made it into the route table (**Installed**, from `cloudwan routes`
   Connect gateway;
 - `none`: no route of the prefix is installed: a routing policy dropped or summarised it.
 
-A prefix the data centre never advertised is in neither command. AWS names only the attachment of
-an installed route, so every path through that attachment (two VPN tunnels, two Connect peers) is
-`yes`: awss does not guess the BGP winner.
+A prefix the data centre never advertised is in neither command.
+
+**How Installed is decided.** AWS has no installed flag on a BGP route, so awss compares two calls
+for each segment and edge location, with the same CIDR and match:
+
+1. `ListCoreNetworkRoutingInformation`: the BGP routes, every path learned for a prefix. These are
+   the rows.
+2. `GetNetworkRoutes`: the routes installed in the route table of that segment and edge, as
+   `cloudwan routes` shows them. Each installed prefix gives the attachments its route points to.
+
+A row is `yes` when its prefix is installed and the installed route points to the row's attachment,
+`no` when the prefix is installed but points elsewhere, and `none` when the prefix is not installed.
+For example, `10.120.0.0/16` learned over two Direct Connect attachments A and B and installed
+through A: the path through A is `yes`, the path through B is `no`.
+
+- **Attachments, not paths:** AWS names only the attachment of an installed route, so every path
+  through that attachment (two VPN tunnels, two Connect peers, two AS paths over one Direct Connect
+  gateway) is `yes`: awss does not guess the BGP winner.
+- **Any installed route counts:** the type and state of the installed route are not checked. A
+  static route of the prefix to the attachment of a BGP path makes that path `yes`, though the
+  static route won, not BGP.
+- **ECMP:** an installed route with several attachments makes the path through each of them `yes`.
+- **Exact prefix:** a BGP prefix covered only by a shorter installed route, such as a summary
+  `10.0.0.0/8`, is `none`. So is a prefix installed only through a prefix list route, which has no
+  CIDR. With `--match longest`, the most specific BGP prefix can be `none` while the traffic takes
+  a shorter installed route: `cloudwan routes --match longest` shows which.
+- **No attachment:** a path is never `yes` without an attachment. An installed route of the prefix
+  that points to no attachment, such as a static blackhole, makes every path of the prefix `no`.
+- **Every next hop counts:** `--next-hop-types` filters the rows, not the installed routes. A
+  prefix installed through a VPC makes a Direct Connect path of the same prefix `no`, even with
+  `--next-hop-types dx`.
+- **Errors:** when `GetNetworkRoutes` fails, the BGP routes of that segment and edge are not shown,
+  and the error is in the result set.
 
 | Flag | Short | Description |
 | --- | --- | --- |
@@ -498,7 +528,7 @@ return it) and **Owner ID** / **Name** (one cell).
   most 5 at once, and one `GetNetworkRoutes` call with the same match for **Installed** (skipped
   when there is no BGP route). Network function groups have no BGP routes. `longest` reads every route of the
   segment and awss picks the most specific one, as in `cloudwan routes`. `--next-hop-types`,
-  `--communities` and `--asns` are filtered by awss.
+  `--communities`, `--asns` and `--installed` are filtered by awss.
 - **What it shows:** every candidate path, so a prefix advertised over several attachments (two
   Direct Connect gateways, many Transit Gateway route tables) has one row per path, and a segment
   can have many more rows here than in `cloudwan routes`. VPC routes have no AS path, local
