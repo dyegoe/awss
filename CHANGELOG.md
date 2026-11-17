@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.22.0](https://github.com/dyegoe/awss/compare/v0.21.0...v0.22.0) (2026-11-17)
+
+
+### Features
+
+* **search/cloudwan:** add awss cloudwan bgp, the BGP routes before the policies ([#243](https://github.com/dyegoe/awss/issues/243)) ([a15c9fc](https://github.com/dyegoe/awss/commit/a15c9fc620426b771433c244c4cceb76bc3f5d7b))
+* **search/cloudwan:** add awss cloudwan routes and attachments ([#237](https://github.com/dyegoe/awss/issues/237)) ([#241](https://github.com/dyegoe/awss/issues/241)) ([344566a](https://github.com/dyegoe/awss/commit/344566af20623e5a98d637ca04d671b4b754e642))
+* **search/cloudwan:** installed column in cloudwan bgp, CIDR-aware sort, short next hop names ([#244](https://github.com/dyegoe/awss/issues/244)) ([#245](https://github.com/dyegoe/awss/issues/245)) ([be8395c](https://github.com/dyegoe/awss/commit/be8395cd061b91f1b30d3cd07f24ecfb8e9be395))
+* **search/dxgw:** add awss dx gateways, the Direct Connect gateways and their allowed prefixes ([#246](https://github.com/dyegoe/awss/issues/246)) ([d4d5c2a](https://github.com/dyegoe/awss/commit/d4d5c2ae2268f56ccabcd815b096c5c4ade19923))
+* **search/tgw:** add awss tgw routes, find a CIDR in the Transit Gateway route tables ([#240](https://github.com/dyegoe/awss/issues/240)) ([#247](https://github.com/dyegoe/awss/issues/247)) ([6f6e913](https://github.com/dyegoe/awss/commit/6f6e913a65c821f7a43026d43dd6b39638070674))
+
 ## [0.21.0](https://github.com/dyegoe/awss/compare/v0.20.0...v0.21.0) (2026-11-04)
 
 
