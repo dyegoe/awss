@@ -571,3 +571,31 @@ func TestBGPResults_sortResults(t *testing.T) {
 		t.Errorf("sortResults(segment) = %q, want %q", got, want)
 	}
 }
+
+// TestBGPResults_sortResults_installed checks that --sort installed orders yes, no, none, then an
+// empty value, not alphabetically, and keeps the rows of one value in route table order.
+func TestBGPResults_sortResults_installed(t *testing.T) {
+	r := NewBGP("network", Region, nil, "installed")
+	r.Data = []bgpRow{
+		{Segment: "prod", Prefix: "10.2.0.0/16", Installed: InstalledNone},
+		{Segment: "prod", Prefix: "10.0.0.0/8", Installed: ""},
+		{Segment: "prod", Prefix: "10.100.0.0/16", Installed: InstalledYes},
+		{Segment: "dev", Prefix: "10.2.0.0/16", Installed: InstalledNo},
+		{Segment: "dev", Prefix: "10.1.0.0/16", Installed: InstalledYes},
+		{Segment: "dev", Prefix: "10.3.0.0/16", Installed: InstalledNone},
+	}
+	if err := r.sortResults("installed"); err != nil {
+		t.Fatal(err)
+	}
+	got := []string{}
+	for i := range r.Data {
+		got = append(got, r.Data[i].Installed+" "+r.Data[i].Segment+" "+string(r.Data[i].Prefix))
+	}
+	want := []string{
+		"yes dev 10.1.0.0/16", "yes prod 10.100.0.0/16", "no dev 10.2.0.0/16",
+		"none dev 10.3.0.0/16", "none prod 10.2.0.0/16", " prod 10.0.0.0/8",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("sortResults(installed) = %q, want %q", got, want)
+	}
+}

@@ -401,6 +401,13 @@ func (r *BGPResults) sortResults(field string) error {
 			rank: installedRank(d.Installed),
 		}
 	})
+	if field == "installed" {
+		// The values sort by rank, the installed path first, not alphabetically. The sort is stable,
+		// so the rows of one value stay in route table order.
+		slices.SortStableFunc(r.Data, func(a, b bgpRow) int {
+			return cmp.Compare(installedRank(a.Installed), installedRank(b.Installed))
+		})
+	}
 	return nil
 }
 
