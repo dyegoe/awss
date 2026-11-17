@@ -624,8 +624,12 @@ func TestResults_accessors(t *testing.T) {
 	if got := r.GetErrors(); !reflect.DeepEqual(got, []string{"e"}) {
 		t.Errorf("GetErrors() = %q, want [e]", got)
 	}
-	if got := len(r.GetHeaders()); got != 14 {
-		t.Errorf("len(GetHeaders()) = %d, want 14", got)
+	wantHeaders := []interface{}{
+		"Query", "TGW ID", "Route Table ID\nName", "CIDR\nPrefix List", "Type", "State",
+		"Resource Type\nResource ID", "Attachment ID\nName", "Owner ID\nName",
+	}
+	if got := r.GetHeaders(); !reflect.DeepEqual(got, wantHeaders) {
+		t.Errorf("GetHeaders() = %q, want %q", got, wantHeaders)
 	}
 	if got := len(r.GetRows()); got != 2 {
 		t.Errorf("len(GetRows()) = %d, want 2", got)

@@ -88,7 +88,7 @@ type bgpRow struct {
 	NextHopType string `json:"next_hop_type,omitempty" header:"Next Hop Type" sort:"next-hop-type"`
 
 	// NextHopID is the ID of the next hop resource, such as a VPC or a Direct Connect gateway.
-	NextHopID string `json:"next_hop_id,omitempty" header:"Next Hop ID" sort:"next-hop-id"`
+	NextHopID string `json:"next_hop_id,omitempty" header:"Next Hop ID" stack:"" sort:"next-hop-id"`
 
 	// NextHopIP is the IP address of the next hop, such as the BGP peer of a Connect peer.
 	NextHopIP string `json:"next_hop_ip,omitempty" sort:"next-hop-ip"`
@@ -97,7 +97,7 @@ type bgpRow struct {
 	AttachmentID string `json:"attachment_id,omitempty" sort:"attachment"`
 
 	// AttachmentName is the Name tag of the attachment.
-	AttachmentName string `json:"attachment_name,omitempty" header:"Attachment" sort:"attachment-name"`
+	AttachmentName string `json:"attachment_name,omitempty" header:"Attachment" stack:"" sort:"attachment-name"`
 
 	// NextHopSegment is the segment of the next hop, from the attachment when AWS does not return
 	// it: another segment for a route shared between segments.
@@ -111,7 +111,7 @@ type bgpRow struct {
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
 
 	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
-	OwnerName string `json:"owner_name,omitempty" header:"Owner" sort:"owner-name"`
+	OwnerName string `json:"owner_name,omitempty" header:"Name" stack:"" sort:"owner-name"`
 }
 
 // NewBGP initiates and returns a new instance of Cloud WAN BGP results. region is kept for the

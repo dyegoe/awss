@@ -81,13 +81,13 @@ type dataRow struct {
 	TargetType string `json:"target_type,omitempty" header:"Target Type" sort:"target-type"`
 
 	// TargetID is the ID of the next hop resource, such as a VPC or a Direct Connect gateway.
-	TargetID string `json:"target_id,omitempty" header:"Target ID" sort:"target-id"`
+	TargetID string `json:"target_id,omitempty" header:"Target ID" stack:"" sort:"target-id"`
 
 	// AttachmentID is the core network attachment of the next hop.
 	AttachmentID string `json:"attachment_id,omitempty" sort:"attachment"`
 
 	// AttachmentName is the Name tag of the attachment.
-	AttachmentName string `json:"attachment_name,omitempty" header:"Attachment" sort:"attachment-name"`
+	AttachmentName string `json:"attachment_name,omitempty" header:"Attachment" stack:"" sort:"attachment-name"`
 
 	// TargetSegment is the segment of the next hop (nfg:<name> for a function group): another
 	// segment for a route shared between segments. AWS does not return it for most routes, so it
@@ -103,7 +103,7 @@ type dataRow struct {
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
 
 	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
-	OwnerName string `json:"owner_name,omitempty" header:"Owner" sort:"owner-name"`
+	OwnerName string `json:"owner_name,omitempty" header:"Name" stack:"" sort:"owner-name"`
 
 	// TransitGatewayAttachmentID is the Transit Gateway attachment of the next hop, for a route
 	// through a Transit Gateway route table attachment.

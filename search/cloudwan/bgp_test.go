@@ -396,8 +396,8 @@ func TestBGPResults_accessors(t *testing.T) {
 	if r.GetProfile() != "network" || r.GetRegion() != Region || r.GetSortField() != "prefix" {
 		t.Errorf("getters = %q %q %q, want network %s prefix", r.GetProfile(), r.GetRegion(), r.GetSortField(), Region)
 	}
-	if got := len(r.GetHeaders()); got != 15 {
-		t.Errorf("len(GetHeaders()) = %d, want 15", got)
+	if got := len(r.GetHeaders()); got != 12 {
+		t.Errorf("len(GetHeaders()) = %d, want 12", got)
 	}
 	if got := len(r.GetRows()); got != 2 {
 		t.Errorf("len(GetRows()) = %d, want 2", got)

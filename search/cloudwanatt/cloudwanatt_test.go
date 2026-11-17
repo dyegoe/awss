@@ -377,8 +377,8 @@ func TestResults_accessors(t *testing.T) {
 	if got := r.GetErrors(); !reflect.DeepEqual(got, []string{"e"}) {
 		t.Errorf("GetErrors() = %q, want [e]", got)
 	}
-	if got := len(r.GetHeaders()); got != 10 {
-		t.Errorf("len(GetHeaders()) = %d, want 10", got)
+	if got := len(r.GetHeaders()); got != 8 {
+		t.Errorf("len(GetHeaders()) = %d, want 8", got)
 	}
 	if got := len(r.GetRows()); got != 2 {
 		t.Errorf("len(GetRows()) = %d, want 2", got)

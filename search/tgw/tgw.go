@@ -63,13 +63,13 @@ type dataRow struct {
 	RouteTableID string `json:"route_table_id,omitempty" header:"Route Table ID" sort:"route-table-id"`
 
 	// RouteTableName is the Name tag of the route table.
-	RouteTableName string `json:"route_table_name,omitempty" header:"Route Table" sort:"route-table"`
+	RouteTableName string `json:"route_table_name,omitempty" header:"Name" stack:"" sort:"route-table"`
 
 	// CIDR is the destination of the route; empty for a prefix list route.
 	CIDR common.CIDR `json:"cidr,omitempty" header:"CIDR" sort:"cidr"`
 
 	// PrefixListID is the destination of a prefix list route.
-	PrefixListID string `json:"prefix_list_id,omitempty" header:"Prefix List" sort:"prefix-list"`
+	PrefixListID string `json:"prefix_list_id,omitempty" header:"Prefix List" stack:"" sort:"prefix-list"`
 
 	// Type is propagated or static.
 	Type string `json:"type,omitempty" header:"Type" sort:"type"`
@@ -82,19 +82,19 @@ type dataRow struct {
 	ResourceType string `json:"resource_type,omitempty" header:"Resource Type" sort:"resource-type"`
 
 	// ResourceID is the resource of the attachment, such as the VPC ID.
-	ResourceID string `json:"resource_id,omitempty" header:"Resource ID" sort:"resource-id"`
+	ResourceID string `json:"resource_id,omitempty" header:"Resource ID" stack:"" sort:"resource-id"`
 
 	// AttachmentID is the ID of the attachment the route points to.
 	AttachmentID string `json:"attachment_id,omitempty" header:"Attachment ID" sort:"attachment-id"`
 
 	// AttachmentName is the Name tag of the attachment.
-	AttachmentName string `json:"attachment_name,omitempty" header:"Attachment" sort:"attachment"`
+	AttachmentName string `json:"attachment_name,omitempty" header:"Name" stack:"" sort:"attachment"`
 
 	// OwnerID is the account that owns the resource of the attachment, such as the VPC.
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
 
 	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
-	OwnerName string `json:"owner_name,omitempty" header:"Owner" sort:"owner-name"`
+	OwnerName string `json:"owner_name,omitempty" header:"Name" stack:"" sort:"owner-name"`
 
 	// AnnouncementID is the route table announcement of the route, for a route from a Cloud WAN
 	// peering.
