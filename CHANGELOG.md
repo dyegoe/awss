@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.22.1](https://github.com/dyegoe/awss/compare/v0.22.0...v0.22.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* **search:** stack IDs and names so the network tables fit the terminal ([#250](https://github.com/dyegoe/awss/issues/250)) ([#251](https://github.com/dyegoe/awss/issues/251)) ([1f1646d](https://github.com/dyegoe/awss/commit/1f1646d58705eefd12eb8416cf0feb379640085d))
+
 ## [0.22.0](https://github.com/dyegoe/awss/compare/v0.21.0...v0.22.0) (2026-11-17)
 
 
