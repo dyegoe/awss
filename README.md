@@ -489,10 +489,10 @@ awss cloudwan routes --profile network --cidrs 10.50.0.0/16
 awss cloudwan bgp --profile network --asns 65010
 ```
 
-One row per BGP route: **Query**, **Segment**, **Edge**, **Prefix**, **Installed**, **AS Path**, **Communities**,
-**Local Pref**, **MED**, **Next Hop Type** / **Next Hop ID** / **Attachment** (one cell),
-**Next Hop Segment** (from the attachment when AWS does not return it) and **Owner ID** / **Name**
-(one cell).
+One row per BGP route: **Query**, **Segment** / **Edge** (one cell), **Prefix** / **Installed** (one
+cell), **AS Path**, **Communities**, **Local Pref**, **MED**, **Next Hop Type** / **Next Hop ID** /
+**Attachment** / **Next Hop Segment** (one cell; the segment comes from the attachment when AWS does not
+return it) and **Owner ID** / **Name** (one cell).
 
 - One `ListCoreNetworkRoutingInformation` call per segment, edge location, CIDR and match mode, at
   most 5 at once, and one `GetNetworkRoutes` call with the same match for **Installed** (skipped

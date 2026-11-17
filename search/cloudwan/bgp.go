@@ -60,7 +60,7 @@ type bgpRow struct {
 	Segment string `json:"segment,omitempty" header:"Segment" sort:"segment"`
 
 	// Edge is the edge location (region) of the route.
-	Edge string `json:"edge,omitempty" header:"Edge" sort:"edge"`
+	Edge string `json:"edge,omitempty" header:"Edge" stack:"" sort:"edge"`
 
 	// Prefix is the IP prefix of the route.
 	Prefix common.CIDR `json:"prefix,omitempty" header:"Prefix" sort:"prefix"`
@@ -70,7 +70,7 @@ type bgpRow struct {
 	// of the prefix points elsewhere, none when no route of the prefix is installed, such as a
 	// prefix a routing policy drops. AWS names only the attachment of an installed route, so every
 	// path through that attachment is yes.
-	Installed string `json:"installed,omitempty" header:"Installed" sort:"installed"`
+	Installed string `json:"installed,omitempty" header:"Installed" stack:"" sort:"installed"`
 
 	// ASPath is the BGP AS path, its AS numbers separated by spaces.
 	ASPath string `json:"as_path,omitempty" header:"AS Path" sort:"as-path"`
@@ -101,7 +101,7 @@ type bgpRow struct {
 
 	// NextHopSegment is the segment of the next hop, from the attachment when AWS does not return
 	// it: another segment for a route shared between segments.
-	NextHopSegment string `json:"next_hop_segment,omitempty" header:"Next Hop Segment" sort:"next-hop-segment"`
+	NextHopSegment string `json:"next_hop_segment,omitempty" header:"Next Hop Segment" stack:"" sort:"next-hop-segment"`
 
 	// NextHopEdge is the edge location of the next hop, or the edges of its attachment.
 	NextHopEdge string `json:"next_hop_edge,omitempty"`
