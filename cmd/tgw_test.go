@@ -24,6 +24,7 @@ import (
 // TestTgwRoutesFilterFlags_coversStruct checks every tgwRoutesFilters field has a registered flag
 // in tgwRoutesFilterFlags.
 func TestTgwRoutesFilterFlags_coversStruct(t *testing.T) {
+	resetCLI(t, nil)
 	checkFilterFlags(t, "tgwRoutes", tgwRoutesCmd, reflect.TypeOf(tgwRoutesFilters{}).NumField(), tgwRoutesFilterFlags)
 }
 

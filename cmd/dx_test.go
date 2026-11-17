@@ -24,6 +24,7 @@ import (
 // TestDxGatewaysFilterFlags_coversStruct checks every dxGatewaysFilters field has a registered
 // flag in dxGatewaysFilterFlags.
 func TestDxGatewaysFilterFlags_coversStruct(t *testing.T) {
+	resetCLI(t, nil)
 	checkFilterFlags(t, "dxGateways", dxGatewaysCmd, reflect.TypeOf(dxGatewaysFilters{}).NumField(),
 		dxGatewaysFilterFlags)
 }
