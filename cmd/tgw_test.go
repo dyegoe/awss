@@ -80,6 +80,7 @@ func TestExecute_tgwAttachments(t *testing.T) {
 		{"--resource-ids", "vpc-1", "resource-id"}, {"--states", "pending-acceptance", "attachment-state"},
 		{"--transit-gateway-ids", "tgw-1", "transit-gateway-id"},
 		{"--associated-route-table-ids", "tgw-rtb-1", "associated-route-table-id"},
+		{"--propagated-route-table-ids", "tgw-rtb-2", "propagated-route-table-id"},
 	}
 	all := filterCase{name: "every filter", args: []string{"tgw", "attachments"}, wantFilters: map[string][]string{}}
 	for _, e := range every {
@@ -92,6 +93,10 @@ func TestExecute_tgwAttachments(t *testing.T) {
 		{
 			name: "--sort", args: []string{"tgw", "attachments", "--sort", "associated-route-table"},
 			wantFilters: map[string][]string{}, wantSort: "associated-route-table",
+		},
+		{
+			name: "--propagations", args: []string{"tgw", "attachments", "--propagations"},
+			wantFilters: map[string][]string{}, wantPropagations: true,
 		},
 		{name: "bad sort", args: []string{"tgw", "attachments", "--sort", "nope"}, wantErr: "nope"},
 		{name: "bad type", args: []string{"tgw", "attachments", "-T", "tgw"}, wantErr: "invalid attachment type"},

@@ -44,6 +44,8 @@ type ec2API interface {
 	ec2.DescribeTransitGatewayRouteTablesAPIClient
 	ec2.DescribeTransitGatewayAttachmentsAPIClient
 	ec2.SearchTransitGatewayRoutesAPIClient
+	ec2.GetTransitGatewayAttachmentPropagationsAPIClient
+	ec2.GetTransitGatewayRouteTablePropagationsAPIClient
 }
 
 // routeTables lists the Transit Gateway route tables of the region that --transit-gateway-ids asks

@@ -745,6 +745,8 @@ the route table it is associated with: the table that routes the traffic coming 
 | `--states` | | States, such as `available`, `pending-acceptance`, `failed` |
 | `--transit-gateway-ids` | | List the attachments of these transit gateways only, exact |
 | `--associated-route-table-ids` | | Attachments associated with these route tables, exact |
+| `--propagations` | | Add **Propagated RTs**: the route tables each attachment propagates to |
+| `--propagated-route-table-ids` | | Attachments that propagate to these route tables, in any propagation state, exact; implies `--propagations` |
 
 ```bash
 # The attachment of a VPC, and the route table it is associated with
@@ -755,12 +757,21 @@ awss tgw attachments --profile network --regions eu-central-1 --associated-route
 
 # Peerings waiting for acceptance
 awss tgw attachments --profile network --types peering --states pending-acceptance
+
+# Why does a route table have, or lack, a propagated route to this VPC?
+awss tgw attachments --profile network --regions eu-central-1 --resource-ids vpc-0123456789abcdef0 --propagations
+
+# Everything that propagates to one route table
+awss tgw attachments --profile network --regions eu-central-1 --propagated-route-table-ids tgw-rtb-0123
 ```
 
 Columns: **Attachment ID** / **Name** (its Name tag), **TGW ID**, **Type**, **Resource ID** (such as
 the VPC), **State**, **Associated RT** / **Name** (the associated route table and its Name tag;
-empty when the attachment is not associated) and **Owner ID** / **Name** (the account of the
-resource; see [Account names](#account-names)), and **Tags** with `--show-tags`. Each pair is one
+empty when the attachment is not associated), **Propagated RTs** with `--propagations` (one route
+table per line, `<id> (<name>)`, the state added when it is not `enabled`, such as
+`tgw-rtb-0123 (dev, disabled)`; the column is hidden when no attachment propagates), **Owner ID** /
+**Name** (the account of the resource; see [Account names](#account-names)), and **Tags** with
+`--show-tags`. Each pair is one
 cell, the second value on its own line.
 
 - **Profile and region:** as for `tgw routes`, run it with a profile of the account that owns the
@@ -772,10 +783,17 @@ cell, the second value on its own line.
   `tgw routes` shows it only once associated.
 - **Calls:** one `DescribeTransitGatewayAttachments` call, then one
   `DescribeTransitGatewayRouteTables` call for the route table names when an attachment is
-  associated. `--names` and `--states` are matched by awss, the other filters by AWS.
-- **JSON only:** `association_state`, `transit_gateway_owner_id` and `created`.
-- **Permission:** `ec2:DescribeTransitGatewayAttachments`, and
-  `ec2:DescribeTransitGatewayRouteTables` for the route table names.
+  associated. `--names`, `--states` and `--propagated-route-table-ids` are matched by awss, the
+  other filters by AWS. `--propagations` adds the propagation calls: AWS reads them one attachment
+  or one route table at a time, so awss makes one `GetTransitGatewayAttachmentPropagations` call
+  per attachment when there are fewer attachments than route tables (a single VPC is one call),
+  otherwise one `GetTransitGatewayRouteTablePropagations` call per route table. A failed call is
+  reported and the rows are kept.
+- **JSON only:** `association_state`, `transit_gateway_owner_id`, `created`, and with
+  `--propagations` the `propagations` (`route_table_id`, `route_table_name`, `state`).
+- **Permission:** `ec2:DescribeTransitGatewayAttachments`,
+  `ec2:DescribeTransitGatewayRouteTables` for the route table names, and with `--propagations`
+  `ec2:GetTransitGatewayAttachmentPropagations` and `ec2:GetTransitGatewayRouteTablePropagations`.
 
 Sort by: `--sort name|id|tgw-id|type|resource-id|state|associated-route-table|associated-route-table-id|owner|owner-name|created` (default: `name`).
 

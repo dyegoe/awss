@@ -41,6 +41,9 @@ const (
 	// FilterKeyAssociatedRouteTableID keeps the attachments associated with these route tables,
 	// filtered by AWS.
 	FilterKeyAssociatedRouteTableID = "associated-route-table-id"
+	// FilterKeyPropagatedRouteTableID keeps the attachments that propagate to these route tables,
+	// in any propagation state, matched by awss. It reads the propagations, as Propagations does.
+	FilterKeyPropagatedRouteTableID = "propagated-route-table-id"
 )
 
 // The DescribeTransitGatewayAttachments filters.
@@ -99,6 +102,10 @@ type AttachmentResults struct {
 	// AccountNames maps an account ID to its name, for the Owner column. It is built once per run
 	// and shared by every search of the run, so it is only read.
 	AccountNames map[string]string `json:"-"`
+
+	// Propagations reads the route tables each attachment propagates to (--propagations): one
+	// call per attachment or per route table, whichever is fewer.
+	Propagations bool `json:"-"`
 }
 
 // attachmentRow represents one Transit Gateway attachment.
@@ -131,6 +138,14 @@ type attachmentRow struct {
 	// AssocState is the state of the association: associated, or associating / disassociating
 	// while it changes.
 	AssocState string `json:"association_state,omitempty"`
+
+	// PropagatedRTs are the route tables the attachment propagates its routes to, one per line:
+	// the ID, then the name and the state when it is not enabled. Filled with --propagations; the
+	// column is hidden when no row has any.
+	PropagatedRTs []string `json:"-" header:"Propagated RTs" hide:"empty"`
+
+	// Propagations are the propagations of PropagatedRTs, for JSON.
+	Propagations []propagation `json:"propagations,omitempty"`
 
 	// OwnerID is the account that owns the resource of the attachment, such as the VPC.
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
@@ -168,6 +183,8 @@ type attachmentQuery struct {
 	awsFilters []types.Filter
 	states     []string
 	names      *common.Matcher
+	// propagatedRTs keeps the attachments that propagate to these route tables.
+	propagatedRTs []string
 }
 
 // newAttachmentQuery builds the query from a filters map, which it only reads.
@@ -176,7 +193,7 @@ func newAttachmentQuery(filters map[string][]string) (*attachmentQuery, error) {
 	if err != nil {
 		return nil, err
 	}
-	q := &attachmentQuery{}
+	q := &attachmentQuery{propagatedRTs: filters[FilterKeyPropagatedRouteTableID]}
 	states := make([]string, 0, len(filters[FilterKeyAttachmentState]))
 	for _, v := range filters[FilterKeyAttachmentState] {
 		states = append(states, camelKebab(v))
@@ -193,6 +210,17 @@ func newAttachmentQuery(filters map[string][]string) (*attachmentQuery, error) {
 	q.awsFilters = appendFilter(q.awsFilters, awsFilterAttTGWID, filters[FilterKeyTransitGatewayID])
 	q.awsFilters = appendFilter(q.awsFilters, awsFilterAttAssociatedRT, filters[FilterKeyAssociatedRouteTableID])
 	return q, nil
+}
+
+// propagatesTo reports whether the row propagates to one of the route tables of
+// --propagated-route-table-ids, or the filter is not set.
+func (q *attachmentQuery) propagatesTo(row *attachmentRow) bool {
+	if len(q.propagatedRTs) == 0 {
+		return true
+	}
+	return slices.ContainsFunc(row.Propagations, func(p propagation) bool {
+		return slices.Contains(q.propagatedRTs, p.RouteTableID)
+	})
 }
 
 // match reports whether a row passes the filters awss matches.
@@ -216,7 +244,7 @@ func (r *AttachmentResults) Search(ctx context.Context) {
 }
 
 // collect lists the attachments with client, keeps those that pass the filters, names their
-// associated route tables and sorts the rows.
+// associated route tables, reads their propagations when asked and sorts the rows.
 func (r *AttachmentResults) collect(ctx context.Context, client ec2API, q *attachmentQuery) {
 	atts, err := attachments(ctx, client, q.awsFilters)
 	if err != nil {
@@ -228,7 +256,21 @@ func (r *AttachmentResults) collect(ctx context.Context, client ec2API, q *attac
 			r.Data = append(r.Data, row)
 		}
 	}
-	r.nameRouteTables(ctx, client)
+	propagations := r.Propagations || len(q.propagatedRTs) > 0
+	tables, ok := r.routeTables(ctx, client, propagations)
+	names := make(map[string]string, len(tables))
+	for i := range tables {
+		names[aws.ToString(tables[i].TransitGatewayRouteTableId)] = common.TagName(tables[i].Tags)
+	}
+	for i := range r.Data {
+		r.Data[i].AssocRTName = names[r.Data[i].AssocRTID]
+	}
+	if propagations {
+		if ok {
+			r.addPropagations(ctx, client, tables, names)
+		}
+		r.Data = slices.DeleteFunc(r.Data, func(row attachmentRow) bool { return !q.propagatesTo(&row) })
+	}
 
 	if r.SortField == "" {
 		return
@@ -238,31 +280,28 @@ func (r *AttachmentResults) collect(ctx context.Context, client ec2API, q *attac
 	}
 }
 
-// nameRouteTables fills the associated route table names from the route tables of the transit
-// gateways of the associated rows: one call for them all, none when no row is associated. A failed
-// call is recorded and leaves the names empty; the rows are kept.
-func (r *AttachmentResults) nameRouteTables(ctx context.Context, client ec2API) {
+// routeTables lists the route tables of the transit gateways of the rows, for their names and, with
+// propagations, to read the propagations: one call, none when no row is associated and propagations
+// are not asked. A failed call is recorded and reports false; the rows are kept.
+func (r *AttachmentResults) routeTables(
+	ctx context.Context, client ec2API, propagations bool,
+) ([]types.TransitGatewayRouteTable, bool) {
 	var tgwIDs []string
 	for i := range r.Data {
-		if r.Data[i].AssocRTID != "" && !slices.Contains(tgwIDs, r.Data[i].TransitGatewayID) {
+		needed := propagations || r.Data[i].AssocRTID != ""
+		if needed && !slices.Contains(tgwIDs, r.Data[i].TransitGatewayID) {
 			tgwIDs = append(tgwIDs, r.Data[i].TransitGatewayID)
 		}
 	}
 	if len(tgwIDs) == 0 {
-		return
+		return nil, true
 	}
 	tables, err := routeTables(ctx, client, &query{tgwID: tgwIDs})
 	if err != nil {
 		r.Errors = append(r.Errors, err.Error())
-		return
+		return nil, false
 	}
-	names := make(map[string]string, len(tables))
-	for i := range tables {
-		names[aws.ToString(tables[i].TransitGatewayRouteTableId)] = common.TagName(tables[i].Tags)
-	}
-	for i := range r.Data {
-		r.Data[i].AssocRTName = names[r.Data[i].AssocRTID]
-	}
+	return tables, true
 }
 
 // parseAttachment converts an attachment into a row. The associated route table is kept in any

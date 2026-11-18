@@ -334,7 +334,8 @@ func TestAttachmentResults_accessors(t *testing.T) {
 		t.Errorf("getters = %q %q %q, want network eu-central-1 name", r.GetProfile(), r.GetRegion(), r.GetSortField())
 	}
 	wantHeaders := []interface{}{
-		"Attachment ID\nName", "TGW ID", "Type", "Resource ID", "State", "Associated RT\nName", "Owner ID\nName", "Tags",
+		"Attachment ID\nName", "TGW ID", "Type", "Resource ID", "State", "Associated RT\nName", "Propagated RTs",
+		"Owner ID\nName", "Tags",
 	}
 	if got := r.GetHeaders(); !reflect.DeepEqual(got, wantHeaders) {
 		t.Errorf("GetHeaders() = %q, want %q", got, wantHeaders)

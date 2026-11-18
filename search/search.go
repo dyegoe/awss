@@ -92,6 +92,10 @@ type Options struct {
 	// The search commands ignore it.
 	Apply bool
 
+	// Propagations makes tgw attachments read the route tables each attachment propagates to. The
+	// other searches ignore it.
+	Propagations bool
+
 	// Timeout is how long the run may take. A profile and region still searching at the deadline
 	// is reported as timed out. Zero disables it.
 	Timeout time.Duration
@@ -265,6 +269,7 @@ var engines = map[string]engine{
 		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
 			r := searchTGW.NewAttachments(profile, region, filters, opts.SortField)
 			r.AccountNames = opts.AccountNames
+			r.Propagations = opts.Propagations
 			return r
 		},
 		sortFields:     searchTGW.GetAttachmentSortFields,

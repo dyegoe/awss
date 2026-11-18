@@ -51,7 +51,7 @@ search/dxgw/         — Direct Connect gateways (global, once per profile, in t
 search/tgw/          — Transit Gateway routes (regional): SearchTransitGatewayRoutes per route table, one CIDR
                        and match mode per call; attachment names from one DescribeTransitGatewayAttachments.
                        Registered as "tgw-routes"; attachments.go lists the attachments with their associated
-                       route table, "tgw-attachments"
+                       route table, "tgw-attachments", and propagations.go their propagations (--propagations)
 cleanup/             — what the cleanups share: statuses, CallerAccount, AWS error helpers
 cleanup/defaultvpc/  — deletes the default VPC and its plumbing, all-or-nothing on its ENIs; a plan
                        unless Apply. Registered in the search engines map as "default-vpc"
@@ -68,6 +68,8 @@ The `common.Results` interface is the central contract. Every resource type impl
 Output rendering (table, JSON, JSON-pretty) is driven entirely by struct tags (`header`, `sort`, `json`, `filter`).
 A field with `stack:""` as well as `header` shares the table column of the field before it, on a new line (an ID and
 its name), to keep wide tables inside the terminal.
+A field with `hide:"empty"` as well as `header` has its column hidden when it is empty in every row: an opt-in
+column, such as one a flag fills, takes no width without the flag.
 
 ---
 
