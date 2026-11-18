@@ -90,6 +90,14 @@ type dataRow struct {
 	// AttachmentName is the Name tag of the attachment.
 	AttachmentName string `json:"attachment_name,omitempty" header:"Name" stack:"" sort:"attachment"`
 
+	// AssocRTID is the route table the attachment is associated with: the table that
+	// routes the traffic coming from the attachment, where to look for the return route. Empty
+	// when the attachment is not associated.
+	AssocRTID string `json:"associated_route_table_id,omitempty" header:"Associated RT" sort:"associated-route-table-id"`
+
+	// AssocRTName is the Name tag of the associated route table.
+	AssocRTName string `json:"associated_route_table_name,omitempty" header:"Name" stack:"" sort:"associated-route-table"`
+
 	// OwnerID is the account that owns the resource of the attachment, such as the VPC.
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
 
@@ -140,19 +148,21 @@ func (r *Results) Search(ctx context.Context) {
 	r.collect(ctx, client, q)
 }
 
-// collect lists the route tables with client, searches the routes of each one --route-table-names
-// keeps, names the attachments and sorts the rows. A route table that fails is recorded and the
-// next one is searched, unless the profile may not search routes at all.
+// collect lists the route tables with client, searches the routes of each one --route-table-ids
+// and --route-table-names keep, names the attachments and sorts the rows. A route table that fails
+// is recorded and the next one is searched, unless the profile may not search routes at all.
 func (r *Results) collect(ctx context.Context, client ec2API, q *query) {
 	tables, err := routeTables(ctx, client, q)
 	if err != nil {
 		r.Errors = append(r.Errors, err.Error())
 		return
 	}
+	tableNames := make(map[string]string, len(tables))
 	seen := map[dataRow]bool{}
 	for i := range tables {
 		base := parseTable(&tables[i])
-		if !q.tableNames.Match(base.RouteTableName) {
+		tableNames[base.RouteTableID] = base.RouteTableName
+		if !q.keepsTable(&base) {
 			continue
 		}
 		rows, err := r.tableRows(ctx, client, q, &base)
@@ -170,7 +180,7 @@ func (r *Results) collect(ctx context.Context, client ec2API, q *query) {
 			}
 		}
 	}
-	r.nameAttachments(ctx, client)
+	r.nameAttachments(ctx, client, tableNames)
 
 	if r.SortField == "" {
 		return
@@ -223,10 +233,11 @@ func longestRows(cidrs []string, covering map[string][]types.TransitGatewayRoute
 	return rows
 }
 
-// nameAttachments fills the attachment name and owner of every row from the attachments of the
-// transit gateways of the rows: one call for them all. A failed call is recorded and leaves the
-// columns empty; the rows are kept.
-func (r *Results) nameAttachments(ctx context.Context, client ec2API) {
+// nameAttachments fills the attachment name, owner and associated route table of every row from
+// the attachments of the transit gateways of the rows: one call for them all. tableNames maps every
+// route table ID of the region to its name. A failed call is recorded and leaves the columns
+// empty; the rows are kept.
+func (r *Results) nameAttachments(ctx context.Context, client ec2API, tableNames map[string]string) {
 	var tgwIDs []string
 	for i := range r.Data {
 		if r.Data[i].AttachmentID != "" && !slices.Contains(tgwIDs, r.Data[i].TransitGatewayID) {
@@ -253,6 +264,10 @@ func (r *Results) nameAttachments(ctx context.Context, client ec2API) {
 		r.Data[i].AttachmentName = common.TagName(att.Tags)
 		r.Data[i].OwnerID = aws.ToString(att.ResourceOwnerId)
 		r.Data[i].OwnerName = r.AccountNames[r.Data[i].OwnerID]
+		if a := att.Association; a != nil && a.State == types.TransitGatewayAssociationStateAssociated {
+			r.Data[i].AssocRTID = aws.ToString(a.TransitGatewayRouteTableId)
+			r.Data[i].AssocRTName = tableNames[r.Data[i].AssocRTID]
+		}
 	}
 }
 

@@ -73,6 +73,8 @@ to: a VPC, a VPN, a Direct Connect gateway, a peering (such as Cloud WAN) or a C
 attachment, or nowhere (blackhole).
 
 One row per attachment of each route: a route with several attachments (ECMP) is several rows.
+Associated RT is the route table the attachment is associated with: the table that routes the
+traffic coming back from it, where to look for the return route.
 
   --cidrs            CIDRs or IP addresses to find; a bare IP is its /32. Without --cidrs, every
                      route of the selected route tables is listed.
@@ -82,14 +84,19 @@ One row per attachment of each route: a route with several attachments (ECMP) is
                        longest      the most specific route covering it: the one traffic takes
                        subnet-of    routes inside the CIDR
                        supernet-of  routes covering the CIDR
-  --route-table-ids, --transit-gateway-ids   pick route tables, filtered by AWS.
-  --route-table-names                        pick route tables by Name tag (globs).
+  --transit-gateway-ids                      pick route tables, filtered by AWS.
+  --route-table-ids, --route-table-names     pick route tables by ID, or by Name tag (globs).
   --types, --states, --attachment-types, --attachment-ids, --resource-ids   filtered by AWS.
 
 Cloud WAN routes a CIDR to a Transit Gateway route table (awss cloudwan routes, target type
 transit-gateway-route-table): which VPC holds it behind the transit gateway?
 	awss tgw routes --profile network --regions eu-central-1 --route-table-ids tgw-rtb-0123 \
 		--cidrs 10.20.1.5 --match longest
+
+Is there a return route? Search the associated route table (Associated RT) of the attachment
+for the source:
+	awss tgw routes --profile network --regions eu-central-1 --route-table-ids tgw-rtb-0456 \
+		--cidrs 10.60.3.7 --match longest
 
 The routes of every route table to one VPC:
 	awss tgw routes --profile network --resource-ids vpc-0123

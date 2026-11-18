@@ -46,12 +46,12 @@ type ec2API interface {
 	ec2.SearchTransitGatewayRoutesAPIClient
 }
 
-// routeTables lists the Transit Gateway route tables of the region that --route-table-ids and
-// --transit-gateway-ids ask for. The IDs are AWS filters, so an ID of another region or account is
-// left out, not an error.
+// routeTables lists the Transit Gateway route tables of the region that --transit-gateway-ids asks
+// for. The IDs are AWS filters, so an ID of another region or account is left out, not an error.
+// --route-table-ids is matched by awss (query.keepsTable): the tables it leaves out still name the
+// associated route table of an attachment.
 func routeTables(ctx context.Context, client ec2API, q *query) ([]types.TransitGatewayRouteTable, error) {
 	in := &ec2.DescribeTransitGatewayRouteTablesInput{MaxResults: aws.Int32(pageSize)}
-	in.Filters = appendFilter(in.Filters, "transit-gateway-route-table-id", q.tableIDs)
 	in.Filters = appendFilter(in.Filters, "transit-gateway-id", q.tgwID)
 
 	var out []types.TransitGatewayRouteTable

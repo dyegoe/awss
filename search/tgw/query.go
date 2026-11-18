@@ -34,7 +34,7 @@ const (
 	FilterKeyCIDR = "cidr"
 	// FilterKeyMatch is how a route must relate to each CIDR.
 	FilterKeyMatch = "match"
-	// FilterKeyRouteTableID picks route tables by ID, filtered by AWS.
+	// FilterKeyRouteTableID picks route tables by ID, matched by awss.
 	FilterKeyRouteTableID = "route-table-id"
 	// FilterKeyRouteTableName picks route tables by Name tag (globs), matched by awss.
 	FilterKeyRouteTableName = "route-table-name"
@@ -131,6 +131,15 @@ func newQuery(filters map[string][]string) (*query, error) {
 		return nil, err
 	}
 	return q, nil
+}
+
+// keepsTable reports whether --route-table-ids and --route-table-names keep the route table of
+// the route table columns t.
+func (q *query) keepsTable(t *dataRow) bool {
+	if len(q.tableIDs) > 0 && !slices.Contains(q.tableIDs, t.RouteTableID) {
+		return false
+	}
+	return q.tableNames.Match(t.RouteTableName)
 }
 
 // buildRouteFilters checks the route and attachment filters and builds their AWS filters. AWS

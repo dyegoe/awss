@@ -205,9 +205,22 @@ func attachment(id, name, owner string) types.TransitGatewayAttachment {
 	}
 }
 
+// associated returns an attachment of tgw-0a, as attachment does, associated with the route table
+// tableID in the state.
+func associated(
+	id, name, owner, tableID string, state types.TransitGatewayAssociationState,
+) types.TransitGatewayAttachment {
+	att := attachment(id, name, owner)
+	att.Association = &types.TransitGatewayAttachmentAssociation{
+		TransitGatewayRouteTableId: aws.String(tableID), State: state,
+	}
+	return att
+}
+
 // fakeFixture returns a made-up transit gateway with two route tables: prod has VPC routes, a
 // Direct Connect and VPN route with two attachments (ECMP), a default route to a peering, a
-// blackhole and a prefix list route; dev has one VPC route.
+// blackhole and a prefix list route; dev has one VPC route. The prod VPC is associated with dev,
+// the app VPC is still associating with prod, and the Direct Connect attachment is not associated.
 func fakeFixture() *fakeEC2 {
 	blackhole := route("10.99.0.0/16", types.TransitGatewayRouteTypeStatic)
 	blackhole.State = types.TransitGatewayRouteStateBlackhole
@@ -228,8 +241,10 @@ func fakeFixture() *fakeEC2 {
 			},
 		},
 		attachments: []types.TransitGatewayAttachment{
-			attachment("tgw-attach-vpc1", "prod-vpc", "333333333333"),
-			attachment("tgw-attach-vpc2", "app-vpc", "444444444444"),
+			associated("tgw-attach-vpc1", "prod-vpc", "333333333333", "tgw-rtb-dev",
+				types.TransitGatewayAssociationStateAssociated),
+			associated("tgw-attach-vpc2", "app-vpc", "444444444444", "tgw-rtb-prod",
+				types.TransitGatewayAssociationStateAssociating),
 			attachment("tgw-attach-dx1", "dc", "111111111111"),
 		},
 	}
@@ -378,7 +393,8 @@ func TestResults_collect_columns(t *testing.T) {
 	want := dataRow{
 		Query: "10.20.0.0/16", TransitGatewayID: "tgw-0a", RouteTableID: "tgw-rtb-prod", RouteTableName: "prod",
 		CIDR: "10.20.0.0/16", Type: "propagated", State: "active", ResourceType: "vpc", ResourceID: "vpc-0prod",
-		AttachmentID: "tgw-attach-vpc1", AttachmentName: "prod-vpc", OwnerID: "333333333333", OwnerName: "prod-account",
+		AttachmentID: "tgw-attach-vpc1", AttachmentName: "prod-vpc", AssocRTID: "tgw-rtb-dev",
+		AssocRTName: "dev", OwnerID: "333333333333", OwnerName: "prod-account",
 	}
 	if len(r.Data) != 1 || !reflect.DeepEqual(r.Data[0], want) {
 		t.Errorf("collect(10.20.0.0/16) = %+v, want [%+v]", r.Data, want)
@@ -391,6 +407,34 @@ func TestResults_collect_columns(t *testing.T) {
 	}
 	if got, _ := filterValues(f.attachmentFilters[0], "transit-gateway-id"); !reflect.DeepEqual(got, []string{"tgw-0a"}) {
 		t.Errorf("attachments transit-gateway-id = %q, want [tgw-0a]", got)
+	}
+}
+
+// TestResults_collect_associatedRouteTable checks the associated route table of each attachment:
+// named even when --route-table-ids leaves its table out, and empty when the attachment is not
+// associated or its association is not done.
+func TestResults_collect_associatedRouteTable(t *testing.T) {
+	r := collectWith(t, fakeFixture(), map[string][]string{FilterKeyRouteTableID: {"tgw-rtb-prod"}}, "")
+	if len(r.Errors) > 0 {
+		t.Fatalf("collect(tgw-rtb-prod) errors = %v", r.Errors)
+	}
+	want := map[string][2]string{
+		"tgw-attach-vpc1": {"tgw-rtb-dev", "dev"},
+		"tgw-attach-vpc2": {},
+		"tgw-attach-dx1":  {},
+		"tgw-attach-vpn1": {},
+		"tgw-attach-peer": {},
+		"":                {},
+	}
+	for i := range r.Data {
+		row := &r.Data[i]
+		if row.RouteTableID != "tgw-rtb-prod" {
+			t.Errorf("collect(tgw-rtb-prod) row of route table %s, want only tgw-rtb-prod", row.RouteTableID)
+		}
+		got := [2]string{row.AssocRTID, row.AssocRTName}
+		if got != want[row.AttachmentID] {
+			t.Errorf("collect(tgw-rtb-prod) %s associated = %q, want %q", row.AttachmentID, got, want[row.AttachmentID])
+		}
 	}
 }
 
@@ -626,7 +670,7 @@ func TestResults_accessors(t *testing.T) {
 	}
 	wantHeaders := []interface{}{
 		"Query", "TGW ID", "Route Table ID\nName", "CIDR\nPrefix List", "Type", "State",
-		"Resource Type\nResource ID", "Attachment ID\nName", "Owner ID\nName",
+		"Resource Type\nResource ID", "Attachment ID\nName", "Associated RT\nName", "Owner ID\nName",
 	}
 	if got := r.GetHeaders(); !reflect.DeepEqual(got, wantHeaders) {
 		t.Errorf("GetHeaders() = %q, want %q", got, wantHeaders)
