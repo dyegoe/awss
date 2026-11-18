@@ -690,6 +690,28 @@ table that routes the traffic coming back from the attachment, where to look for
 empty when the attachment is not associated) and **Owner ID** / **Name** (the account of the resource; see
 [Account names](#account-names)). Each pair is one cell, the second value on its own line.
 
+**Checking the return route.** Search both addresses at once: `--match longest` shows, for each
+CIDR, the route traffic takes in every route table, side by side (the **Query** column tells them
+apart).
+
+```bash
+# Forward (to 10.20.1.5) and return (to 10.60.3.7) in every route table
+awss tgw routes --profile network --regions eu-central-1 --cidrs 10.60.3.7,10.20.1.5 --match longest
+
+# Only the two tables that matter: the source's, and the Associated RT of the destination's attachment
+awss tgw routes --profile network --regions eu-central-1 --cidrs 10.60.3.7,10.20.1.5 --match longest \
+  --route-table-ids tgw-rtb-0123,tgw-rtb-0456
+```
+
+The Associated RT is only one hop, so read it with the topology in mind:
+
+- **Inspection:** behind a firewall (inspection) attachment, the Associated RT is the inspection
+  table, not the source's; follow each hop.
+- **No association:** a Direct Connect or VPN attachment may have no Associated RT; its return
+  traffic follows the routes the other side advertises.
+- **Cloud WAN:** behind a Cloud WAN peering, the return path is in
+  [`awss cloudwan routes`](#cloud-wan-routes-awss-cloudwan-routes).
+
 - **Profile:** run it with a profile of the account that owns the transit gateways, usually the
   network account. An account a transit gateway is shared with does not see its route tables, so
   its result set is empty.
