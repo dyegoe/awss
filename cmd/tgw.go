@@ -116,10 +116,11 @@ transit-gateway-route-table): which VPC holds it behind the transit gateway?
 	awss tgw routes --profile network --regions eu-central-1 --route-table-ids tgw-rtb-0123 \
 		--cidrs 10.20.1.5 --match longest
 
-Is there a return route? Search the associated route table (Associated RT) of the attachment
-for the source:
-	awss tgw routes --profile network --regions eu-central-1 --route-table-ids tgw-rtb-0456 \
-		--cidrs 10.60.3.7 --match longest
+Is there a return route? Search the source and the destination at once: the route traffic takes
+to each, in every route table (add --route-table-ids for the source's table and the Associated RT
+of the destination's attachment). Behind a firewall attachment, the Associated RT is the inspection
+table: follow each hop.
+	awss tgw routes --profile network --regions eu-central-1 --cidrs 10.60.3.7,10.20.1.5 --match longest
 
 The routes of every route table to one VPC:
 	awss tgw routes --profile network --resource-ids vpc-0123
