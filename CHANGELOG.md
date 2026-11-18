@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.23.0](https://github.com/dyegoe/awss/compare/v0.22.2...v0.23.0) (2026-11-18)
+
+
+### Features
+
+* **search/tgw:** add --propagations to tgw attachments ([#263](https://github.com/dyegoe/awss/issues/263)) ([#266](https://github.com/dyegoe/awss/issues/266)) ([f2c3904](https://github.com/dyegoe/awss/commit/f2c3904bedc4913c1b1006c0d15f360909a8ed15))
+* **search/tgw:** add tgw attachments with the associated route table ([#259](https://github.com/dyegoe/awss/issues/259)) ([#262](https://github.com/dyegoe/awss/issues/262)) ([118fe13](https://github.com/dyegoe/awss/commit/118fe13ca45b5384ded2aacb54724e8729af4d6b))
+* **search/tgw:** show the associated route table of each attachment ([#258](https://github.com/dyegoe/awss/issues/258)) ([#260](https://github.com/dyegoe/awss/issues/260)) ([c4d7023](https://github.com/dyegoe/awss/commit/c4d7023f5b136677909300ba3aa6589b4e22ddb9))
+
 ## [0.22.2](https://github.com/dyegoe/awss/compare/v0.22.1...v0.22.2) (2026-11-17)
 
 
