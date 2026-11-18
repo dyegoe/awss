@@ -60,24 +60,30 @@ func (p *propagation) cell() string {
 // table at a time, with no batch call, so awss picks the side with fewer calls: one call per
 // attachment when there are fewer attachments than route tables (a single VPC is one call),
 // otherwise one call per route table. tables are the route tables of the transit gateways of the
-// rows, and names maps a route table ID to its name. A failed call is recorded; the rows are kept.
+// rows, and names maps a route table ID to its name. Only the attachments of a transit gateway
+// whose route tables the profile sees are read: an attachment to a transit gateway another account
+// shares is not, as AWS would refuse it. A failed call is recorded; the rows are kept.
 func (r *AttachmentResults) addPropagations(
 	ctx context.Context, client ec2API, tables []types.TransitGatewayRouteTable, names map[string]string,
 ) {
+	owned := map[string]bool{}
+	tableIDs := make([]string, 0, len(tables))
+	for i := range tables {
+		owned[aws.ToString(tables[i].TransitGatewayId)] = true
+		tableIDs = append(tableIDs, aws.ToString(tables[i].TransitGatewayRouteTableId))
+	}
+	var attIDs []string
+	for i := range r.Data {
+		if owned[r.Data[i].TransitGatewayID] {
+			attIDs = append(attIDs, r.Data[i].ID)
+		}
+	}
 	var byAttachment map[string][]propagation
 	var msgs []string
-	if len(r.Data) < len(tables) {
-		ids := make([]string, 0, len(r.Data))
-		for i := range r.Data {
-			ids = append(ids, r.Data[i].ID)
-		}
-		byAttachment, msgs = propagationsByAttachment(ctx, client, ids)
+	if len(attIDs) < len(tableIDs) {
+		byAttachment, msgs = propagationsByAttachment(ctx, client, attIDs)
 	} else {
-		ids := make([]string, 0, len(tables))
-		for i := range tables {
-			ids = append(ids, aws.ToString(tables[i].TransitGatewayRouteTableId))
-		}
-		byAttachment, msgs = propagationsByTable(ctx, client, ids)
+		byAttachment, msgs = propagationsByTable(ctx, client, tableIDs)
 	}
 	r.Errors = append(r.Errors, msgs...)
 	for i := range r.Data {

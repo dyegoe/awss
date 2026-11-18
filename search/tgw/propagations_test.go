@@ -108,6 +108,27 @@ func TestAttachmentResults_collect_propagations(t *testing.T) {
 	}
 }
 
+// TestAttachmentResults_collect_propagationsSharedTGW checks that, with one call per attachment,
+// the attachment to a transit gateway whose route tables the profile does not see (tgw-0b, shared
+// by another account) is not read: AWS would refuse it and stop the other calls.
+func TestAttachmentResults_collect_propagationsSharedTGW(t *testing.T) {
+	f := propagationFixture()
+	f.tables = append(f.tables, table("tgw-rtb-spare", "spare"))
+	f.propagationsErr = map[string]error{
+		"tgw-attach-vpc9": &smithy.GenericAPIError{Code: errCodeUnauthorized, Message: "no"},
+	}
+	filters := map[string][]string{FilterKeyAttachmentID: {"tgw-attach-vpc1", "tgw-attach-vpc9"}}
+	r := collectPropagations(t, f, filters)
+	want := map[string][]string{"tgw-attach-vpc1": {"tgw-rtb-dev (dev)", "tgw-rtb-prod (prod)"}, "tgw-attach-vpc9": nil}
+	if got := propagatedRTs(r.Data); len(r.Errors) > 0 || !reflect.DeepEqual(got, want) {
+		t.Errorf("collect(%v) = %q, errors %q, want %q and no error", filters, got, r.Errors, want)
+	}
+	if f.attachmentPropagationCalls != 1 || f.tablePropagationCalls != 0 {
+		t.Errorf("collect(%v) calls = %d per attachment, %d per route table, want 1, 0", filters,
+			f.attachmentPropagationCalls, f.tablePropagationCalls)
+	}
+}
+
 // TestAttachmentResults_collect_propagationsJSON checks the propagations JSON keeps the ID, name
 // and state of every route table.
 func TestAttachmentResults_collect_propagationsJSON(t *testing.T) {
