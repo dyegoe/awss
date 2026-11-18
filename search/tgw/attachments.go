@@ -64,17 +64,17 @@ func AttachmentStateNames() []string {
 }
 
 // camelKebab writes a camel case AWS value in kebab case: pendingAcceptance is pending-acceptance.
-// A value already in kebab case is kept.
+// A dash goes only where a lower case letter meets an upper case one, so a value already in kebab
+// case, or in upper case (AVAILABLE), is kept as one word.
 func camelKebab(s string) string {
 	var b strings.Builder
-	for i, c := range s {
-		if unicode.IsUpper(c) {
-			if i > 0 {
-				b.WriteByte('-')
-			}
-			c = unicode.ToLower(c)
+	prev := rune(0)
+	for _, c := range s {
+		if unicode.IsUpper(c) && unicode.IsLower(prev) {
+			b.WriteByte('-')
 		}
-		b.WriteRune(c)
+		b.WriteRune(unicode.ToLower(c))
+		prev = c
 	}
 	return b.String()
 }
@@ -144,8 +144,8 @@ type attachmentRow struct {
 	// Created is when the attachment was created, in RFC 3339 UTC so it sorts chronologically.
 	Created string `json:"created,omitempty" sort:"created"`
 
-	// Tags are the tags of the attachment.
-	Tags map[string]string `json:"tags,omitempty"`
+	// Tags are the tags of the attachment, shown in the table with --show-tags.
+	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
 }
 
 // NewAttachments initiates and returns a new instance of Transit Gateway attachment results.

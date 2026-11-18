@@ -292,6 +292,8 @@ func TestCamelKebab(t *testing.T) {
 		{name: "one word", in: "available", want: "available"},
 		{name: "kebab", in: "rolling-back", want: "rolling-back"},
 		{name: "leading capital", in: "Available", want: "available"},
+		{name: "upper case", in: "AVAILABLE", want: "available"},
+		{name: "title kebab", in: "Pending-Acceptance", want: "pending-acceptance"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -332,7 +334,7 @@ func TestAttachmentResults_accessors(t *testing.T) {
 		t.Errorf("getters = %q %q %q, want network eu-central-1 name", r.GetProfile(), r.GetRegion(), r.GetSortField())
 	}
 	wantHeaders := []interface{}{
-		"Attachment ID\nName", "TGW ID", "Type", "Resource ID", "State", "Associated RT\nName", "Owner ID\nName",
+		"Attachment ID\nName", "TGW ID", "Type", "Resource ID", "State", "Associated RT\nName", "Owner ID\nName", "Tags",
 	}
 	if got := r.GetHeaders(); !reflect.DeepEqual(got, wantHeaders) {
 		t.Errorf("GetHeaders() = %q, want %q", got, wantHeaders)

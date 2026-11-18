@@ -738,18 +738,20 @@ awss tgw attachments --profile network --types peering --states pending-acceptan
 Columns: **Attachment ID** / **Name** (its Name tag), **TGW ID**, **Type**, **Resource ID** (such as
 the VPC), **State**, **Associated RT** / **Name** (the associated route table and its Name tag;
 empty when the attachment is not associated) and **Owner ID** / **Name** (the account of the
-resource; see [Account names](#account-names)). Each pair is one cell, the second value on its own
-line.
+resource; see [Account names](#account-names)), and **Tags** with `--show-tags`. Each pair is one
+cell, the second value on its own line.
 
 - **Profile and region:** as for `tgw routes`, run it with a profile of the account that owns the
-  transit gateways, in their region.
+  transit gateways, in their region. Unlike `tgw routes`, an account a transit gateway is shared
+  with is not empty: it sees the attachments of its own resources and their Associated RT, without
+  the route table name, since it does not see the route tables.
 - **Association state:** Associated RT is shown in any association state; the JSON
   `association_state` says `associated`, or `associating` / `disassociating` while it changes.
   `tgw routes` shows it only once associated.
 - **Calls:** one `DescribeTransitGatewayAttachments` call, then one
   `DescribeTransitGatewayRouteTables` call for the route table names when an attachment is
   associated. `--names` and `--states` are matched by awss, the other filters by AWS.
-- **JSON only:** `association_state`, `transit_gateway_owner_id`, `created` and `tags`.
+- **JSON only:** `association_state`, `transit_gateway_owner_id` and `created`.
 - **Permission:** `ec2:DescribeTransitGatewayAttachments`, and
   `ec2:DescribeTransitGatewayRouteTables` for the route table names.
 
