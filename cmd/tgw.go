@@ -23,8 +23,9 @@ import (
 )
 
 const (
-	labelTGWRoutesSort      = "tgw.routes.sort"
-	labelTGWAttachmentsSort = "tgw.attachments.sort"
+	labelTGWRoutesSort              = "tgw.routes.sort"
+	labelTGWAttachmentsSort         = "tgw.attachments.sort"
+	labelTGWAttachmentsPropagations = "tgw.attachments.propagations"
 )
 
 // tgwRoutesFilters represents the filters of the tgw routes command, keyed by the search/tgw
@@ -61,6 +62,7 @@ type tgwAttachmentsFilters struct {
 	States                  []string `filter:"attachment-state"`
 	TransitGatewayIDs       []string `filter:"transit-gateway-id"`
 	AssociatedRouteTableIDs []string `filter:"associated-route-table-id"`
+	PropagatedRouteTableIDs []string `filter:"propagated-route-table-id"`
 }
 
 var tgwAttachmentsF = tgwAttachmentsFilters{}
@@ -69,6 +71,7 @@ var tgwAttachmentsF = tgwAttachmentsFilters{}
 // lists every attachment.
 var tgwAttachmentsFilterFlags = []string{
 	flagIDs, flagNames, flagTypes, "resource-ids", flagStates, "transit-gateway-ids", "associated-route-table-ids",
+	"propagated-route-table-ids",
 }
 
 // tgwCmd groups the AWS Transit Gateway searches.
@@ -151,15 +154,27 @@ associated with (Associated RT): the table that routes the traffic coming from i
 Associated RT is shown in any association state; the JSON association_state says whether it is
 associated, or associating / disassociating while it changes.
 
+--propagations adds Propagated RTs: the route tables the attachment propagates its routes to, the
+state appended when it is not enabled. It explains why a route table has, or lacks, a propagated
+route to the attachment. AWS reads them one attachment or one route table at a time, so it costs
+one call per attachment or per route table, whichever is fewer.
+
   --ids, --types, --resource-ids, --transit-gateway-ids, --associated-route-table-ids
                      filtered by AWS. --types takes dx for direct-connect-gateway.
   --names, --states  matched by awss; --names takes globs.
+  --propagated-route-table-ids   matched by awss, in any propagation state; turns --propagations on.
 
 The attachments associated with one route table:
 	awss tgw attachments --profile network --regions eu-central-1 --associated-route-table-ids tgw-rtb-0123
 
 The attachment of a VPC, and its route table:
 	awss tgw attachments --profile network --resource-ids vpc-0123
+
+Why does tgw-rtb-0123 have a route to this VPC? The route tables its attachment propagates to:
+	awss tgw attachments --profile network --resource-ids vpc-0123 --propagations
+
+Everything that propagates to one route table:
+	awss tgw attachments --profile network --propagated-route-table-ids tgw-rtb-0123
 `,
 	Args: cobra.NoArgs,
 	RunE: tgwAttachmentsRunE,
@@ -175,7 +190,7 @@ func tgwAttachmentsRunE(cmd *cobra.Command, _ []string) error {
 	}
 	return runSearch(cmd, &cmdSpec{
 		sortLabel: labelTGWAttachmentsSort, filterFlags: tgwAttachmentsFilterFlags, optionalFilters: true,
-		accountNames: true,
+		accountNames: true, propagationsLabel: labelTGWAttachmentsPropagations,
 	}, nil, nil, tgwAttachmentsF)
 }
 
@@ -253,9 +268,15 @@ func tgwAttachmentsInitFlags() {
 		"List the attachments of these transit gateways only, exact. `tgw-0123`")
 	fl.StringSliceVar(&f.AssociatedRouteTableIDs, "associated-route-table-ids", []string{},
 		"Filter attachments by the route table they are associated with, exact. `tgw-rtb-0123`")
+	fl.StringSliceVar(&f.PropagatedRouteTableIDs, "propagated-route-table-ids", []string{},
+		"Filter attachments by a route table they propagate to, exact; implies --propagations. `tgw-rtb-0123`")
+	fl.Bool("propagations", false,
+		"Add the route tables each attachment propagates to: one call per attachment or per route table")
 	fl.String(flagSort, "name", sortHelp("tgw-attachments", "attachments", "name"))
 }
 
 func tgwAttachmentsInitViper() error {
-	return bindFlags(tgwAttachmentsCmd, map[string]string{labelTGWAttachmentsSort: flagSort})
+	return bindFlags(tgwAttachmentsCmd, map[string]string{
+		labelTGWAttachmentsSort: flagSort, labelTGWAttachmentsPropagations: "propagations",
+	})
 }

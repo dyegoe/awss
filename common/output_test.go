@@ -308,6 +308,39 @@ func TestToTable(t *testing.T) {
 	}
 }
 
+// TestHiddenEmptyColumns checks that a column tagged hide:"empty" is hidden only when it is empty
+// in every row, and that the other columns are never hidden.
+func TestHiddenEmptyColumns(t *testing.T) {
+	type row struct {
+		ID     string   `header:"ID"`
+		Extra  []string `header:"Extra" hide:"empty"`
+		Count  int      `header:"Count" hide:"empty"`
+		NoHead []string `hide:"empty"`
+	}
+	tests := []struct {
+		name string
+		rows []interface{}
+		want []table.ColumnConfig
+	}{
+		{name: "no rows", rows: nil, want: nil},
+		{
+			name: "every opt-in column empty", rows: []interface{}{row{ID: "a"}, row{ID: "b", Extra: []string{}}},
+			want: []table.ColumnConfig{{Name: "Extra", Hidden: true}, {Name: "Count", Hidden: true}},
+		},
+		{
+			name: "one row fills them", rows: []interface{}{row{ID: "a"}, row{ID: "b", Extra: []string{"x"}, Count: 1}},
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := hiddenEmptyColumns(tt.rows); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("hiddenEmptyColumns(%v) = %+v, want %+v", tt.rows, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestRowFromStruct is a test function for rowFromStruct.
 func TestRowFromStruct(t *testing.T) {
 	tests := []struct {

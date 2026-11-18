@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
 	"sort"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -189,13 +190,42 @@ func toTable(r Results, showEmpty, showTags bool, tagsKeys []string) string {
 		t.AppendRow(rowFromStruct(d, tagsKeys))
 	}
 
-	t.SetColumnConfigs(
-		[]table.ColumnConfig{
-			{Name: "Tags", Hidden: !showTags},
-		},
-	)
+	t.SetColumnConfigs(append(
+		[]table.ColumnConfig{{Name: "Tags", Hidden: !showTags}},
+		hiddenEmptyColumns(r.GetRows())...,
+	))
 
 	return fmt.Sprintf("%s\n", t.Render())
+}
+
+// hiddenEmptyColumns hides the columns of the fields tagged `hide:"empty"` that are empty in every
+// row: an opt-in column, such as one a flag fills, takes no width when nothing fills it.
+func hiddenEmptyColumns(rows []interface{}) []table.ColumnConfig {
+	if len(rows) == 0 {
+		return nil
+	}
+	var configs []table.ColumnConfig
+	t := reflect.TypeOf(rows[0])
+	for i := 0; i < t.NumField(); i++ {
+		header, ok := t.Field(i).Tag.Lookup("header")
+		if !ok || t.Field(i).Tag.Get("hide") != "empty" {
+			continue
+		}
+		if !slices.ContainsFunc(rows, func(row interface{}) bool { return !isEmpty(reflect.ValueOf(row).Field(i)) }) {
+			configs = append(configs, table.ColumnConfig{Name: header, Hidden: true})
+		}
+	}
+	return configs
+}
+
+// isEmpty reports whether a field shows nothing: its zero value, or an empty slice or map.
+func isEmpty(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Slice, reflect.Map:
+		return v.Len() == 0
+	default:
+		return v.IsZero()
+	}
 }
 
 // RowsFromStruct returns a table.Row from a struct.

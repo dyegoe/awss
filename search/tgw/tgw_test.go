@@ -19,6 +19,7 @@ package tgw
 import (
 	"context"
 	"errors"
+	"maps"
 	"net/netip"
 	"reflect"
 	"slices"
@@ -45,6 +46,13 @@ type fakeEC2 struct {
 
 	tablesErr, attachmentsErr error
 	routesErr                 map[string]error
+
+	// propagations are the attachments that propagate to each route table, each written
+	// attachment-id/state; propagationsErr fails the propagation call of an attachment or a route
+	// table; attachmentPropagationCalls and tablePropagationCalls count the calls of each kind.
+	propagations                                      map[string][]string
+	propagationsErr                                   map[string]error
+	attachmentPropagationCalls, tablePropagationCalls int
 
 	// maxResults are the page sizes the calls asked for; searches are the filters of every
 	// SearchTransitGatewayRoutes call; attachmentFilters those of the attachment calls.
@@ -115,6 +123,50 @@ func attachmentFiltersKeep(fs []types.Filter, a *types.TransitGatewayAttachment)
 		keep(fs, awsFilterAttResourceType, string(a.ResourceType)) &&
 		keep(fs, awsFilterAttResourceID, aws.ToString(a.ResourceId)) &&
 		keep(fs, awsFilterAttAssociatedRT, rt)
+}
+
+func (f *fakeEC2) GetTransitGatewayAttachmentPropagations(
+	_ context.Context, in *ec2.GetTransitGatewayAttachmentPropagationsInput, _ ...func(*ec2.Options),
+) (*ec2.GetTransitGatewayAttachmentPropagationsOutput, error) {
+	f.maxResults = append(f.maxResults, aws.ToInt32(in.MaxResults))
+	f.attachmentPropagationCalls++
+	id := aws.ToString(in.TransitGatewayAttachmentId)
+	if err := f.propagationsErr[id]; err != nil {
+		return nil, err
+	}
+	out := &ec2.GetTransitGatewayAttachmentPropagationsOutput{}
+	for _, table := range slices.Sorted(maps.Keys(f.propagations)) {
+		for _, p := range f.propagations[table] {
+			att, state, _ := strings.Cut(p, "/")
+			if att == id {
+				out.TransitGatewayAttachmentPropagations = append(out.TransitGatewayAttachmentPropagations,
+					types.TransitGatewayAttachmentPropagation{
+						TransitGatewayRouteTableId: aws.String(table), State: types.TransitGatewayPropagationState(state),
+					})
+			}
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeEC2) GetTransitGatewayRouteTablePropagations(
+	_ context.Context, in *ec2.GetTransitGatewayRouteTablePropagationsInput, _ ...func(*ec2.Options),
+) (*ec2.GetTransitGatewayRouteTablePropagationsOutput, error) {
+	f.maxResults = append(f.maxResults, aws.ToInt32(in.MaxResults))
+	f.tablePropagationCalls++
+	id := aws.ToString(in.TransitGatewayRouteTableId)
+	if err := f.propagationsErr[id]; err != nil {
+		return nil, err
+	}
+	out := &ec2.GetTransitGatewayRouteTablePropagationsOutput{}
+	for _, p := range f.propagations[id] {
+		att, state, _ := strings.Cut(p, "/")
+		out.TransitGatewayRouteTablePropagations = append(out.TransitGatewayRouteTablePropagations,
+			types.TransitGatewayRouteTablePropagation{
+				TransitGatewayAttachmentId: aws.String(att), State: types.TransitGatewayPropagationState(state),
+			})
+	}
+	return out, nil
 }
 
 func (f *fakeEC2) SearchTransitGatewayRoutes(

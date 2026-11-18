@@ -38,7 +38,9 @@ type filterCase struct {
 	wantFilters map[string][]string
 	wantSort    string
 	wantRegex   bool
-	wantErr     string
+	// wantPropagations is the Propagations option of tgw attachments.
+	wantPropagations bool
+	wantErr          string
 }
 
 // runFilterCases runs each case through the command tree and checks what reached the search.
@@ -67,10 +69,11 @@ func runFilterCases(t *testing.T, command, defaultSort string, tests []filterCas
 				wantSort = defaultSort
 			}
 			if got.cmd != command || !reflect.DeepEqual(got.filters, tt.wantFilters) ||
-				got.opts.SortField != wantSort || got.opts.Regex != tt.wantRegex {
-				t.Errorf("Execute(%v) = %s %v sort %q regex %v, want %s %v sort %q regex %v", tt.args,
-					got.cmd, got.filters, got.opts.SortField, got.opts.Regex,
-					command, tt.wantFilters, wantSort, tt.wantRegex)
+				got.opts.SortField != wantSort || got.opts.Regex != tt.wantRegex ||
+				got.opts.Propagations != tt.wantPropagations {
+				t.Errorf("Execute(%v) = %s %v sort %q regex %v propagations %v, want %s %v sort %q regex %v "+
+					"propagations %v", tt.args, got.cmd, got.filters, got.opts.SortField, got.opts.Regex,
+					got.opts.Propagations, command, tt.wantFilters, wantSort, tt.wantRegex, tt.wantPropagations)
 			}
 		})
 	}
