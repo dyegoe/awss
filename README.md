@@ -666,6 +666,11 @@ the VPC that holds it.
 awss tgw routes --profile network --regions eu-central-1 --route-table-ids tgw-rtb-0123 \
   --cidrs 10.20.1.5 --match longest
 
+# The route points to an attachment whose Associated RT is tgw-rtb-0456: is there a return route
+# to the source 10.60.3.7?
+awss tgw routes --profile network --regions eu-central-1 --route-table-ids tgw-rtb-0456 \
+  --cidrs 10.60.3.7 --match longest
+
 # Is the data centre prefix learned over Direct Connect in every route table?
 awss tgw routes --profile network --regions all --cidrs 10.50.0.0/16 --attachment-types dx
 
@@ -680,7 +685,9 @@ One row per attachment of each route (a route with several attachments, ECMP, is
 **Query** (the CIDR searched), **TGW ID**, **Route Table ID** / **Name** (its Name tag), **CIDR** /
 **Prefix List** (the destination: a CIDR, or the prefix list of a prefix list route), **Type**,
 **State**, **Resource Type** / **Resource ID** (such as the VPC), **Attachment ID** / **Name** (its
-Name tag) and **Owner ID** / **Name** (the account of the resource; see
+Name tag), **Associated RT** / **Name** (the route table the attachment is associated with: the
+table that routes the traffic coming back from the attachment, where to look for the return route;
+empty when the attachment is not associated) and **Owner ID** / **Name** (the account of the resource; see
 [Account names](#account-names)). Each pair is one cell, the second value on its own line.
 
 - **Profile:** run it with a profile of the account that owns the transit gateways, usually the
@@ -692,14 +699,14 @@ Name tag) and **Owner ID** / **Name** (the account of the resource; see
   call per route table, per CIDR and per match mode (`any` is three, `longest` is two: `exact` and
   `supernet-of`, of which awss keeps the most specific route), then one
   `DescribeTransitGatewayAttachments` call for the names and owners. Every filter except
-  `--route-table-names` is applied by AWS. When AWS says a route table has more routes than it
+  `--route-table-ids` and `--route-table-names` is applied by AWS. When AWS says a route table has more routes than it
   returned, the result set reports it: narrow the search with `--cidrs`.
 - **JSON only:** `announcement_id` (the route table announcement of a route from a Cloud WAN
   peering).
 - **Permission:** `ec2:DescribeTransitGatewayRouteTables`, `ec2:SearchTransitGatewayRoutes`, and
   `ec2:DescribeTransitGatewayAttachments` for the attachment names and owners.
 
-Sort by: `--sort route-table|route-table-id|tgw-id|cidr|prefix-list|query|type|state|resource-type|resource-id|attachment|attachment-id|owner|owner-name` (default: `route-table`). `cidr` sorts by address, and rows equal on the sort field stay in route table order: route table, then CIDR.
+Sort by: `--sort route-table|route-table-id|tgw-id|cidr|prefix-list|query|type|state|resource-type|resource-id|attachment|attachment-id|associated-route-table|associated-route-table-id|owner|owner-name` (default: `route-table`). `cidr` sorts by address, and rows equal on the sort field stay in route table order: route table, then CIDR.
 
 ### Cleanup
 
