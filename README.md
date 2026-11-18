@@ -25,7 +25,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Shell completion of commands, flags and the values of the flags that take a known list (sort fields, profiles, regions, states); see [Shell completion](#shell-completion)
 - AWS Cloud WAN: find a CIDR in the route tables of the segments and see where it points (`awss cloudwan routes`), see the BGP routes before the routing policies with their AS path and communities (`awss cloudwan bgp`), and list the attachments (`awss cloudwan attachments`); see [Cloud WAN routes](#cloud-wan-routes-awss-cloudwan-routes)
 - AWS Direct Connect: list the gateways, what they are associated with and the prefixes they advertise to the data centres (`awss dx gateways`); see [Direct Connect gateways](#direct-connect-gateways-awss-dx-gateways)
-- AWS Transit Gateway: find a CIDR in the Transit Gateway route tables and see which attachment (VPC, VPN, Direct Connect, peering) holds it (`awss tgw routes`); see [Transit Gateway routes](#transit-gateway-routes-awss-tgw-routes)
+- AWS Transit Gateway: find a CIDR in the Transit Gateway route tables and see which attachment (VPC, VPN, Direct Connect, peering) holds it (`awss tgw routes`), and list the attachments with the route table each one is associated with (`awss tgw attachments`); see [Transit Gateway routes](#transit-gateway-routes-awss-tgw-routes) and [Transit Gateway attachments](#transit-gateway-attachments-awss-tgw-attachments)
 - Cleanup of the default VPCs with no workload (`awss cleanup default-vpc`) and of the unused DHCP options sets (`awss cleanup dhcp-options`), a preview unless `--apply`; see [Cleanup](#cleanup)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
@@ -708,6 +708,55 @@ empty when the attachment is not associated) and **Owner ID** / **Name** (the ac
 
 Sort by: `--sort route-table|route-table-id|tgw-id|cidr|prefix-list|query|type|state|resource-type|resource-id|attachment|attachment-id|associated-route-table|associated-route-table-id|owner|owner-name` (default: `route-table`). `cidr` sorts by address, and rows equal on the sort field stay in route table order: route table, then CIDR.
 
+#### Transit Gateway attachments (`awss tgw attachments`)
+
+Lists the Transit Gateway attachments: which VPC, VPN, Direct Connect gateway, peering (such as
+Cloud WAN) or Connect attachment is attached to which transit gateway, owned by which account, and
+the route table it is associated with: the table that routes the traffic coming from it.
+
+| Flag | Short | Description |
+| --- | --- | --- |
+| `--ids` | `-i` | Attachment IDs, exact |
+| `--names` | `-n` | Name tags (globs) |
+| `--types` | `-T` | Resource types: `vpc`, `vpn`, `direct-connect-gateway` (`dx` for short), `peering`, `connect`... |
+| `--resource-ids` | | Attached resources, such as VPC IDs, exact |
+| `--states` | | States, such as `available`, `pending-acceptance`, `failed` |
+| `--transit-gateway-ids` | | List the attachments of these transit gateways only, exact |
+| `--associated-route-table-ids` | | Attachments associated with these route tables, exact |
+
+```bash
+# The attachment of a VPC, and the route table it is associated with
+awss tgw attachments --profile network --regions eu-central-1 --resource-ids vpc-0123456789abcdef0
+
+# Everything associated with one route table
+awss tgw attachments --profile network --regions eu-central-1 --associated-route-table-ids tgw-rtb-0123
+
+# Peerings waiting for acceptance
+awss tgw attachments --profile network --types peering --states pending-acceptance
+```
+
+Columns: **Attachment ID** / **Name** (its Name tag), **TGW ID**, **Type**, **Resource ID** (such as
+the VPC), **State**, **Associated RT** / **Name** (the associated route table and its Name tag;
+empty when the attachment is not associated) and **Owner ID** / **Name** (the account of the
+resource; see [Account names](#account-names)), and **Tags** with `--show-tags`. Each pair is one
+cell, the second value on its own line.
+
+- **Profile and region:** as for `tgw routes`, run it with a profile of the account that owns the
+  transit gateways, in their region. Unlike `tgw routes`, an account a transit gateway is shared
+  with is not empty: it sees the attachments of its own resources and their Associated RT, without
+  the route table name, since it does not see the route tables.
+- **Association state:** Associated RT is shown in any association state; the JSON
+  `association_state` says `associated`, or `associating` / `disassociating` while it changes.
+  `tgw routes` shows it only once associated.
+- **Calls:** one `DescribeTransitGatewayAttachments` call, then one
+  `DescribeTransitGatewayRouteTables` call for the route table names when an attachment is
+  associated. `--names` and `--states` are matched by awss, the other filters by AWS.
+- **JSON only:** `association_state`, `transit_gateway_owner_id` and `created`.
+- **Permission:** `ec2:DescribeTransitGatewayAttachments`, and
+  `ec2:DescribeTransitGatewayRouteTables` for the route table names.
+
+Sort by: `--sort name|id|tgw-id|type|resource-id|state|associated-route-table|associated-route-table-id|owner|owner-name|created` (default: `name`).
+
 ### Cleanup
 
 The cleanup commands are the only ones that change your AWS accounts. Each one shows its plan
@@ -887,7 +936,7 @@ awss stats
 
 ### Account names
 
-`vpc`, `subnet`, `eni`, `cloudwan routes`, `cloudwan bgp`, `cloudwan attachments`, `dx gateways` and `tgw routes` show the owner name (JSON `owner_name`, sort field `owner-name`)
+`vpc`, `subnet`, `eni`, `cloudwan routes`, `cloudwan bgp`, `cloudwan attachments`, `dx gateways`, `tgw routes` and `tgw attachments` show the owner name (JSON `owner_name`, sort field `owner-name`)
 next to **Owner ID**, in its own **Owner** column or on the line under the ID: the name of the account, which matters in a shared VPC, where the owner is
 usually a network account. The names come from the `accounts` map of `~/.awss/config.yaml`, from
 account ID to name, with no AWS call:

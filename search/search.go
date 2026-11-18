@@ -260,6 +260,16 @@ var engines = map[string]engine{
 		sortFields:     searchTGW.GetSortFields,
 		sortFieldNames: searchTGW.SortFieldNames,
 	},
+	// tgw-attachments is awss tgw attachments, regional like tgw-routes.
+	"tgw-attachments": {
+		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
+			r := searchTGW.NewAttachments(profile, region, filters, opts.SortField)
+			r.AccountNames = opts.AccountNames
+			return r
+		},
+		sortFields:     searchTGW.GetAttachmentSortFields,
+		sortFieldNames: searchTGW.AttachmentSortFieldNames,
+	},
 	// default-vpc is the cleanup of the default VPCs (awss cleanup default-vpc). It deletes only
 	// with opts.Apply; otherwise it reports the plan.
 	"default-vpc": {

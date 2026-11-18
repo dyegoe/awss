@@ -179,6 +179,13 @@ func TestFixedLists(t *testing.T) {
 				"vpc,tgw-peering", "vpc,network-function", "vpc,dx",
 			},
 		},
+		{
+			name: "tgw attachments --states", args: []string{"tgw", "attachments", "--states", ""},
+			want: []string{
+				"initiating", "initiating-request", "pending-acceptance", "rolling-back", "pending", "available",
+				"modifying", "deleting", "deleted", "failed", "rejected", "rejecting", "failing",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

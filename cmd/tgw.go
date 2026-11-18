@@ -22,7 +22,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const labelTGWRoutesSort = "tgw.routes.sort"
+const (
+	labelTGWRoutesSort      = "tgw.routes.sort"
+	labelTGWAttachmentsSort = "tgw.attachments.sort"
+)
 
 // tgwRoutesFilters represents the filters of the tgw routes command, keyed by the search/tgw
 // FilterKey constants.
@@ -48,10 +51,30 @@ var tgwRoutesFilterFlags = []string{
 	"attachment-types", "attachment-ids", "resource-ids",
 }
 
+// tgwAttachmentsFilters represents the filters of the tgw attachments command, keyed by the
+// search/tgw FilterKey constants.
+type tgwAttachmentsFilters struct {
+	IDs                     []string `filter:"attachment-id"`
+	Names                   []string `filter:"attachment-name"`
+	Types                   []string `filter:"attachment-type"`
+	ResourceIDs             []string `filter:"resource-id"`
+	States                  []string `filter:"attachment-state"`
+	TransitGatewayIDs       []string `filter:"transit-gateway-id"`
+	AssociatedRouteTableIDs []string `filter:"associated-route-table-id"`
+}
+
+var tgwAttachmentsF = tgwAttachmentsFilters{}
+
+// tgwAttachmentsFilterFlags lists the tgw attachments filter flag names: without any, the command
+// lists every attachment.
+var tgwAttachmentsFilterFlags = []string{
+	flagIDs, flagNames, flagTypes, "resource-ids", flagStates, "transit-gateway-ids", "associated-route-table-ids",
+}
+
 // tgwCmd groups the AWS Transit Gateway searches.
 var tgwCmd = &cobra.Command{
 	Use:   "tgw",
-	Short: "Search AWS Transit Gateways: the routes of their route tables.",
+	Short: "Search AWS Transit Gateways: the routes of their route tables, and their attachments.",
 	Long: `
 Search AWS Transit Gateways.
 
@@ -114,6 +137,47 @@ func (f *tgwRoutesFilters) checked() map[string][]string {
 	}
 }
 
+// tgwAttachmentsCmd lists the Transit Gateway attachments.
+var tgwAttachmentsCmd = &cobra.Command{
+	Use:         "attachments",
+	Short:       "List the Transit Gateway attachments, and the route table each one is associated with.",
+	Annotations: map[string]string{annotationEngine: "tgw-attachments"},
+	Long: `
+List the Transit Gateway attachments: which VPC, VPN, Direct Connect gateway, peering (such as
+Cloud WAN) or Connect attachment is attached to which transit gateway, and the route table it is
+associated with (Associated RT): the table that routes the traffic coming from it.
+
+Associated RT is shown in any association state; the JSON association_state says whether it is
+associated, or associating / disassociating while it changes.
+
+  --ids, --types, --resource-ids, --transit-gateway-ids, --associated-route-table-ids
+                     filtered by AWS. --types takes dx for direct-connect-gateway.
+  --names, --states  matched by awss; --names takes globs.
+
+The attachments associated with one route table:
+	awss tgw attachments --profile network --regions eu-central-1 --associated-route-table-ids tgw-rtb-0123
+
+The attachment of a VPC, and its route table:
+	awss tgw attachments --profile network --resource-ids vpc-0123
+`,
+	Args: cobra.NoArgs,
+	RunE: tgwAttachmentsRunE,
+}
+
+func tgwAttachmentsRunE(cmd *cobra.Command, _ []string) error {
+	f := &tgwAttachmentsF
+	if err := searchTGW.CheckAttachmentFlags(map[string][]string{
+		searchTGW.FilterKeyAttachmentName: f.Names, searchTGW.FilterKeyAttachmentType: f.Types,
+		searchTGW.FilterKeyAttachmentState: f.States,
+	}); err != nil {
+		return err
+	}
+	return runSearch(cmd, &cmdSpec{
+		sortLabel: labelTGWAttachmentsSort, filterFlags: tgwAttachmentsFilterFlags, optionalFilters: true,
+		accountNames: true,
+	}, nil, nil, tgwAttachmentsF)
+}
+
 func tgwRoutesRunE(cmd *cobra.Command, _ []string) error {
 	if err := searchTGW.CheckFlags(tgwRoutesF.checked()); err != nil {
 		return err
@@ -167,4 +231,30 @@ func tgwAttachmentTypes() []string {
 
 func tgwRoutesInitViper() error {
 	return bindFlags(tgwRoutesCmd, map[string]string{labelTGWRoutesSort: flagSort})
+}
+
+func tgwAttachmentsInitFlags() {
+	addTGWCommand(tgwAttachmentsCmd)
+	f, fl := &tgwAttachmentsF, tgwAttachmentsCmd.Flags()
+
+	fl.StringSliceVarP(&f.IDs, flagIDs, "i", []string{},
+		"Filter attachments by ID, exact. `tgw-attach-0123`")
+	fl.StringSliceVarP(&f.Names, flagNames, "n", []string{},
+		"Filter attachments by Name tag (globs). `'prod-*'`")
+	fl.StringSliceVarP(&f.Types, flagTypes, "T", []string{},
+		listHelp("Filter attachments by resource type (dx is short for direct-connect-gateway)",
+			tgwAttachmentTypes(), "vpc"))
+	fl.StringSliceVar(&f.ResourceIDs, "resource-ids", []string{},
+		"Filter attachments by resource, such as a VPC ID, exact. `vpc-0123`")
+	fl.StringSliceVar(&f.States, flagStates, []string{},
+		listHelp("Filter attachments by state", searchTGW.AttachmentStateNames(), "available"))
+	fl.StringSliceVar(&f.TransitGatewayIDs, "transit-gateway-ids", []string{},
+		"List the attachments of these transit gateways only, exact. `tgw-0123`")
+	fl.StringSliceVar(&f.AssociatedRouteTableIDs, "associated-route-table-ids", []string{},
+		"Filter attachments by the route table they are associated with, exact. `tgw-rtb-0123`")
+	fl.String(flagSort, "name", sortHelp("tgw-attachments", "attachments", "name"))
+}
+
+func tgwAttachmentsInitViper() error {
+	return bindFlags(tgwAttachmentsCmd, map[string]string{labelTGWAttachmentsSort: flagSort})
 }

@@ -66,10 +66,9 @@ func routeTables(ctx context.Context, client ec2API, q *query) ([]types.TransitG
 	return out, nil
 }
 
-// attachments lists the attachments of the transit gateways tgwIDs.
-func attachments(ctx context.Context, client ec2API, tgwIDs []string) ([]types.TransitGatewayAttachment, error) {
-	in := &ec2.DescribeTransitGatewayAttachmentsInput{MaxResults: aws.Int32(pageSize)}
-	in.Filters = appendFilter(in.Filters, "transit-gateway-id", tgwIDs)
+// attachments lists the attachments the AWS filters keep.
+func attachments(ctx context.Context, client ec2API, filters []types.Filter) ([]types.TransitGatewayAttachment, error) {
+	in := &ec2.DescribeTransitGatewayAttachmentsInput{MaxResults: aws.Int32(pageSize), Filters: filters}
 
 	var out []types.TransitGatewayAttachment
 	paginator := ec2.NewDescribeTransitGatewayAttachmentsPaginator(client, in)

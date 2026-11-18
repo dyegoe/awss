@@ -136,6 +136,7 @@ var subcommands = []subcommand{
 	{cloudwanAttachmentsCmd, cloudwanAttachmentsInitFlags, cloudwanAttachmentsInitViper},
 	{dxGatewaysCmd, dxGatewaysInitFlags, dxGatewaysInitViper},
 	{tgwRoutesCmd, tgwRoutesInitFlags, tgwRoutesInitViper},
+	{tgwAttachmentsCmd, tgwAttachmentsInitFlags, tgwAttachmentsInitViper},
 	{defaultVpcCmd, defaultVpcInitFlags, cleanupInitViper},
 	{dhcpOptionsCmd, dhcpOptionsInitFlags, cleanupInitViper},
 }

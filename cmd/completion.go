@@ -163,6 +163,7 @@ func fixedLists() map[string]map[string]func() []string {
 			flagMatch: searchTGW.MatchNames, flagTypes: searchTGW.TypeNames, flagStates: searchTGW.StateNames,
 			"attachment-types": tgwAttachmentTypes,
 		},
+		"tgw-attachments": {flagTypes: tgwAttachmentTypes, flagStates: searchTGW.AttachmentStateNames},
 	}
 }
 
