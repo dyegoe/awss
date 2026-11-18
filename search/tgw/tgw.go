@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package tgw contains the search for the routes of the AWS Transit Gateway route tables.
+// Package tgw contains the searches of the AWS Transit Gateways: the routes of their route tables
+// (tgw.go) and their attachments (attachments.go).
 //
 // It implements the common.Results interface. A Transit Gateway is regional: the search runs once
 // per profile and region, as the EC2 searches do. It answers where a CIDR goes behind a Transit
@@ -247,7 +248,7 @@ func (r *Results) nameAttachments(ctx context.Context, client ec2API, tableNames
 	if len(tgwIDs) == 0 {
 		return
 	}
-	atts, err := attachments(ctx, client, tgwIDs)
+	atts, err := attachments(ctx, client, appendFilter(nil, awsFilterAttTGWID, tgwIDs))
 	if err != nil {
 		r.Errors = append(r.Errors, err.Error())
 		return

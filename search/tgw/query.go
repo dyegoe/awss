@@ -38,17 +38,21 @@ const (
 	FilterKeyRouteTableID = "route-table-id"
 	// FilterKeyRouteTableName picks route tables by Name tag (globs), matched by awss.
 	FilterKeyRouteTableName = "route-table-name"
-	// FilterKeyTransitGatewayID picks the route tables of these transit gateways, filtered by AWS.
+	// FilterKeyTransitGatewayID picks the route tables, or the attachments, of these transit
+	// gateways, filtered by AWS.
 	FilterKeyTransitGatewayID = "transit-gateway-id"
 	// FilterKeyType keeps the routes of these types, filtered by AWS.
 	FilterKeyType = "type"
 	// FilterKeyState keeps the routes in these states, filtered by AWS.
 	FilterKeyState = "state"
-	// FilterKeyAttachmentType keeps the routes to attachments of these resource types, filtered by AWS.
+	// FilterKeyAttachmentType keeps the routes to attachments, or the attachments, of these resource
+	// types, filtered by AWS.
 	FilterKeyAttachmentType = "attachment-type"
-	// FilterKeyAttachmentID keeps the routes to these attachments, filtered by AWS.
+	// FilterKeyAttachmentID keeps the routes to these attachments, or these attachments, filtered
+	// by AWS.
 	FilterKeyAttachmentID = "attachment-id"
-	// FilterKeyResourceID keeps the routes to attachments of these resources, filtered by AWS.
+	// FilterKeyResourceID keeps the routes to attachments, or the attachments, of these resources,
+	// filtered by AWS.
 	FilterKeyResourceID = "resource-id"
 )
 
@@ -156,15 +160,8 @@ func (q *query) buildRouteFilters(filters map[string][]string) error {
 	if len(states) == 0 {
 		states = []string{string(types.TransitGatewayRouteStateActive), string(types.TransitGatewayRouteStateBlackhole)}
 	}
-	attTypes := make([]string, 0, len(filters[FilterKeyAttachmentType]))
-	for _, v := range filters[FilterKeyAttachmentType] {
-		v = cloudwan.Kebab(v)
-		if long, ok := attachmentAliases[v]; ok {
-			v = long
-		}
-		attTypes = append(attTypes, v)
-	}
-	if _, err := oneOf(attTypes, AttachmentTypeNames(), "attachment type"); err != nil {
+	attTypes, err := attachmentTypes(filters[FilterKeyAttachmentType])
+	if err != nil {
 		return err
 	}
 	q.routeFilters = appendFilter(q.routeFilters, awsFilterState, states)
@@ -173,6 +170,20 @@ func (q *query) buildRouteFilters(filters map[string][]string) error {
 	q.routeFilters = appendFilter(q.routeFilters, awsFilterAttachmentID, filters[FilterKeyAttachmentID])
 	q.routeFilters = appendFilter(q.routeFilters, awsFilterResourceID, filters[FilterKeyResourceID])
 	return nil
+}
+
+// attachmentTypes returns the attachment resource types of values, in kebab case with the short
+// names (dx) replaced by the AWS types, checking each.
+func attachmentTypes(values []string) ([]string, error) {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		v = cloudwan.Kebab(v)
+		if long, ok := attachmentAliases[v]; ok {
+			v = long
+		}
+		out = append(out, v)
+	}
+	return oneOf(out, AttachmentTypeNames(), "attachment type")
 }
 
 // appendFilter appends the AWS filter name=values to fs, unless values is empty.

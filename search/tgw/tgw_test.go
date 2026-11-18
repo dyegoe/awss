@@ -25,6 +25,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dyegoe/awss/common"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -94,11 +96,25 @@ func (f *fakeEC2) DescribeTransitGatewayAttachments(
 	}
 	out := &ec2.DescribeTransitGatewayAttachmentsOutput{}
 	for _, a := range f.attachments {
-		if keep(in.Filters, "transit-gateway-id", aws.ToString(a.TransitGatewayId)) {
+		if attachmentFiltersKeep(in.Filters, &a) {
 			out.TransitGatewayAttachments = append(out.TransitGatewayAttachments, a)
 		}
 	}
 	return out, nil
+}
+
+// attachmentFiltersKeep reports whether the attachment a passes the DescribeTransitGatewayAttachments
+// filters of fs.
+func attachmentFiltersKeep(fs []types.Filter, a *types.TransitGatewayAttachment) bool {
+	rt := ""
+	if a.Association != nil {
+		rt = aws.ToString(a.Association.TransitGatewayRouteTableId)
+	}
+	return keep(fs, awsFilterAttTGWID, aws.ToString(a.TransitGatewayId)) &&
+		keep(fs, awsFilterAttID, aws.ToString(a.TransitGatewayAttachmentId)) &&
+		keep(fs, awsFilterAttResourceType, string(a.ResourceType)) &&
+		keep(fs, awsFilterAttResourceID, aws.ToString(a.ResourceId)) &&
+		keep(fs, awsFilterAttAssociatedRT, rt)
 }
 
 func (f *fakeEC2) SearchTransitGatewayRoutes(
@@ -683,6 +699,17 @@ func TestResults_accessors(t *testing.T) {
 // TestResults_Search checks Search with a fake client, bad filters and a client that cannot be
 // built.
 func TestResults_Search(t *testing.T) {
+	runSearchCases(t, fakeFixture, 8, map[string][]string{FilterKeyState: {"x"}},
+		func(filters map[string][]string) common.Results { return New("network", "eu-central-1", filters, "") })
+}
+
+// runSearchCases runs the Search of the results newResults builds over the fixture: it lists
+// wantLen rows, reports badFilter as a filter error, and reports a client that cannot be built.
+func runSearchCases(
+	t *testing.T, fixture func() *fakeEC2, wantLen int, badFilter map[string][]string,
+	newResults func(map[string][]string) common.Results,
+) {
+	t.Helper()
 	tests := []struct {
 		name      string
 		filters   map[string][]string
@@ -690,8 +717,8 @@ func TestResults_Search(t *testing.T) {
 		wantLen   int
 		wantError string
 	}{
-		{name: "lists", filters: map[string][]string{}, wantLen: 8},
-		{name: "bad filter", filters: map[string][]string{FilterKeyState: {"x"}}, wantError: "error building filters"},
+		{name: "lists", filters: map[string][]string{}, wantLen: wantLen},
+		{name: "bad filter", filters: badFilter, wantError: "error building filters"},
 		{
 			name: "no client", filters: map[string][]string{}, clientErr: errors.New("no profile"),
 			wantError: "error getting aws config: no profile",
@@ -705,14 +732,15 @@ func TestResults_Search(t *testing.T) {
 				if tt.clientErr != nil {
 					return nil, tt.clientErr
 				}
-				return fakeFixture(), nil
+				return fixture(), nil
 			}
-			r := New("network", "eu-central-1", tt.filters, "")
+			r := newResults(tt.filters)
 			r.Search(context.Background())
 			if r.Len() != tt.wantLen {
 				t.Errorf("Search() rows = %d, want %d", r.Len(), tt.wantLen)
 			}
-			if got := strings.Join(r.Errors, ";"); !strings.HasPrefix(got, tt.wantError) || (tt.wantError == "") != (got == "") {
+			got := strings.Join(r.GetErrors(), ";")
+			if !strings.HasPrefix(got, tt.wantError) || (tt.wantError == "") != (got == "") {
 				t.Errorf("Search() errors = %q, want prefix %q", got, tt.wantError)
 			}
 		})

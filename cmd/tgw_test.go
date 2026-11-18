@@ -62,3 +62,40 @@ func TestExecute_tgwRoutes(t *testing.T) {
 		{name: "bad cidr", args: []string{"tgw", "routes", "-c", "x"}, wantErr: "invalid CIDR"},
 	})
 }
+
+// TestTgwAttachmentsFilterFlags_coversStruct checks every tgwAttachmentsFilters field has a
+// registered flag in tgwAttachmentsFilterFlags.
+func TestTgwAttachmentsFilterFlags_coversStruct(t *testing.T) {
+	resetCLI(t, nil)
+	checkFilterFlags(t, "tgwAttachments", tgwAttachmentsCmd, reflect.TypeOf(tgwAttachmentsFilters{}).NumField(),
+		tgwAttachmentsFilterFlags)
+}
+
+// TestExecute_tgwAttachments checks the filters every tgw attachments flag sends to the search, and
+// the invalid values rejected before any search.
+func TestExecute_tgwAttachments(t *testing.T) {
+	// every is each filter flag, a value and the filter key it fills.
+	every := [][3]string{
+		{"-i", "tgw-attach-1", "attachment-id"}, {"-n", "prod-*", "attachment-name"}, {"-T", "dx", "attachment-type"},
+		{"--resource-ids", "vpc-1", "resource-id"}, {"--states", "pending-acceptance", "attachment-state"},
+		{"--transit-gateway-ids", "tgw-1", "transit-gateway-id"},
+		{"--associated-route-table-ids", "tgw-rtb-1", "associated-route-table-id"},
+	}
+	all := filterCase{name: "every filter", args: []string{"tgw", "attachments"}, wantFilters: map[string][]string{}}
+	for _, e := range every {
+		all.args = append(all.args, e[0], e[1])
+		all.wantFilters[e[2]] = []string{e[1]}
+	}
+	runFilterCases(t, "tgw-attachments", "name", []filterCase{
+		{name: "no filter lists every attachment", args: []string{"tgw", "attachments"}, wantFilters: map[string][]string{}},
+		all,
+		{
+			name: "--sort", args: []string{"tgw", "attachments", "--sort", "associated-route-table"},
+			wantFilters: map[string][]string{}, wantSort: "associated-route-table",
+		},
+		{name: "bad sort", args: []string{"tgw", "attachments", "--sort", "nope"}, wantErr: "nope"},
+		{name: "bad type", args: []string{"tgw", "attachments", "-T", "tgw"}, wantErr: "invalid attachment type"},
+		{name: "bad state", args: []string{"tgw", "attachments", "--states", "up"}, wantErr: "invalid attachment state"},
+		{name: "bad name", args: []string{"tgw", "attachments", "-n", "["}, wantErr: "attachment names"},
+	})
+}
