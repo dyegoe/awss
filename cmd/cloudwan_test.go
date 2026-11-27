@@ -21,8 +21,6 @@ import (
 	"testing"
 
 	searchCloudWAN "github.com/dyegoe/awss/search/cloudwan"
-
-	"github.com/spf13/cobra"
 )
 
 // TestCloudwanRoutesFilterFlags_coversStruct checks every cloudwanRoutesFilters field has a
@@ -52,7 +50,7 @@ func TestCloudwanBGPFilterFlags_coversStruct(t *testing.T) {
 // TestExecute_cloudwanBGP checks the filters every cloudwan bgp flag sends to the search, and the
 // invalid values rejected before any search.
 func TestExecute_cloudwanBGP(t *testing.T) {
-	runFilterCases(t, "cloudwan-bgp", "segment", []filterCase{
+	runFilterCases(t, "cloudwan bgp", "segment", []filterCase{
 		{name: "no filter lists every route", args: []string{"cloudwan", "bgp"}, wantFilters: map[string][]string{}},
 		{
 			name: "every filter",
@@ -81,7 +79,7 @@ func TestExecute_cloudwanBGP(t *testing.T) {
 // TestExecute_cloudwanRoutes checks the filters every cloudwan routes flag sends to the search,
 // and the invalid values rejected before any search.
 func TestExecute_cloudwanRoutes(t *testing.T) {
-	runFilterCases(t, "cloudwan-routes", "segment", []filterCase{
+	runFilterCases(t, "cloudwan routes", "segment", []filterCase{
 		{name: "no filter lists every route", args: []string{"cloudwan", "routes"}, wantFilters: map[string][]string{}},
 		{
 			name: "--cidrs --match", args: []string{"cloudwan", "routes", "-c", "10.0.0.0/8,10.1.1.1", "-m", "longest"},
@@ -119,7 +117,7 @@ func TestExecute_cloudwanRoutes(t *testing.T) {
 // TestExecute_cloudwanAttachments checks the filters every cloudwan attachments flag sends to the
 // search, and the invalid values rejected before any search.
 func TestExecute_cloudwanAttachments(t *testing.T) {
-	runFilterCases(t, "cloudwan-attachments", "segment", []filterCase{
+	runFilterCases(t, "cloudwan attachments", "segment", []filterCase{
 		{
 			name: "no filter lists every attachment", args: []string{"cloudwan", "attachments"},
 			wantFilters: map[string][]string{},
@@ -176,29 +174,6 @@ func TestExecute_cloudwanRegions(t *testing.T) {
 			}
 			if got.opts.AccountNames["111111111111"] != "network" {
 				t.Errorf("Execute(%v) AccountNames = %v, want 111111111111 named network", tt.args, got.opts.AccountNames)
-			}
-		})
-	}
-}
-
-// TestEngineName checks the engine key of a command with and without the engine annotation.
-func TestEngineName(t *testing.T) {
-	tests := []struct {
-		name string
-		cmd  *cobra.Command
-		want string
-	}{
-		{
-			name: "annotated",
-			cmd:  &cobra.Command{Use: "routes", Annotations: map[string]string{annotationEngine: "cloudwan-routes"}},
-			want: "cloudwan-routes",
-		},
-		{name: "plain", cmd: &cobra.Command{Use: "vpc"}, want: "vpc"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := engineName(tt.cmd); got != tt.want {
-				t.Errorf("engineName(%s) = %q, want %q", tt.cmd.Use, got, tt.want)
 			}
 		})
 	}

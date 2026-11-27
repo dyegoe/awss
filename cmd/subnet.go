@@ -21,6 +21,8 @@ package cmd
 
 import (
 	"github.com/dyegoe/awss/common"
+	"github.com/dyegoe/awss/search"
+	searchSubnet "github.com/dyegoe/awss/search/subnet"
 
 	"github.com/spf13/cobra"
 )
@@ -91,6 +93,29 @@ func subnetRunE(cmd *cobra.Command, _ []string) error {
 	}, subnetF.AvailabilityZones, subnetF.Tags, subnetF)
 }
 
+// subnetSubcommand is the subnet command: the engine it runs, the values of its fixed-list flags,
+// and how it registers and binds its flags.
+var subnetSubcommand = &subcommand{
+	cmd: subnetCmd,
+	engine: &search.Engine{
+		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+			r := searchSubnet.New(profile, region, filters, opts.SortField)
+			r.AccountNames = opts.AccountNames
+			return r
+		},
+		SortFields:     searchSubnet.GetSortFields,
+		SortFieldNames: searchSubnet.SortFieldNames,
+		AccountNames:   true,
+	},
+	lists: flagValues{
+		flagStates:            subnetStateNames,
+		"default-for-az":      trueFalse,
+		"public-ip-on-launch": trueFalse,
+	},
+	initFlags: subnetInitFlags,
+	initViper: subnetInitViper,
+}
+
 func subnetInitFlags() {
 	rootCmd.AddCommand(subnetCmd)
 
@@ -117,7 +142,7 @@ func subnetInitFlags() {
 		listHelp("Filter subnets by whether they are the default subnet of their AZ", trueFalse(), "true"))
 	subnetCmd.Flags().StringSliceVarP(&subnetF.MapPublicIP, "public-ip-on-launch", "p", []string{},
 		listHelp("Filter subnets by whether instances get a public IP on launch", trueFalse(), "true"))
-	subnetCmd.Flags().String("sort", "name", sortHelp("subnet", "subnets", "name"))
+	subnetCmd.Flags().String("sort", "name", sortHelp(subnetCmd, "subnets", "name"))
 }
 
 func subnetInitViper() error {

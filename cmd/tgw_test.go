@@ -31,7 +31,7 @@ func TestTgwRoutesFilterFlags_coversStruct(t *testing.T) {
 // TestExecute_tgwRoutes checks the filters every tgw routes flag sends to the search, and the
 // invalid values rejected before any search.
 func TestExecute_tgwRoutes(t *testing.T) {
-	runFilterCases(t, "tgw-routes", "route-table", []filterCase{
+	runFilterCases(t, "tgw routes", "route-table", []filterCase{
 		{name: "no filter lists every route", args: []string{"tgw", "routes"}, wantFilters: map[string][]string{}},
 		{
 			name: "every filter",
@@ -87,7 +87,7 @@ func TestExecute_tgwAttachments(t *testing.T) {
 		all.args = append(all.args, e[0], e[1])
 		all.wantFilters[e[2]] = []string{e[1]}
 	}
-	runFilterCases(t, "tgw-attachments", "name", []filterCase{
+	runFilterCases(t, "tgw attachments", "name", []filterCase{
 		{name: "no filter lists every attachment", args: []string{"tgw", "attachments"}, wantFilters: map[string][]string{}},
 		all,
 		{

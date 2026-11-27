@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/dyegoe/awss/common"
-	"github.com/dyegoe/awss/search"
 )
 
 // TestEc2Filters_volumeIDs checks that --volume-ids maps to the AWS block-device-mapping.volume-id filter.
@@ -71,11 +70,15 @@ func TestEc2RunE_invalidCIDR(t *testing.T) {
 
 // TestSortHelp_listsEveryField checks the --sort help text of each command names every valid sort field.
 func TestSortHelp_listsEveryField(t *testing.T) {
-	for _, cmd := range []string{"ec2", "eni", "ebs", "vpc", "subnet", "s3", "s3obj"} {
-		help := sortHelp(cmd, "things", "id")
-		for _, name := range search.SortFieldNames(cmd) {
+	resetCLI(t, nil)
+	for _, sub := range subcommands {
+		if sub.cmd.Flags().Lookup(flagSort) == nil {
+			continue
+		}
+		help := sortHelp(sub.cmd, "things", "id")
+		for _, name := range sub.engine.SortFieldNames() {
 			if !strings.Contains(help, name) {
-				t.Errorf("sortHelp(%q) = %q does not mention sort field %q", cmd, help, name)
+				t.Errorf("sortHelp(%s) = %q does not mention sort field %q", sub.cmd.CommandPath(), help, name)
 			}
 		}
 	}

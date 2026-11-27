@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dyegoe/awss/cleanup/defaultvpc"
+	"github.com/dyegoe/awss/cleanup/dhcpoptions"
+	"github.com/dyegoe/awss/common"
 	"github.com/dyegoe/awss/search"
 
 	"github.com/spf13/cobra"
@@ -127,7 +130,7 @@ func cleanupRunE(cmd *cobra.Command, _ []string) error {
 
 	start := time.Now()
 	summary, err := executeSearch(
-		cmd.Name(),
+		engineOf(cmd),
 		viper.GetStringSlice(labelProfiles),
 		viper.GetStringSlice(labelRegions),
 		map[string][]string{},
@@ -184,8 +187,42 @@ func addCleanupCommand(cmd *cobra.Command) {
 // cleanupInitViper binds nothing: the flags of a cleanup command are read from the command only.
 func cleanupInitViper() error { return nil }
 
+// defaultVpcSubcommand is the default-vpc command: the engine it runs and how it registers and
+// binds its flags.
+//
+// It deletes only with --apply (Options.Apply); otherwise it reports the plan.
+var defaultVpcSubcommand = &subcommand{
+	cmd: defaultVpcCmd,
+	engine: &search.Engine{
+		New: func(profile, region string, _ map[string][]string, opts *search.Options) common.Results {
+			return defaultvpc.New(profile, region, opts.Apply)
+		},
+		SortFields:     defaultvpc.GetSortFields,
+		SortFieldNames: defaultvpc.SortFieldNames,
+	},
+	initFlags: defaultVpcInitFlags,
+	initViper: cleanupInitViper,
+}
+
 // defaultVpcInitFlags registers the default-vpc command.
 func defaultVpcInitFlags() { addCleanupCommand(defaultVpcCmd) }
+
+// dhcpOptionsSubcommand is the dhcp-options command: the engine it runs and how it registers and
+// binds its flags.
+//
+// It deletes only with --apply (Options.Apply); otherwise it reports the unused sets.
+var dhcpOptionsSubcommand = &subcommand{
+	cmd: dhcpOptionsCmd,
+	engine: &search.Engine{
+		New: func(profile, region string, _ map[string][]string, opts *search.Options) common.Results {
+			return dhcpoptions.New(profile, region, opts.Apply)
+		},
+		SortFields:     dhcpoptions.GetSortFields,
+		SortFieldNames: dhcpoptions.SortFieldNames,
+	},
+	initFlags: dhcpOptionsInitFlags,
+	initViper: cleanupInitViper,
+}
 
 // dhcpOptionsInitFlags registers the dhcp-options command.
 func dhcpOptionsInitFlags() { addCleanupCommand(dhcpOptionsCmd) }

@@ -20,7 +20,10 @@ limitations under the License.
 package cmd
 
 import (
-	"slices"
+	"context"
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -203,16 +206,107 @@ func TestParseTimeout(t *testing.T) {
 	}
 }
 
-// TestSubcommands_matchEngines checks that every subcommand has a search engine and every search
-// engine has a subcommand, joined by engineName.
-func TestSubcommands_matchEngines(t *testing.T) {
+// TestSubcommands_engines checks that every subcommand has its own engine, registered for its
+// command by setup, with a constructor and sort fields that agree, and that the constructor of
+// every search passes SortField through. A cleanup, such as default-vpc, has no --sort and is
+// known by its package under cleanup/.
+func TestSubcommands_engines(t *testing.T) {
 	resetCLI(t, nil)
-	got := make([]string, 0, len(subcommands))
+	seen := map[*search.Engine]string{}
 	for _, sub := range subcommands {
-		got = append(got, engineName(sub.cmd))
+		t.Run(sub.cmd.CommandPath(), func(t *testing.T) {
+			eng := sub.engine
+			if eng == nil || eng.New == nil || eng.SortFields == nil || eng.SortFieldNames == nil {
+				t.Fatalf("%s: the engine must define New, SortFields and SortFieldNames", sub.cmd.CommandPath())
+			}
+			if other, ok := seen[eng]; ok {
+				t.Errorf("%s shares its engine with %s", sub.cmd.CommandPath(), other)
+			}
+			seen[eng] = sub.cmd.CommandPath()
+			if got := engineOf(sub.cmd); got != eng {
+				t.Errorf("engineOf(%s) = %p, want its engine %p", sub.cmd.CommandPath(), got, eng)
+			}
+			for _, name := range eng.SortFieldNames() {
+				if err := eng.CheckSortField(name); err != nil {
+					t.Errorf("%s: SortFieldNames lists %q but CheckSortField rejects it: %v", sub.cmd.CommandPath(), name, err)
+				}
+			}
+			r := eng.New("default", "us-east-1", map[string][]string{}, &search.Options{SortField: "id", NoInstanceName: true})
+			if r == nil {
+				t.Fatalf("%s: New returned nil", sub.cmd.CommandPath())
+			}
+			cleanup := strings.HasPrefix(reflect.TypeOf(r).Elem().PkgPath(), "github.com/dyegoe/awss/cleanup/")
+			if got := r.GetSortField(); !cleanup && got != "id" {
+				t.Errorf("%s: New SortField = %q, want %q", sub.cmd.CommandPath(), got, "id")
+			}
+		})
 	}
-	slices.Sort(got)
-	if want := search.EngineNames(); !slices.Equal(got, want) {
-		t.Errorf("engine names of the subcommands = %v, want the search engines %v", got, want)
+}
+
+// TestEngineOf checks that a command that is not a registered subcommand has no engine.
+func TestEngineOf(t *testing.T) {
+	resetCLI(t, nil)
+	for _, cmd := range []*cobra.Command{rootCmd, cleanupCmd, {Use: "nope"}} {
+		if got := engineOf(cmd); got != nil {
+			t.Errorf("engineOf(%s) = %p, want nil", cmd.Name(), got)
+		}
+	}
+}
+
+// TestSubcommands_searchKeepsFilters checks that no search changes the filters map it is given: one
+// map is shared by every profile x region goroutine of a run (AGENTS.md). The profile does not
+// exist, so each search builds its filters and stops at the AWS config, with no AWS call.
+func TestSubcommands_searchKeepsFilters(t *testing.T) {
+	empty := filepath.Join(t.TempDir(), "config")
+	if err := os.WriteFile(empty, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AWS_CONFIG_FILE", empty)
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", empty)
+
+	// One key of every kind the commands send: IDs, names, tags, zones, CIDRs and S3 patterns.
+	sent := func() map[string][]string {
+		return map[string][]string{
+			"instance-id": {"i-1"}, "tag:Name": {"web-*"}, "tag": {"Env=prod:dev"},
+			"availability-zone": {"a", "b"}, "cidr": {"10.0.0.0/16"}, "vpc-id": {"vpc-1"},
+			"name": {"logs-*"}, "bucket": {"b1"}, "key": {"app/*"},
+			"engine": {"postgres"}, "engine-version": {"13*"}, "db-cluster-id": {"c1"}, "db-instance-id": {"db-1"},
+		}
+	}
+	for _, sub := range subcommands {
+		t.Run(sub.cmd.CommandPath(), func(t *testing.T) {
+			filters := sent()
+			r := sub.engine.New("awss-test-missing-profile", "us-east-1", filters, &search.Options{NoInstanceName: true})
+
+			r.Search(context.Background())
+
+			if !reflect.DeepEqual(filters, sent()) {
+				t.Errorf("%s Search() changed its filters to %v, want %v", sub.cmd.CommandPath(), filters, sent())
+			}
+		})
+	}
+}
+
+// TestSubcommands_accountNames checks that every search with an AccountNames field, the ones with
+// an Owner column, is marked AccountNames and receives the account names of the run, and that no
+// other search is marked.
+func TestSubcommands_accountNames(t *testing.T) {
+	names := map[string]string{"111111111111": "network"}
+	opts := &search.Options{AccountNames: names}
+	for _, sub := range subcommands {
+		t.Run(sub.cmd.CommandPath(), func(t *testing.T) {
+			r := sub.engine.New("default", "us-east-1", map[string][]string{}, opts)
+			field := reflect.ValueOf(r).Elem().FieldByName("AccountNames")
+			if got, want := sub.engine.AccountNames, field.IsValid(); got != want {
+				t.Fatalf("%s: AccountNames = %v, want %v: true exactly when the result has an AccountNames field",
+					sub.cmd.CommandPath(), got, want)
+			}
+			if !field.IsValid() {
+				return
+			}
+			if got := field.Interface(); !reflect.DeepEqual(got, names) {
+				t.Errorf("%s: New AccountNames = %v, want %v", sub.cmd.CommandPath(), got, names)
+			}
+		})
 	}
 }

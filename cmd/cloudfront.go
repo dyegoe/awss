@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"github.com/dyegoe/awss/common"
+	"github.com/dyegoe/awss/search"
 	searchCloudFront "github.com/dyegoe/awss/search/cloudfront"
 
 	"github.com/spf13/cobra"
@@ -109,6 +110,23 @@ func checkCloudFrontPatterns(regex bool) error {
 	return nil
 }
 
+// cloudfrontSubcommand is the cloudfront command: the engine it runs and how it registers and binds
+// its flags.
+//
+// cloudfront is global: the command passes the region searchCloudFront.Region.
+var cloudfrontSubcommand = &subcommand{
+	cmd: cloudfrontCmd,
+	engine: &search.Engine{
+		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+			return searchCloudFront.New(profile, region, filters, opts.SortField, opts.Regex, opts.ShowTags)
+		},
+		SortFields:     searchCloudFront.GetSortFields,
+		SortFieldNames: searchCloudFront.SortFieldNames,
+	},
+	initFlags: cloudfrontInitFlags,
+	initViper: cloudfrontInitViper,
+}
+
 func cloudfrontInitFlags() {
 	rootCmd.AddCommand(cloudfrontCmd)
 
@@ -125,7 +143,7 @@ func cloudfrontInitFlags() {
 		"Filter distributions by tags; values accept globs. `'Env=prod:stg,Team=app'`")
 	cloudfrontCmd.Flags().Bool(flagRegex, false,
 		"Treat --domains and --origins patterns as Go regular expressions instead of globs.")
-	cloudfrontCmd.Flags().String(flagSort, "id", sortHelp("cloudfront", "distributions", "id"))
+	cloudfrontCmd.Flags().String(flagSort, "id", sortHelp(cloudfrontCmd, "distributions", "id"))
 }
 
 func cloudfrontInitViper() error {

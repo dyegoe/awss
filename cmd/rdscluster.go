@@ -20,6 +20,10 @@ limitations under the License.
 package cmd
 
 import (
+	"github.com/dyegoe/awss/common"
+	"github.com/dyegoe/awss/search"
+	searchRDSCluster "github.com/dyegoe/awss/search/rdscluster"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -85,6 +89,21 @@ func rdsClusterRunE(cmd *cobra.Command, _ []string) error {
 	}, nil, nil, rdsClusterF)
 }
 
+// rdsClusterSubcommand is the rds-cluster command: the engine it runs and how it registers and
+// binds its flags.
+var rdsClusterSubcommand = &subcommand{
+	cmd: rdsClusterCmd,
+	engine: &search.Engine{
+		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+			return searchRDSCluster.New(profile, region, filters, opts.SortField, opts.Regex)
+		},
+		SortFields:     searchRDSCluster.GetSortFields,
+		SortFieldNames: searchRDSCluster.SortFieldNames,
+	},
+	initFlags: rdsClusterInitFlags,
+	initViper: rdsClusterInitViper,
+}
+
 func rdsClusterInitFlags() {
 	rootCmd.AddCommand(rdsClusterCmd)
 
@@ -102,7 +121,7 @@ func rdsClusterInitFlags() {
 		"Filter DB clusters by tags (awss); values accept globs. `'Env=prod:stg,Team=app'`")
 	rdsClusterCmd.Flags().Bool(flagRegex, false,
 		"Treat --names patterns as Go regular expressions instead of globs.")
-	rdsClusterCmd.Flags().String(flagSort, "id", sortHelp("rds-cluster", "DB clusters", "id"))
+	rdsClusterCmd.Flags().String(flagSort, "id", sortHelp(rdsClusterCmd, "DB clusters", "id"))
 }
 
 func rdsClusterInitViper() error {

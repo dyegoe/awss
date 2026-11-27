@@ -23,32 +23,14 @@ package search
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
-	"slices"
 	"sync"
 	"time"
 
-	"github.com/dyegoe/awss/cleanup/defaultvpc"
-	"github.com/dyegoe/awss/cleanup/dhcpoptions"
 	"github.com/dyegoe/awss/common"
-	searchCloudFront "github.com/dyegoe/awss/search/cloudfront"
-	searchCloudWAN "github.com/dyegoe/awss/search/cloudwan"
-	searchCloudWANAtt "github.com/dyegoe/awss/search/cloudwanatt"
-	searchDXGW "github.com/dyegoe/awss/search/dxgw"
-	searchEBS "github.com/dyegoe/awss/search/ebs"
-	searchEC2 "github.com/dyegoe/awss/search/ec2"
-	searchENI "github.com/dyegoe/awss/search/eni"
-	searchOrg "github.com/dyegoe/awss/search/org"
-	searchRDS "github.com/dyegoe/awss/search/rds"
-	searchRDSCluster "github.com/dyegoe/awss/search/rdscluster"
-	searchS3 "github.com/dyegoe/awss/search/s3"
-	searchS3obj "github.com/dyegoe/awss/search/s3obj"
-	searchSubnet "github.com/dyegoe/awss/search/subnet"
-	searchTGW "github.com/dyegoe/awss/search/tgw"
-	searchVPC "github.com/dyegoe/awss/search/vpc"
 )
 
 // Options carries the settings of a search that are not AWS filters.
@@ -109,205 +91,32 @@ type Options struct {
 // memory for the printer.
 const DefaultConcurrency = 32
 
-// constructor builds the results object of one search for a single profile and region.
-type constructor func(profile, region string, filters map[string][]string, opts *Options) common.Results
+// Constructor builds the results object of one search for a single profile and region.
+type Constructor func(profile, region string, filters map[string][]string, opts *Options) common.Results
 
-// engine describes a search command: how to build its results and which sort fields it accepts.
-type engine struct {
-	// new builds the common.Results for one profile and region.
-	new constructor
+// Engine describes how a command searches: how to build its result sets and which sort fields
+// it accepts. Each command of the cmd package declares its own, next to its flags; Execute runs
+// it over every profile and region.
+type Engine struct {
+	// New builds the common.Results for one profile and region.
+	New Constructor
 
-	// sortFields validates a sort field and returns the sort tag to struct field mapping.
-	sortFields func(string) (map[string]string, error)
+	// SortFields validates a sort field and returns the sort tag to struct field mapping.
+	SortFields func(string) (map[string]string, error)
 
-	// sortFieldNames returns the valid sort fields, used to build the --sort help text.
-	sortFieldNames func() []string
+	// SortFieldNames returns the valid sort fields, used to build the --sort help text.
+	SortFieldNames func() []string
 
-	// accountNames is true for the searches with an Owner column: new sets their AccountNames
+	// AccountNames is true for the searches with an Owner column: New sets their AccountNames
 	// from Options.AccountNames, and the cmd package looks the names up only for them.
-	accountNames bool
+	AccountNames bool
 }
 
-// engines is the registry of search commands, keyed by the cobra command name.
-//
-// Adding a resource type means adding one entry here.
-// It is a variable so tests can replace it.
-var engines = map[string]engine{
-	"ec2": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchEC2.New(profile, region, filters, opts.SortField)
-		},
-		sortFields:     searchEC2.GetSortFields,
-		sortFieldNames: searchEC2.SortFieldNames,
-	},
-	"eni": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			r := searchENI.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		sortFields:     searchENI.GetSortFields,
-		sortFieldNames: searchENI.SortFieldNames,
-		accountNames:   true,
-	},
-	"ebs": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchEBS.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
-		},
-		sortFields:     searchEBS.GetSortFields,
-		sortFieldNames: searchEBS.SortFieldNames,
-	},
-	"vpc": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			r := searchVPC.New(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		sortFields:     searchVPC.GetSortFields,
-		sortFieldNames: searchVPC.SortFieldNames,
-		accountNames:   true,
-	},
-	"subnet": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			r := searchSubnet.New(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		sortFields:     searchSubnet.GetSortFields,
-		sortFieldNames: searchSubnet.SortFieldNames,
-		accountNames:   true,
-	},
-	"s3": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchS3.New(profile, region, filters, opts.SortField, opts.Regex, opts.ShowTags)
-		},
-		sortFields:     searchS3.GetSortFields,
-		sortFieldNames: searchS3.SortFieldNames,
-	},
-	"s3obj": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchS3obj.New(profile, region, filters, opts.SortField, opts.Regex, opts.MaxKeys, opts.MaxBuckets)
-		},
-		sortFields:     searchS3obj.GetSortFields,
-		sortFieldNames: searchS3obj.SortFieldNames,
-	},
-	"rds": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchRDS.New(profile, region, filters, opts.SortField, opts.Regex)
-		},
-		sortFields:     searchRDS.GetSortFields,
-		sortFieldNames: searchRDS.SortFieldNames,
-	},
-	"rds-cluster": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchRDSCluster.New(profile, region, filters, opts.SortField, opts.Regex)
-		},
-		sortFields:     searchRDSCluster.GetSortFields,
-		sortFieldNames: searchRDSCluster.SortFieldNames,
-	},
-	// org lists one organization: the command passes one profile and the region searchOrg.Region.
-	"org": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchOrg.New(profile, region, filters, opts.SortField, opts.ShowTags)
-		},
-		sortFields:     searchOrg.GetSortFields,
-		sortFieldNames: searchOrg.SortFieldNames,
-	},
-	// cloudfront is global: the command passes the region searchCloudFront.Region.
-	"cloudfront": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			return searchCloudFront.New(profile, region, filters, opts.SortField, opts.Regex, opts.ShowTags)
-		},
-		sortFields:     searchCloudFront.GetSortFields,
-		sortFieldNames: searchCloudFront.SortFieldNames,
-	},
-	// cloudwan-routes is awss cloudwan routes. Network Manager is global: the command passes the
-	// region searchCloudWAN.Region.
-	"cloudwan-routes": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			r := searchCloudWAN.New(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		sortFields:     searchCloudWAN.GetSortFields,
-		sortFieldNames: searchCloudWAN.SortFieldNames,
-		accountNames:   true,
-	},
-	// cloudwan-bgp is awss cloudwan bgp, global like cloudwan-routes.
-	"cloudwan-bgp": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			r := searchCloudWAN.NewBGP(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		sortFields:     searchCloudWAN.GetBGPSortFields,
-		sortFieldNames: searchCloudWAN.BGPSortFieldNames,
-		accountNames:   true,
-	},
-	// cloudwan-attachments is awss cloudwan attachments, global like cloudwan-routes.
-	"cloudwan-attachments": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			r := searchCloudWANAtt.New(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		sortFields:     searchCloudWANAtt.GetSortFields,
-		sortFieldNames: searchCloudWANAtt.SortFieldNames,
-		accountNames:   true,
-	},
-	// dx-gateways is awss dx gateways. A Direct Connect gateway is global: the command passes the
-	// region searchDXGW.Region.
-	"dx-gateways": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			r := searchDXGW.New(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		sortFields:     searchDXGW.GetSortFields,
-		sortFieldNames: searchDXGW.SortFieldNames,
-		accountNames:   true,
-	},
-	// tgw-routes is awss tgw routes. A transit gateway is regional: it runs per profile and region.
-	"tgw-routes": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			r := searchTGW.New(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		sortFields:     searchTGW.GetSortFields,
-		sortFieldNames: searchTGW.SortFieldNames,
-		accountNames:   true,
-	},
-	// tgw-attachments is awss tgw attachments, regional like tgw-routes.
-	"tgw-attachments": {
-		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
-			r := searchTGW.NewAttachments(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			r.Propagations = opts.Propagations
-			return r
-		},
-		sortFields:     searchTGW.GetAttachmentSortFields,
-		sortFieldNames: searchTGW.AttachmentSortFieldNames,
-		accountNames:   true,
-	},
-	// default-vpc is the cleanup of the default VPCs (awss cleanup default-vpc). It deletes only
-	// with opts.Apply; otherwise it reports the plan.
-	"default-vpc": {
-		new: func(profile, region string, _ map[string][]string, opts *Options) common.Results {
-			return defaultvpc.New(profile, region, opts.Apply)
-		},
-		sortFields:     defaultvpc.GetSortFields,
-		sortFieldNames: defaultvpc.SortFieldNames,
-	},
-	// dhcp-options is the cleanup of the DHCP options sets no VPC uses (awss cleanup dhcp-options).
-	// It deletes only with opts.Apply; otherwise it reports them.
-	"dhcp-options": {
-		new: func(profile, region string, _ map[string][]string, opts *Options) common.Results {
-			return dhcpoptions.New(profile, region, opts.Apply)
-		},
-		sortFields:     dhcpoptions.GetSortFields,
-		sortFieldNames: dhcpoptions.SortFieldNames,
-	},
+// CheckSortField returns an error when f is not one of the sort fields of the engine. The error
+// names the valid options.
+func (e *Engine) CheckSortField(f string) error {
+	_, err := e.SortFields(f)
+	return err
 }
 
 // Summary counts how a run went. Every result set is counted once, in the first of these that
@@ -359,17 +168,16 @@ func (s *Summary) add(r common.Results, timedOut bool) {
 
 // Execute executes the search command and returns how the run went.
 //
-// It searches for the given command in the given profiles and regions, in parallel: at most
+// It runs the search of eng in the given profiles and regions, in parallel: at most
 // opts.Concurrency searches run at once, the others wait for a free slot without calling AWS.
 // The filters are used to filter the results and opts holds every other setting.
 //
 // When opts.Timeout is set, a profile and region still searching or still waiting at the deadline
 // is reported as timed out in its own result set; the result sets that finished are printed as
 // usual.
-func Execute(cmd string, profiles, regions []string, filters map[string][]string, opts *Options) (Summary, error) {
-	eng, ok := engines[cmd]
-	if !ok {
-		return Summary{}, fmt.Errorf("command %s not found", cmd)
+func Execute(eng *Engine, profiles, regions []string, filters map[string][]string, opts *Options) (Summary, error) {
+	if eng == nil || eng.New == nil {
+		return Summary{}, errors.New("no search engine to run")
 	}
 
 	workers := workerCount(opts.Concurrency, len(profiles)*len(regions))
@@ -453,7 +261,7 @@ func withTimeout(ctx context.Context, d time.Duration) (context.Context, context
 // When the deadline passed before the search started, it is not started at all.
 // A search that ignores ctx is left running; its result set is never read again.
 func searchOne(
-	ctx context.Context, eng engine, profile, region string, filters map[string][]string, opts *Options,
+	ctx context.Context, eng *Engine, profile, region string, filters map[string][]string, opts *Options,
 ) (common.Results, bool) {
 	// The deadline passed while this search waited for a free slot: do not start it.
 	if ctx.Err() != nil {
@@ -461,7 +269,7 @@ func searchOne(
 			"search did not start before the %s timeout; raise --timeout or --concurrency", opts.Timeout)), true
 	}
 
-	r := eng.new(profile, region, filters, opts)
+	r := eng.New(profile, region, filters, opts)
 
 	inTime := make(chan bool, 1)
 	go func() {
@@ -491,48 +299,9 @@ func searchOne(
 
 // timedOut returns a new, empty result set of profile and region holding only msg as its error.
 func timedOut(
-	eng engine, profile, region string, filters map[string][]string, opts *Options, msg string,
+	eng *Engine, profile, region string, filters map[string][]string, opts *Options, msg string,
 ) common.Results {
-	r := eng.new(profile, region, filters, opts)
+	r := eng.New(profile, region, filters, opts)
 	r.AddError(msg)
 	return r
-}
-
-// CheckSortField checks if the given sort field is valid for the given command.
-//
-// It returns an error if the command is unknown or the sort field is not valid.
-func CheckSortField(cmd, f string) error {
-	eng, ok := engines[cmd]
-	if !ok {
-		return fmt.Errorf("command %s not found", cmd)
-	}
-
-	if _, err := eng.sortFields(f); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// UsesAccountNames reports whether the search of the given command has an Owner column and so
-// reads Options.AccountNames. It is false for an unknown command.
-func UsesAccountNames(cmd string) bool {
-	return engines[cmd].accountNames
-}
-
-// EngineNames returns the names of every registered command, sorted alphabetically. The cmd
-// package tests check them against its command tree.
-func EngineNames() []string {
-	return slices.Sorted(maps.Keys(engines))
-}
-
-// SortFieldNames returns the valid sort fields of the given command, sorted alphabetically.
-//
-// It returns nil for an unknown command. It is used by the cmd package to build --sort help texts.
-func SortFieldNames(cmd string) []string {
-	eng, ok := engines[cmd]
-	if !ok {
-		return nil
-	}
-	return eng.sortFieldNames()
 }

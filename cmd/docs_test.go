@@ -23,8 +23,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dyegoe/awss/search"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -91,7 +89,7 @@ func TestSubcommands_readmeSortFields(t *testing.T) {
 		if sub.cmd.Flags().Lookup(flagSort) == nil {
 			continue
 		}
-		want := search.SortFieldNames(engineName(sub.cmd))
+		want := sub.engine.SortFieldNames()
 		if !slices.ContainsFunc(documented, func(got []string) bool { return slices.Equal(got, want) }) {
 			t.Errorf("README.md has no \"Sort by: `--sort ...`\" line with exactly the sort fields of %s: %s",
 				sub.cmd.CommandPath(), strings.Join(want, "|"))

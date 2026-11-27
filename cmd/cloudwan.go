@@ -20,6 +20,8 @@ limitations under the License.
 package cmd
 
 import (
+	"github.com/dyegoe/awss/common"
+	"github.com/dyegoe/awss/search"
 	searchCloudWAN "github.com/dyegoe/awss/search/cloudwan"
 	searchCloudWANAtt "github.com/dyegoe/awss/search/cloudwanatt"
 
@@ -126,9 +128,8 @@ and ignore --regions. Use --edges to pick edge locations.
 
 // cloudwanRoutesCmd searches the routes of the core networks.
 var cloudwanRoutesCmd = &cobra.Command{
-	Use:         "routes",
-	Short:       "Find a CIDR in the route tables of the Cloud WAN segments, and where its routes point.",
-	Annotations: map[string]string{annotationEngine: "cloudwan-routes"},
+	Use:   "routes",
+	Short: "Find a CIDR in the route tables of the Cloud WAN segments, and where its routes point.",
 	Long: `
 Find which Cloud WAN segments and edge locations have a route to a CIDR, and where it points:
 a VPC, a Direct Connect gateway, a VPN, a Connect peer, a Transit Gateway route table, or
@@ -165,9 +166,8 @@ Which route does traffic to 10.20.1.5 take in the prod segment at eu-west-1?
 
 // cloudwanBGPCmd searches the BGP routes of the segments, before the routing policies.
 var cloudwanBGPCmd = &cobra.Command{
-	Use:         "bgp",
-	Short:       "Show the BGP routes of the Cloud WAN segments before the routing policies: AS path, communities...",
-	Annotations: map[string]string{annotationEngine: "cloudwan-bgp"},
+	Use:   "bgp",
+	Short: "Show the BGP routes of the Cloud WAN segments before the routing policies: AS path, communities...",
 	Long: `
 Show the BGP routes each Cloud WAN segment learned at each edge location, before the routing
 policies of the core network, with their AS path, communities, local preference, MED and next hop.
@@ -199,9 +199,8 @@ Did the prefix 10.50.0.0/16 arrive, and with which AS path?
 
 // cloudwanAttachmentsCmd lists the attachments of the core networks.
 var cloudwanAttachmentsCmd = &cobra.Command{
-	Use:         "attachments",
-	Short:       "List the attachments of the Cloud WAN core networks: VPCs, Direct Connect gateways, VPNs...",
-	Annotations: map[string]string{annotationEngine: "cloudwan-attachments"},
+	Use:   "attachments",
+	Short: "List the attachments of the Cloud WAN core networks: VPCs, Direct Connect gateways, VPNs...",
 	Long: `
 List the attachments of the Cloud WAN core networks: which VPC, Direct Connect gateway, VPN,
 Connect or Transit Gateway route table is attached to which segment, at which edge locations.
@@ -269,6 +268,32 @@ func addCloudWANCommand(cmd *cobra.Command) {
 	cloudwanCmd.AddCommand(cmd)
 }
 
+// cloudwanRoutesSubcommand is the cloudwan routes command: the engine it runs, the values of its
+// fixed-list flags, and how it registers and binds its flags.
+//
+// Network Manager is global: the command passes the region searchCloudWAN.Region.
+var cloudwanRoutesSubcommand = &subcommand{
+	cmd: cloudwanRoutesCmd,
+	engine: &search.Engine{
+		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+			r := searchCloudWAN.New(profile, region, filters, opts.SortField)
+			r.AccountNames = opts.AccountNames
+			return r
+		},
+		SortFields:     searchCloudWAN.GetSortFields,
+		SortFieldNames: searchCloudWAN.SortFieldNames,
+		AccountNames:   true,
+	},
+	lists: flagValues{
+		flagMatch:      searchCloudWAN.MatchNames,
+		"types":        searchCloudWAN.TypeNames,
+		flagStates:     searchCloudWAN.StateNames,
+		"target-types": cloudwanTargetTypes,
+	},
+	initFlags: cloudwanRoutesInitFlags,
+	initViper: cloudwanRoutesInitViper,
+}
+
 func cloudwanRoutesInitFlags() {
 	addCloudWANCommand(cloudwanRoutesCmd)
 	f, fl := &cloudwanRoutesF, cloudwanRoutesCmd.Flags()
@@ -291,11 +316,32 @@ func cloudwanRoutesInitFlags() {
 		listHelp("Keep the route destinations of these next hop types ("+aliasHelp+")", cloudwanTargetTypes(), "dx"))
 	fl.StringSliceVar(&f.CoreNetworkIDs, flagCoreNetworkIDs, []string{},
 		"Search these core networks only. `core-network-0123456789abcdef0`")
-	fl.String(flagSort, "segment", sortHelp("cloudwan-routes", "routes", "segment"))
+	fl.String(flagSort, "segment", sortHelp(cloudwanRoutesCmd, "routes", "segment"))
 }
 
 func cloudwanRoutesInitViper() error {
 	return bindFlags(cloudwanRoutesCmd, map[string]string{labelCloudWANRoutesSort: flagSort})
+}
+
+// cloudwanAttachmentsSubcommand is the cloudwan attachments command: the engine it runs, the values
+// of its fixed-list flags, and how it registers and binds its flags.
+//
+// Global like cloudwan routes: the command passes the region searchCloudWAN.Region.
+var cloudwanAttachmentsSubcommand = &subcommand{
+	cmd: cloudwanAttachmentsCmd,
+	engine: &search.Engine{
+		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+			r := searchCloudWANAtt.New(profile, region, filters, opts.SortField)
+			r.AccountNames = opts.AccountNames
+			return r
+		},
+		SortFields:     searchCloudWANAtt.GetSortFields,
+		SortFieldNames: searchCloudWANAtt.SortFieldNames,
+		AccountNames:   true,
+	},
+	lists:     flagValues{"types": searchCloudWANAtt.TypeNames, flagStates: searchCloudWANAtt.StateNames},
+	initFlags: cloudwanAttachmentsInitFlags,
+	initViper: cloudwanAttachmentsInitViper,
 }
 
 func cloudwanAttachmentsInitFlags() {
@@ -316,11 +362,35 @@ func cloudwanAttachmentsInitFlags() {
 		listHelp("Filter attachments by state", searchCloudWANAtt.StateNames(), "available"))
 	fl.StringSliceVar(&f.CoreNetworkIDs, flagCoreNetworkIDs, []string{},
 		"List the attachments of these core networks only. `core-network-0123456789abcdef0`")
-	fl.String(flagSort, "segment", sortHelp("cloudwan-attachments", "attachments", "segment"))
+	fl.String(flagSort, "segment", sortHelp(cloudwanAttachmentsCmd, "attachments", "segment"))
 }
 
 func cloudwanAttachmentsInitViper() error {
 	return bindFlags(cloudwanAttachmentsCmd, map[string]string{labelCloudWANAttachmentsSort: flagSort})
+}
+
+// cloudwanBGPSubcommand is the cloudwan bgp command: the engine it runs, the values of its fixed-
+// list flags, and how it registers and binds its flags.
+//
+// Global like cloudwan routes: the command passes the region searchCloudWAN.Region.
+var cloudwanBGPSubcommand = &subcommand{
+	cmd: cloudwanBGPCmd,
+	engine: &search.Engine{
+		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+			r := searchCloudWAN.NewBGP(profile, region, filters, opts.SortField)
+			r.AccountNames = opts.AccountNames
+			return r
+		},
+		SortFields:     searchCloudWAN.GetBGPSortFields,
+		SortFieldNames: searchCloudWAN.BGPSortFieldNames,
+		AccountNames:   true,
+	},
+	lists: flagValues{
+		flagMatch: searchCloudWAN.MatchNames, "next-hop-types": cloudwanTargetTypes,
+		"installed": searchCloudWAN.InstalledNames,
+	},
+	initFlags: cloudwanBGPInitFlags,
+	initViper: cloudwanBGPInitViper,
 }
 
 func cloudwanBGPInitFlags() {
@@ -345,7 +415,7 @@ func cloudwanBGPInitFlags() {
 		"Keep the routes whose AS path has any of these AS numbers. `65010`")
 	fl.StringSliceVar(&f.CoreNetworkIDs, flagCoreNetworkIDs, []string{},
 		"Search these core networks only. `core-network-0123456789abcdef0`")
-	fl.String(flagSort, "segment", sortHelp("cloudwan-bgp", "BGP routes", "segment"))
+	fl.String(flagSort, "segment", sortHelp(cloudwanBGPCmd, "BGP routes", "segment"))
 }
 
 func cloudwanBGPInitViper() error {

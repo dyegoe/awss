@@ -32,7 +32,7 @@ func TestDxGatewaysFilterFlags_coversStruct(t *testing.T) {
 // TestExecute_dxGateways checks the filters every dx gateways flag sends to the search, and the
 // invalid values rejected before any search.
 func TestExecute_dxGateways(t *testing.T) {
-	runFilterCases(t, "dx-gateways", "gateway", []filterCase{
+	runFilterCases(t, "dx gateways", "gateway", []filterCase{
 		{name: "no filter lists every gateway", args: []string{"dx", "gateways"}, wantFilters: map[string][]string{}},
 		{
 			name: "every filter",
