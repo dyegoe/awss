@@ -25,12 +25,7 @@ import (
 	"strings"
 
 	"github.com/dyegoe/awss/common"
-	"github.com/dyegoe/awss/search"
 	searchCloudWAN "github.com/dyegoe/awss/search/cloudwan"
-	searchCloudWANAtt "github.com/dyegoe/awss/search/cloudwanatt"
-	searchDXGW "github.com/dyegoe/awss/search/dxgw"
-	searchOrg "github.com/dyegoe/awss/search/org"
-	searchTGW "github.com/dyegoe/awss/search/tgw"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/spf13/cobra"
@@ -66,7 +61,7 @@ func registerCompletions() error {
 	}
 	for _, sub := range subcommands {
 		sub.cmd.ValidArgsFunction = noArgs
-		if err := register(sub.cmd, commandCompletions(sub.cmd)); err != nil {
+		if err := register(sub.cmd, commandCompletions(sub)); err != nil {
 			return err
 		}
 		if err := registerNoValues(sub.cmd, sub.cmd.NonInheritedFlags()); err != nil {
@@ -116,55 +111,19 @@ func globalCompletions() flagCompletions {
 
 // commandCompletions returns the completions of the flags of a command: --sort when it has one, the
 // availability zones when the command has them, and the flags of a fixed list.
-func commandCompletions(cmd *cobra.Command) flagCompletions {
-	name := engineName(cmd)
+func commandCompletions(sub *subcommand) flagCompletions {
+	cmd := sub.cmd
 	comps := flagCompletions{}
 	if cmd.Flags().Lookup(flagSort) != nil {
-		comps[flagSort] = fixedValues(func() []string { return search.SortFieldNames(name) })
+		comps[flagSort] = fixedValues(sub.engine.SortFieldNames)
 	}
 	if cmd.Flags().Lookup(flagAvailabilityZones) != nil {
 		comps[flagAvailabilityZones] = listValues(common.AvailabilityZoneLetters)
 	}
-	for flag, values := range fixedLists()[name] {
+	for flag, values := range sub.lists {
 		comps[flag] = listValues(values)
 	}
 	return comps
-}
-
-// fixedLists returns, by command and flag, the values of the flags that take a fixed list. Their
-// help text lists the same values, with listHelp.
-func fixedLists() map[string]map[string]func() []string {
-	return map[string]map[string]func() []string{
-		"ec2": {"instance-states": instanceStateNames},
-		"ebs": {flagStatuses: volumeStateNames, "volume-types": volumeTypeNames, "encrypted": trueFalse},
-		"vpc": {flagStates: vpcStateNames, "default": trueFalse},
-		"subnet": {
-			flagStates:            subnetStateNames,
-			"default-for-az":      trueFalse,
-			"public-ip-on-launch": trueFalse,
-		},
-		"org": {flagStatuses: searchOrg.StatusNames},
-		"cloudwan-routes": {
-			flagMatch:      searchCloudWAN.MatchNames,
-			"types":        searchCloudWAN.TypeNames,
-			flagStates:     searchCloudWAN.StateNames,
-			"target-types": cloudwanTargetTypes,
-		},
-		"cloudwan-bgp": {
-			flagMatch: searchCloudWAN.MatchNames, "next-hop-types": cloudwanTargetTypes,
-			"installed": searchCloudWAN.InstalledNames,
-		},
-		"cloudwan-attachments": {"types": searchCloudWANAtt.TypeNames, flagStates: searchCloudWANAtt.StateNames},
-		"dx-gateways": {
-			flagMatch: searchDXGW.MatchNames, "associated-types": searchDXGW.AssociatedTypeNames,
-			flagStates: searchDXGW.StateNames,
-		},
-		"tgw-routes": {
-			flagMatch: searchTGW.MatchNames, flagTypes: searchTGW.TypeNames, flagStates: searchTGW.StateNames,
-			"attachment-types": tgwAttachmentTypes,
-		},
-		"tgw-attachments": {flagTypes: tgwAttachmentTypes, flagStates: searchTGW.AttachmentStateNames},
-	}
 }
 
 // cloudwanTargetTypes returns the next hop types of Cloud WAN and their short names.

@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"github.com/dyegoe/awss/common"
+	"github.com/dyegoe/awss/search"
 	"github.com/dyegoe/awss/search/s3obj"
 
 	"github.com/spf13/cobra"
@@ -102,6 +103,24 @@ func s3objRunE(cmd *cobra.Command, _ []string) error {
 	}, nil, nil, s3objF)
 }
 
+// s3objEngine is what the s3obj command runs over every profile and region.
+var s3objEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		return s3obj.New(profile, region, filters, opts.SortField, opts.Regex, opts.MaxKeys, opts.MaxBuckets)
+	},
+	SortFields:     s3obj.GetSortFields,
+	SortFieldNames: s3obj.SortFieldNames,
+}
+
+// s3objSubcommand is the s3obj command: the engine it runs and how it registers and binds its
+// flags.
+var s3objSubcommand = &subcommand{
+	cmd:       s3objCmd,
+	engine:    s3objEngine,
+	initFlags: s3objInitFlags,
+	initViper: s3objInitViper,
+}
+
 func s3objInitFlags() {
 	rootCmd.AddCommand(s3objCmd)
 
@@ -115,7 +134,7 @@ func s3objInitFlags() {
 		"Maximum number of keys scanned per bucket before stopping.")
 	s3objCmd.Flags().Int(flagMaxBuckets, s3obj.DefaultMaxBuckets,
 		"Maximum number of buckets the patterns may match in one region; above it the region scans nothing.")
-	s3objCmd.Flags().String(flagSort, "key", sortHelp("s3obj", "objects", "key"))
+	s3objCmd.Flags().String(flagSort, "key", sortHelp(s3objEngine, "objects", "key"))
 }
 
 func s3objInitViper() error {

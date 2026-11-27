@@ -37,6 +37,7 @@ import (
 
 // searchCall records the arguments one run passed to executeSearch.
 type searchCall struct {
+	// cmd is the path, after awss, of the command whose engine ran: "ec2", "cloudwan routes".
 	cmd      string
 	profiles []string
 	regions  []string
@@ -79,9 +80,11 @@ func resetCLIWithSummary(t *testing.T, searchErr error, summary search.Summary) 
 	calls := &[]searchCall{}
 	old := executeSearch
 	executeSearch = func(
-		cmd string, profiles, regions []string, filters map[string][]string, opts *search.Options,
+		eng *search.Engine, profiles, regions []string, filters map[string][]string, opts *search.Options,
 	) (search.Summary, error) {
-		*calls = append(*calls, searchCall{cmd: cmd, profiles: profiles, regions: regions, filters: filters, opts: *opts})
+		*calls = append(*calls, searchCall{
+			cmd: commandOf(t, eng), profiles: profiles, regions: regions, filters: filters, opts: *opts,
+		})
 		return summary, searchErr
 	}
 	t.Cleanup(func() {
@@ -91,6 +94,19 @@ func resetCLIWithSummary(t *testing.T, searchErr error, summary search.Summary) 
 		rootCmd.SetErr(nil)
 	})
 	return calls
+}
+
+// commandOf returns the path, after awss, of the subcommand whose engine is eng: "ec2",
+// "cloudwan routes".
+func commandOf(t *testing.T, eng *search.Engine) string {
+	t.Helper()
+	for _, sub := range subcommands {
+		if sub.engine == eng {
+			return strings.TrimPrefix(sub.cmd.CommandPath(), rootCmd.Name()+" ")
+		}
+	}
+	t.Fatalf("no subcommand runs the engine %p", eng)
+	return ""
 }
 
 // runCLI runs the root command with args and returns the error and what it printed.

@@ -112,38 +112,66 @@ func Execute() {
 	}
 }
 
-// subcommand ties a search subcommand to the functions that register its flags and bind them to viper.
+// subcommand describes a search or cleanup command in one place, next to its flags in the
+// command's file: the cobra command, the engine it runs, the values of its fixed-list flags, and
+// the functions that register its flags and bind them to viper. Registering it registers all of
+// them: nothing else names the command.
 type subcommand struct {
-	cmd       *cobra.Command
+	cmd *cobra.Command
+
+	// engine is what the command runs over every profile and region.
+	engine *search.Engine
+
+	// lists holds, by flag name, the values of the flags that take a fixed list, for their shell
+	// completion. Their help text lists the same values, with listHelp.
+	lists flagValues
+
 	initFlags func()
 	initViper func() error
 }
 
-// subcommands lists the search subcommands, in the order they are registered.
-var subcommands = []subcommand{
-	{ec2Cmd, ec2InitFlags, ec2InitViper},
-	{eniCmd, eniInitFlags, eniInitViper},
-	{ebsCmd, ebsInitFlags, ebsInitViper},
-	{vpcCmd, vpcInitFlags, vpcInitViper},
-	{subnetCmd, subnetInitFlags, subnetInitViper},
-	{s3Cmd, s3InitFlags, s3InitViper},
-	{s3objCmd, s3objInitFlags, s3objInitViper},
-	{orgCmd, orgInitFlags, orgInitViper},
-	{rdsCmd, rdsInitFlags, rdsInitViper},
-	{rdsClusterCmd, rdsClusterInitFlags, rdsClusterInitViper},
-	{cloudfrontCmd, cloudfrontInitFlags, cloudfrontInitViper},
-	{cloudwanRoutesCmd, cloudwanRoutesInitFlags, cloudwanRoutesInitViper},
-	{cloudwanBGPCmd, cloudwanBGPInitFlags, cloudwanBGPInitViper},
-	{cloudwanAttachmentsCmd, cloudwanAttachmentsInitFlags, cloudwanAttachmentsInitViper},
-	{dxGatewaysCmd, dxGatewaysInitFlags, dxGatewaysInitViper},
-	{tgwRoutesCmd, tgwRoutesInitFlags, tgwRoutesInitViper},
-	{tgwAttachmentsCmd, tgwAttachmentsInitFlags, tgwAttachmentsInitViper},
-	{defaultVpcCmd, defaultVpcInitFlags, cleanupInitViper},
-	{dhcpOptionsCmd, dhcpOptionsInitFlags, cleanupInitViper},
+// flagValues maps a flag name to the function that lists the values it accepts.
+type flagValues map[string]func() []string
+
+// subcommands lists the search and cleanup subcommands, in the order they are registered. Each
+// is declared in its command's file.
+var subcommands = []*subcommand{
+	ec2Subcommand,
+	eniSubcommand,
+	ebsSubcommand,
+	vpcSubcommand,
+	subnetSubcommand,
+	s3Subcommand,
+	s3objSubcommand,
+	orgSubcommand,
+	rdsSubcommand,
+	rdsClusterSubcommand,
+	cloudfrontSubcommand,
+	cloudwanRoutesSubcommand,
+	cloudwanBGPSubcommand,
+	cloudwanAttachmentsSubcommand,
+	dxGatewaysSubcommand,
+	tgwRoutesSubcommand,
+	tgwAttachmentsSubcommand,
+	defaultVpcSubcommand,
+	dhcpOptionsSubcommand,
 }
 
-// setup registers the global flags and every subcommand with its flags, then binds them to viper.
+// engines maps each registered command to the engine it runs. setup fills it from subcommands; a
+// command reads it at run time, so a command never names its engine by a string.
+var engines = map[*cobra.Command]*search.Engine{}
+
+// engineOf returns the engine of cmd, or nil when cmd is not a registered subcommand.
+func engineOf(cmd *cobra.Command) *search.Engine { return engines[cmd] }
+
+// setup registers the global flags and every subcommand with its engine and flags, then binds them
+// to viper.
 func setup() error {
+	clear(engines)
+	for _, sub := range subcommands {
+		engines[sub.cmd] = sub.engine
+	}
+
 	initFlags()
 	for _, sub := range subcommands {
 		sub.initFlags()
@@ -384,10 +412,11 @@ func bindFlags(cmd *cobra.Command, keys map[string]string) error {
 	return nil
 }
 
-// sortHelp builds the --sort help text of a command from its registered sort fields,
-// so the help never drifts from the struct tags.
-func sortHelp(cmd, what, def string) string {
-	return fmt.Sprintf("Sort %s by %s. %#q", what, common.StringSliceToString(search.SortFieldNames(cmd), ", "), def)
+// sortHelp builds the --sort help text of a command from the sort fields of its engine, so the
+// help never drifts from the struct tags.
+func sortHelp(eng *search.Engine, what, def string) string {
+	names := common.StringSliceToString(eng.SortFieldNames(), ", ")
+	return fmt.Sprintf("Sort %s by %s. %#q", what, names, def)
 }
 
 // helpWidth is the width the generated parts of a command's long help wrap at.
@@ -496,19 +525,6 @@ func intLabel(label string) int {
 	return viper.GetInt(label)
 }
 
-// annotationEngine is the cobra annotation that names the search engine of a command whose name is
-// not its engine key: a command of a group, such as cloudwan routes, whose engine is
-// cloudwan-routes.
-const annotationEngine = "awss-engine"
-
-// engineName returns the key of the search engine of cmd: its annotationEngine, or its name.
-func engineName(cmd *cobra.Command) string {
-	if e := cmd.Annotations[annotationEngine]; e != "" {
-		return e
-	}
-	return cmd.Name()
-}
-
 // executeSearch runs the search. It is a variable so tests can replace the AWS calls.
 var executeSearch = search.Execute
 
@@ -518,7 +534,8 @@ var executeSearch = search.Execute
 // writes on stderr a line when a search failed, and the stats of the run with --stats: stdout
 // stays only the results, so JSON output still parses. A failed search does not fail the command.
 func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStruct interface{}) error {
-	if err := search.CheckSortField(engineName(cmd), viper.GetString(spec.sortLabel)); err != nil {
+	eng := engineOf(cmd)
+	if err := eng.CheckSortField(viper.GetString(spec.sortLabel)); err != nil {
 		return err
 	}
 
@@ -533,13 +550,13 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 	tagsKeys := viper.GetStringSlice(labelTagsKeys)
 
 	var names map[string]string
-	if search.UsesAccountNames(engineName(cmd)) {
+	if eng.AccountNames {
 		names = accountNames(cmd.Context(), cmd.ErrOrStderr())
 	}
 
 	start := time.Now()
 	summary, err := executeSearch(
-		engineName(cmd),
+		eng,
 		viper.GetStringSlice(labelProfiles),
 		viper.GetStringSlice(labelRegions),
 		filters,

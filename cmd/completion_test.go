@@ -27,7 +27,6 @@ import (
 	"testing"
 
 	"github.com/dyegoe/awss/common"
-	"github.com/dyegoe/awss/search"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -70,11 +69,11 @@ func TestRegisterCompletions_sort(t *testing.T) {
 		if sub.cmd.Flags().Lookup(flagSort) == nil {
 			continue
 		}
-		name := engineName(sub.cmd)
+		name := sub.cmd.CommandPath()
 		t.Run(name, func(t *testing.T) {
 			resetCLI(t, nil)
 			got, directive := complete(t, append(commandArgs(sub.cmd), "--sort", "")...)
-			if want := search.SortFieldNames(name); len(want) == 0 || !reflect.DeepEqual(got, want) {
+			if want := sub.engine.SortFieldNames(); len(want) == 0 || !reflect.DeepEqual(got, want) {
 				t.Errorf("complete(%s --sort) = %v, want %v", name, got, want)
 			}
 			if directive != cobra.ShellCompDirectiveNoFileComp {
@@ -113,7 +112,7 @@ func TestRegisterCompletions(t *testing.T) {
 		},
 		{
 			name: "an invalid region typed earlier", args: []string{"rds-cluster", "--regions", "mars-1", "--sort", ""},
-			want: search.SortFieldNames("rds-cluster"), wantDirective: noFile,
+			want: rdsClusterSubcommand.engine.SortFieldNames(), wantDirective: noFile,
 		},
 		{
 			name: "a free-text flag", args: []string{"rds", "--engines", ""},
@@ -138,9 +137,9 @@ func TestRegisterCompletions(t *testing.T) {
 	}
 }
 
-// TestFixedLists checks the comma-list completion of the flags of a fixed list, from the AWS SDK enums
+// TestFlagValues checks the comma-list completion of the flags of a fixed list, from the AWS SDK enums
 // or the lists awss validates against.
-func TestFixedLists(t *testing.T) {
+func TestFlagValues(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
@@ -201,13 +200,13 @@ func TestFixedLists(t *testing.T) {
 	}
 }
 
-// TestFixedLists_inHelp checks that the help of every flag of a fixed list, and of the
+// TestFlagValues_inHelp checks that the help of every flag of a fixed list, and of the
 // availability zones, lists the values it completes.
-func TestFixedLists_inHelp(t *testing.T) {
+func TestFlagValues_inHelp(t *testing.T) {
 	resetCLI(t, nil)
 	for _, sub := range subcommands {
 		lists := map[string]func() []string{}
-		maps.Copy(lists, fixedLists()[engineName(sub.cmd)])
+		maps.Copy(lists, sub.lists)
 		if sub.cmd.Flags().Lookup(flagAvailabilityZones) != nil {
 			lists[flagAvailabilityZones] = common.AvailabilityZoneLetters
 		}

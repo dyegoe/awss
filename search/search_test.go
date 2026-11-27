@@ -27,10 +27,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -38,151 +35,57 @@ import (
 	"github.com/dyegoe/awss/common"
 )
 
-// mockEngines swaps the registry for a single "test" engine and restores it after the test.
-func mockEngines(t *testing.T, newFn constructor) {
-	t.Helper()
-	old := engines
-	t.Cleanup(func() { engines = old })
-	engines = map[string]engine{
-		"test": {
-			new: newFn,
-			sortFields: func(f string) (map[string]string, error) {
-				fields := map[string]string{"field1": "value1"}
-				if _, ok := fields[f]; !ok {
-					return nil, fmt.Errorf("field %s not found", f)
-				}
-				return fields, nil
-			},
-			sortFieldNames: func() []string { return []string{"field1"} },
+// testEngine returns an engine built by newFn whose only sort field is field1.
+func testEngine(newFn Constructor) *Engine {
+	return &Engine{
+		New: newFn,
+		SortFields: func(f string) (map[string]string, error) {
+			fields := map[string]string{"field1": "value1"}
+			if _, ok := fields[f]; !ok {
+				return nil, fmt.Errorf("field %s not found", f)
+			}
+			return fields, nil
 		},
+		SortFieldNames: func() []string { return []string{"field1"} },
 	}
 }
 
-// TestCheckSortField tests the CheckSortField function.
-func TestCheckSortField(t *testing.T) {
-	mockEngines(t, nil)
-
+// TestEngine_CheckSortField checks that a sort field of the engine passes and any other fails.
+func TestEngine_CheckSortField(t *testing.T) {
 	tests := []struct {
 		name    string
-		cmd     string
 		f       string
 		wantErr bool
 	}{
-		{
-			name:    "Command found and field found",
-			cmd:     "test",
-			f:       "field1",
-			wantErr: false,
-		},
-		{
-			name:    "Command not found",
-			cmd:     "test2",
-			f:       "field1",
-			wantErr: true,
-		},
-		{
-			name:    "Command found but field not found",
-			cmd:     "test",
-			f:       "field2",
-			wantErr: true,
-		},
+		{name: "field found", f: "field1"},
+		{name: "field not found", f: "field2", wantErr: true},
+	}
+	eng := testEngine(nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := eng.CheckSortField(tt.f); (err != nil) != tt.wantErr {
+				t.Errorf("CheckSortField(%q) error = %v, wantErr %v", tt.f, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestExecute_noEngine checks that a missing engine fails before any profile or region is touched.
+func TestExecute_noEngine(t *testing.T) {
+	tests := []struct {
+		name string
+		eng  *Engine
+	}{
+		{name: "nil engine"},
+		{name: "engine without a constructor", eng: testEngine(nil)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := CheckSortField(tt.cmd, tt.f); (err != nil) != tt.wantErr {
-				t.Errorf("CheckSortField() error = %v, wantErr %v", err, tt.wantErr)
+			opts := &Options{Output: common.JSON}
+			if _, err := Execute(tt.eng, []string{"default"}, []string{"us-east-1"}, map[string][]string{}, opts); err == nil {
+				t.Error("Execute() error = nil, want an error")
 			}
 		})
-	}
-}
-
-// TestExecute_unknownCommand checks that an unknown command fails before any profile or region is touched.
-func TestExecute_unknownCommand(t *testing.T) {
-	called := false
-	mockEngines(t, func(_, _ string, _ map[string][]string, _ *Options) common.Results {
-		called = true
-		return nil
-	})
-
-	opts := &Options{Output: common.JSON}
-	_, err := Execute("nope", []string{"default"}, []string{"us-east-1"}, map[string][]string{}, opts)
-	if err == nil {
-		t.Fatal("Execute() error = nil, want command not found")
-	}
-	if called {
-		t.Error("Execute() built results for an unknown command")
-	}
-}
-
-// TestEngines_searchKeepsFilters checks that no search changes the filters map it is given: one
-// map is shared by every profile x region goroutine of a run (AGENTS.md). The profile does not
-// exist, so each search builds its filters and stops at the AWS config, with no AWS call.
-func TestEngines_searchKeepsFilters(t *testing.T) {
-	empty := filepath.Join(t.TempDir(), "config")
-	if err := os.WriteFile(empty, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("AWS_CONFIG_FILE", empty)
-	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", empty)
-
-	// One key of every kind the commands send: IDs, names, tags, zones, CIDRs and S3 patterns.
-	sent := func() map[string][]string {
-		return map[string][]string{
-			"instance-id": {"i-1"}, "tag:Name": {"web-*"}, "tag": {"Env=prod:dev"},
-			"availability-zone": {"a", "b"}, "cidr": {"10.0.0.0/16"}, "vpc-id": {"vpc-1"},
-			"name": {"logs-*"}, "bucket": {"b1"}, "key": {"app/*"},
-			"engine": {"postgres"}, "engine-version": {"13*"}, "db-cluster-id": {"c1"}, "db-instance-id": {"db-1"},
-		}
-	}
-	for cmd, eng := range engines {
-		t.Run(cmd, func(t *testing.T) {
-			filters := sent()
-			r := eng.new("awss-test-missing-profile", "us-east-1", filters, &Options{NoInstanceName: true})
-
-			r.Search(context.Background())
-
-			if !reflect.DeepEqual(filters, sent()) {
-				t.Errorf("%s Search() changed its filters to %v, want %v", cmd, filters, sent())
-			}
-		})
-	}
-}
-
-// TestEngines_registeredCommands checks every registered command has a constructor and sort fields
-// that agree, and that the constructor of every search passes SortField through. A cleanup, such
-// as default-vpc, has no --sort and is known by its package under cleanup/.
-func TestEngines_registeredCommands(t *testing.T) {
-	for _, cmd := range EngineNames() {
-		t.Run(cmd, func(t *testing.T) {
-			eng := engines[cmd]
-			if eng.new == nil || eng.sortFields == nil || eng.sortFieldNames == nil {
-				t.Fatalf("engines[%q] must define new, sortFields and sortFieldNames", cmd)
-			}
-			for _, name := range eng.sortFieldNames() {
-				if _, err := eng.sortFields(name); err != nil {
-					t.Errorf("engines[%q]: sortFieldNames lists %q but sortFields rejects it: %v", cmd, name, err)
-				}
-			}
-			r := eng.new("default", "us-east-1", map[string][]string{}, &Options{SortField: "id", NoInstanceName: true})
-			if r == nil {
-				t.Fatalf("engines[%q].new returned nil", cmd)
-			}
-			cleanup := strings.HasPrefix(reflect.TypeOf(r).Elem().PkgPath(), "github.com/dyegoe/awss/cleanup/")
-			if got := r.GetSortField(); !cleanup && got != "id" {
-				t.Errorf("engines[%q].new SortField = %q, want %q", cmd, got, "id")
-			}
-		})
-	}
-}
-
-// TestSortFieldNames tests SortFieldNames for known and unknown commands.
-func TestSortFieldNames(t *testing.T) {
-	mockEngines(t, nil)
-	if got := SortFieldNames("test"); len(got) != 1 || got[0] != "field1" {
-		t.Errorf("SortFieldNames(test) = %v, want [field1]", got)
-	}
-	if got := SortFieldNames("nope"); got != nil {
-		t.Errorf("SortFieldNames(nope) = %v, want nil", got)
 	}
 }
 
@@ -194,18 +97,17 @@ func (f *fakeResults) Len() int                  { return 0 }
 func (f *fakeResults) GetHeaders() []interface{} { return nil }
 func (f *fakeResults) GetRows() []interface{}    { return nil }
 
-// mockCountingEngine registers a "test" engine returning fakeResults and counts how many it built.
-func mockCountingEngine(t *testing.T) *int {
-	t.Helper()
+// countingEngine returns an engine building fakeResults, and how many it built.
+func countingEngine() (eng *Engine, built *int) {
 	var mu sync.Mutex
-	calls := 0
-	mockEngines(t, func(profile, region string, _ map[string][]string, _ *Options) common.Results {
+	n := 0
+	eng = testEngine(func(profile, region string, _ map[string][]string, _ *Options) common.Results {
 		mu.Lock()
-		calls++
+		n++
 		mu.Unlock()
 		return &fakeResults{common.BaseResults{Profile: profile, Region: region}}
 	})
-	return &calls
+	return eng, &n
 }
 
 // TestExecute_fanOut checks that every profile x region is searched once, and none without profiles.
@@ -225,10 +127,10 @@ func TestExecute_fanOut(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			calls := mockCountingEngine(t)
+			eng, calls := countingEngine()
 
 			opts := &Options{Output: common.JSON}
-			if _, err := Execute("test", tt.profiles, tt.regions, map[string][]string{}, opts); err != nil {
+			if _, err := Execute(eng, tt.profiles, tt.regions, map[string][]string{}, opts); err != nil {
 				t.Fatalf("Execute() error = %v, want nil", err)
 			}
 			if *calls != tt.wantCalls {
@@ -251,10 +153,9 @@ func (f *timedResults) Len() int                   { return len(f.Data) }
 func (f *timedResults) GetHeaders() []interface{}  { return nil }
 func (f *timedResults) GetRows() []interface{}     { return nil }
 
-// mockTimedEngine registers a "test" engine whose searches are looked up by profile.
-func mockTimedEngine(t *testing.T, searches map[string]func(ctx context.Context, r *timedResults)) {
-	t.Helper()
-	mockEngines(t, func(profile, region string, _ map[string][]string, _ *Options) common.Results {
+// timedEngine returns an engine whose searches are looked up by profile.
+func timedEngine(searches map[string]func(ctx context.Context, r *timedResults)) *Engine {
+	return testEngine(func(profile, region string, _ map[string][]string, _ *Options) common.Results {
 		return &timedResults{
 			BaseResults: common.BaseResults{Profile: profile, Region: region},
 			Data:        []string{},
@@ -317,11 +218,11 @@ func TestExecute_timeoutReachesSearch(t *testing.T) {
 				deadlines[r.Profile+"/"+r.Region] = ok
 				mu.Unlock()
 			}
-			mockTimedEngine(t, map[string]func(context.Context, *timedResults){"p1": record, "p2": record})
+			eng := timedEngine(map[string]func(context.Context, *timedResults){"p1": record, "p2": record})
 			captureStdout(t)
 
 			opts := &Options{Output: common.JSON, Timeout: tt.timeout}
-			if _, err := Execute("test", []string{"p1", "p2"}, []string{"r1", "r2"}, map[string][]string{}, opts); err != nil {
+			if _, err := Execute(eng, []string{"p1", "p2"}, []string{"r1", "r2"}, map[string][]string{}, opts); err != nil {
 				t.Fatalf("Execute() error = %v", err)
 			}
 			if len(deadlines) != 4 {
@@ -344,7 +245,7 @@ func TestExecute_timeout(t *testing.T) {
 	t.Cleanup(func() { close(hang) })
 	ctxErr := make(chan error, 1)
 
-	mockTimedEngine(t, map[string]func(context.Context, *timedResults){
+	eng := timedEngine(map[string]func(context.Context, *timedResults){
 		"fast":  func(_ context.Context, r *timedResults) { r.Data = append(r.Data, "row-1", "row-2") },
 		"empty": func(_ context.Context, _ *timedResults) {},
 		"failed": func(_ context.Context, r *timedResults) {
@@ -367,7 +268,7 @@ func TestExecute_timeout(t *testing.T) {
 
 	opts := &Options{Output: common.JSON, Timeout: 100 * time.Millisecond}
 	profiles := []string{"fast", "empty", "failed", "cut-short", "hung"}
-	summary, err := Execute("test", profiles, []string{"us-east-1"}, map[string][]string{}, opts)
+	summary, err := Execute(eng, profiles, []string{"us-east-1"}, map[string][]string{}, opts)
 	if err != nil {
 		t.Fatalf("Execute() error = %v, want nil", err)
 	}
@@ -406,7 +307,7 @@ func TestExecute_timeout(t *testing.T) {
 // in its result set, and that the other profiles are unaffected.
 func TestExecute_loggedOutProfile(t *testing.T) {
 	const expired = "error describing instances: failed to refresh cached credentials, the SSO session has expired"
-	mockTimedEngine(t, map[string]func(context.Context, *timedResults){
+	eng := timedEngine(map[string]func(context.Context, *timedResults){
 		"logged-in-1": func(_ context.Context, r *timedResults) { r.Data = append(r.Data, "row-1") },
 		"expired":     func(_ context.Context, r *timedResults) { r.Errors = append(r.Errors, expired) },
 		"logged-in-2": func(_ context.Context, r *timedResults) { r.Data = append(r.Data, "row-2") },
@@ -415,7 +316,7 @@ func TestExecute_loggedOutProfile(t *testing.T) {
 
 	opts := &Options{Output: common.JSON}
 	profiles := []string{"logged-in-1", "expired", "logged-in-2"}
-	if _, err := Execute("test", profiles, []string{"us-east-1"}, map[string][]string{}, opts); err != nil {
+	if _, err := Execute(eng, profiles, []string{"us-east-1"}, map[string][]string{}, opts); err != nil {
 		t.Fatalf("Execute() error = %v, want nil", err)
 	}
 
@@ -485,7 +386,7 @@ func TestExecute_concurrency(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			probe := &concurrencyProbe{want: tt.wantMax, full: make(chan struct{})}
-			mockEngines(t, func(profile, region string, _ map[string][]string, _ *Options) common.Results {
+			eng := testEngine(func(profile, region string, _ map[string][]string, _ *Options) common.Results {
 				return &timedResults{
 					BaseResults: common.BaseResults{Profile: profile, Region: region},
 					Data:        []string{},
@@ -504,7 +405,7 @@ func TestExecute_concurrency(t *testing.T) {
 			}
 
 			opts := &Options{Output: common.JSON, Concurrency: tt.concurrency}
-			if _, err := Execute("test", profiles, regions, map[string][]string{}, opts); err != nil {
+			if _, err := Execute(eng, profiles, regions, map[string][]string{}, opts); err != nil {
 				t.Fatalf("Execute() error = %v, want nil", err)
 			}
 			if probe.max != tt.wantMax {
@@ -521,7 +422,7 @@ func TestExecute_concurrency(t *testing.T) {
 // deadline is reported as not started, never calls its Search, and counts as timed out.
 func TestExecute_timeoutWhileWaiting(t *testing.T) {
 	started := make(chan string, 2)
-	mockTimedEngine(t, map[string]func(context.Context, *timedResults){
+	eng := timedEngine(map[string]func(context.Context, *timedResults){
 		// Holds the only slot until the deadline.
 		"first": func(ctx context.Context, r *timedResults) {
 			started <- r.Profile
@@ -532,7 +433,7 @@ func TestExecute_timeoutWhileWaiting(t *testing.T) {
 	out := captureStdout(t)
 
 	opts := &Options{Output: common.JSON, Concurrency: 1, Timeout: 50 * time.Millisecond}
-	summary, err := Execute("test", []string{"first", "second"}, []string{"us-east-1"}, map[string][]string{}, opts)
+	summary, err := Execute(eng, []string{"first", "second"}, []string{"us-east-1"}, map[string][]string{}, opts)
 	if err != nil {
 		t.Fatalf("Execute() error = %v, want nil", err)
 	}
@@ -583,32 +484,5 @@ func TestWorkerCount(t *testing.T) {
 				t.Errorf("workerCount(%d, %d) = %d, want %d", tt.concurrency, tt.searches, got, tt.want)
 			}
 		})
-	}
-}
-
-// TestEngines_accountNames checks that every search with an AccountNames field, the ones with an
-// Owner column, is marked accountNames and receives the account names of the run, and that no
-// other search is marked.
-func TestEngines_accountNames(t *testing.T) {
-	names := map[string]string{"111111111111": "network"}
-	opts := &Options{AccountNames: names}
-	for _, cmd := range EngineNames() {
-		t.Run(cmd, func(t *testing.T) {
-			r := engines[cmd].new("default", "us-east-1", map[string][]string{}, opts)
-			field := reflect.ValueOf(r).Elem().FieldByName("AccountNames")
-			if got, want := UsesAccountNames(cmd), field.IsValid(); got != want {
-				t.Fatalf("UsesAccountNames(%q) = %v, want %v: true exactly when the result has an AccountNames field",
-					cmd, got, want)
-			}
-			if !field.IsValid() {
-				return
-			}
-			if got := field.Interface(); !reflect.DeepEqual(got, names) {
-				t.Errorf("engines[%q].new AccountNames = %v, want %v", cmd, got, names)
-			}
-		})
-	}
-	if UsesAccountNames("unknown") {
-		t.Errorf("UsesAccountNames(%q) = true, want false", "unknown")
 	}
 }

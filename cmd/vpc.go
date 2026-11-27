@@ -21,6 +21,8 @@ package cmd
 
 import (
 	"github.com/dyegoe/awss/common"
+	"github.com/dyegoe/awss/search"
+	searchVPC "github.com/dyegoe/awss/search/vpc"
 
 	"github.com/spf13/cobra"
 )
@@ -93,6 +95,28 @@ func vpcRunE(cmd *cobra.Command, _ []string) error {
 	}, nil, vpcF.Tags, vpcF)
 }
 
+// vpcEngine is what the vpc command runs over every profile and region.
+var vpcEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		r := searchVPC.New(profile, region, filters, opts.SortField)
+		r.AccountNames = opts.AccountNames
+		return r
+	},
+	SortFields:     searchVPC.GetSortFields,
+	SortFieldNames: searchVPC.SortFieldNames,
+	AccountNames:   true,
+}
+
+// vpcSubcommand is the vpc command: the engine it runs, the values of its fixed-list flags, and how
+// it registers and binds its flags.
+var vpcSubcommand = &subcommand{
+	cmd:       vpcCmd,
+	engine:    vpcEngine,
+	lists:     flagValues{flagStates: vpcStateNames, "default": trueFalse},
+	initFlags: vpcInitFlags,
+	initViper: vpcInitViper,
+}
+
 func vpcInitFlags() {
 	rootCmd.AddCommand(vpcCmd)
 
@@ -114,7 +138,7 @@ func vpcInitFlags() {
 		listHelp("Filter VPCs by whether they are the default VPC", trueFalse(), "true"))
 	vpcCmd.Flags().StringSliceVarP(&vpcF.OwnerIDs, "owner-ids", "o", []string{},
 		"Filter VPCs by owner account IDs. `123456789012`")
-	vpcCmd.Flags().String("sort", "name", sortHelp("vpc", "VPCs", "name"))
+	vpcCmd.Flags().String("sort", "name", sortHelp(vpcEngine, "VPCs", "name"))
 }
 
 func vpcInitViper() error {

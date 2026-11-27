@@ -23,6 +23,8 @@ import (
 	"net"
 
 	"github.com/dyegoe/awss/common"
+	"github.com/dyegoe/awss/search"
+	searchEC2 "github.com/dyegoe/awss/search/ec2"
 
 	"github.com/spf13/cobra"
 )
@@ -97,6 +99,25 @@ func ec2RunE(cmd *cobra.Command, _ []string) error {
 	}, ec2F.AvailabilityZones, ec2F.Tags, ec2F)
 }
 
+// ec2Engine is what the ec2 command runs over every profile and region.
+var ec2Engine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		return searchEC2.New(profile, region, filters, opts.SortField)
+	},
+	SortFields:     searchEC2.GetSortFields,
+	SortFieldNames: searchEC2.SortFieldNames,
+}
+
+// ec2Subcommand is the ec2 command: the engine it runs, the values of its fixed-list flags, and how
+// it registers and binds its flags.
+var ec2Subcommand = &subcommand{
+	cmd:       ec2Cmd,
+	engine:    ec2Engine,
+	lists:     flagValues{"instance-states": instanceStateNames},
+	initFlags: ec2InitFlags,
+	initViper: ec2InitViper,
+}
+
 func ec2InitFlags() {
 	rootCmd.AddCommand(ec2Cmd)
 
@@ -125,7 +146,7 @@ func ec2InitFlags() {
 		"Filter EC2 instances by attached EBS volume IDs. `vol-1230456078901,vol-1230456078902`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.CIDRs, flagCIDRs, "c", []string{},
 		"Filter EC2 instances by IPv4 range: any private IP of any ENI inside it. `100.64.0.0/16`")
-	ec2Cmd.Flags().String(flagSort, "name", sortHelp("ec2", "EC2 instances", "name"))
+	ec2Cmd.Flags().String(flagSort, "name", sortHelp(ec2Engine, "EC2 instances", "name"))
 }
 
 func ec2InitViper() error {

@@ -201,7 +201,7 @@ In `cmd`, a command file uses these instead of writing the code or the text by h
 | Need                                        | Helper                                         |
 | ------------------------------------------- | ---------------------------------------------- |
 | Bind the command's flags to viper keys      | `bindFlags(cmd, map[string]string{key: flag})` |
-| `--sort` help from the registered fields    | `sortHelp(cmd, what, default)`                 |
+| `--sort` help from the engine's sort fields | `sortHelp(<cmd>Engine, what, default)`         |
 | Long help sentence listing the filter flags | `filtersHelp(what, <cmd>FilterFlags)`          |
 | Flag help listing the accepted values       | `listHelp(text, values, example)`              |
 

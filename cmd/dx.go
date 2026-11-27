@@ -17,6 +17,8 @@ limitations under the License.
 package cmd
 
 import (
+	"github.com/dyegoe/awss/common"
+	"github.com/dyegoe/awss/search"
 	searchDXGW "github.com/dyegoe/awss/search/dxgw"
 
 	"github.com/spf13/cobra"
@@ -61,9 +63,8 @@ in the region of the profile, and ignore --regions.
 
 // dxGatewaysCmd lists the Direct Connect gateways, their associations and allowed prefixes.
 var dxGatewaysCmd = &cobra.Command{
-	Use:         "gateways",
-	Short:       "List the Direct Connect gateways: what they are associated with and the prefixes they advertise.",
-	Annotations: map[string]string{annotationEngine: "dx-gateways"},
+	Use:   "gateways",
+	Short: "List the Direct Connect gateways: what they are associated with and the prefixes they advertise.",
 	Long: `
 List the Direct Connect gateways, what each one is associated with (a transit gateway, a virtual
 private gateway or a Cloud WAN core network), the prefixes it advertises to the data centres, and
@@ -121,6 +122,33 @@ func addDXCommand(cmd *cobra.Command) {
 	dxCmd.AddCommand(cmd)
 }
 
+// dxGatewaysEngine is what the dx gateways command runs over every profile and region.
+var dxGatewaysEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		r := searchDXGW.New(profile, region, filters, opts.SortField)
+		r.AccountNames = opts.AccountNames
+		return r
+	},
+	SortFields:     searchDXGW.GetSortFields,
+	SortFieldNames: searchDXGW.SortFieldNames,
+	AccountNames:   true,
+}
+
+// dxGatewaysSubcommand is the dx gateways command: the engine it runs, the values of its fixed-list
+// flags, and how it registers and binds its flags.
+//
+// A Direct Connect gateway is global: the command passes the region searchDXGW.Region.
+var dxGatewaysSubcommand = &subcommand{
+	cmd:    dxGatewaysCmd,
+	engine: dxGatewaysEngine,
+	lists: flagValues{
+		flagMatch: searchDXGW.MatchNames, "associated-types": searchDXGW.AssociatedTypeNames,
+		flagStates: searchDXGW.StateNames,
+	},
+	initFlags: dxGatewaysInitFlags,
+	initViper: dxGatewaysInitViper,
+}
+
 func dxGatewaysInitFlags() {
 	addDXCommand(dxGatewaysCmd)
 	f, fl := &dxGatewaysF, dxGatewaysCmd.Flags()
@@ -139,7 +167,7 @@ func dxGatewaysInitFlags() {
 		"Keep the associations of these transit gateways, virtual private gateways or core networks, exact. `tgw-0123`")
 	fl.StringSliceVar(&f.States, flagStates, []string{},
 		listHelp("Keep the associations in these states", searchDXGW.StateNames(), "associated"))
-	fl.String(flagSort, "gateway", sortHelp("dx-gateways", "gateways", "gateway"))
+	fl.String(flagSort, "gateway", sortHelp(dxGatewaysEngine, "gateways", "gateway"))
 }
 
 func dxGatewaysInitViper() error {

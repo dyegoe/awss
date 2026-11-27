@@ -94,7 +94,7 @@ func checkCleanupRun(t *testing.T, args []string, err error, calls []searchCall,
 		t.Fatalf("Execute(%v) runs = %d, want 1", args, len(calls))
 	}
 	want := searchCall{
-		cmd: args[1], profiles: profiles, regions: []string{"us-east-1"}, filters: map[string][]string{},
+		cmd: args[0] + " " + args[1], profiles: profiles, regions: []string{"us-east-1"}, filters: map[string][]string{},
 		opts: search.Options{
 			Output: "table", Concurrency: search.DefaultConcurrency, Timeout: defaultTimeout, Apply: apply,
 		},

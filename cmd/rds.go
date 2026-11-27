@@ -23,6 +23,8 @@ import (
 	"fmt"
 
 	"github.com/dyegoe/awss/common"
+	"github.com/dyegoe/awss/search"
+	searchRDS "github.com/dyegoe/awss/search/rds"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -103,6 +105,23 @@ func checkRDSPatterns(names, versions, tags []string, regex bool) error {
 	return nil
 }
 
+// rdsEngine is what the rds command runs over every profile and region.
+var rdsEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		return searchRDS.New(profile, region, filters, opts.SortField, opts.Regex)
+	},
+	SortFields:     searchRDS.GetSortFields,
+	SortFieldNames: searchRDS.SortFieldNames,
+}
+
+// rdsSubcommand is the rds command: the engine it runs and how it registers and binds its flags.
+var rdsSubcommand = &subcommand{
+	cmd:       rdsCmd,
+	engine:    rdsEngine,
+	initFlags: rdsInitFlags,
+	initViper: rdsInitViper,
+}
+
 func rdsInitFlags() {
 	rootCmd.AddCommand(rdsCmd)
 
@@ -122,7 +141,7 @@ func rdsInitFlags() {
 		"Filter DB instances by tags (awss); values accept globs. `'Env=prod:stg,Team=app'`")
 	rdsCmd.Flags().Bool(flagRegex, false,
 		"Treat --names patterns as Go regular expressions instead of globs.")
-	rdsCmd.Flags().String(flagSort, "id", sortHelp("rds", "DB instances", "id"))
+	rdsCmd.Flags().String(flagSort, "id", sortHelp(rdsEngine, "DB instances", "id"))
 }
 
 func rdsInitViper() error {
