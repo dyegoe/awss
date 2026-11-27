@@ -538,14 +538,18 @@ func TestGetSortFields(t *testing.T) {
 	}
 	r := New("dev", Region, nil, "", false, false)
 	r.Data = []dataRow{{ID: "E1", Modified: "2025-03-01T00:00:00Z"}, {ID: "E2", Modified: "2024-01-01T00:00:00Z"}}
-	if err := r.sortResults("modified"); err != nil {
-		t.Fatalf("sortResults(modified) error = %v", err)
+	r.SortField = "modified"
+	r.SortRows()
+	if len(r.Errors) > 0 {
+		t.Fatalf("SortRows() by modified errors = %v, want none", r.Errors)
 	}
 	if got := ids(r.Data); !slices.Equal(got, []string{"E2", "E1"}) {
-		t.Errorf("sortResults(modified) ids = %v, want [E2 E1]", got)
+		t.Errorf("SortRows() by modified ids = %v, want [E2 E1]", got)
 	}
-	if err := r.sortResults("nope"); err == nil {
-		t.Error("sortResults(nope) error = nil, want an error")
+	r.SortField = "nope"
+	r.SortRows()
+	if len(r.Errors) == 0 {
+		t.Error("SortRows() by nope errors = none, want an error")
 	}
 }
 
