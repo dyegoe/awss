@@ -196,6 +196,15 @@ provides:
 A resource package's `GetHeaders`, `GetRows`, `GetSortFields`, `SortFieldNames` and
 `sortResults` should each be one line calling these.
 
+In `cmd`, a command file uses these instead of writing the code or the text by hand:
+
+| Need                                        | Helper                                         |
+| ------------------------------------------- | ---------------------------------------------- |
+| Bind the command's flags to viper keys      | `bindFlags(cmd, map[string]string{key: flag})` |
+| `--sort` help from the registered fields    | `sortHelp(cmd, what, default)`                 |
+| Long help sentence listing the filter flags | `filtersHelp(what, <cmd>FilterFlags)`          |
+| Flag help listing the accepted values       | `listHelp(text, values, example)`              |
+
 `Results.Filters` is the same map in every profile x region goroutine of a run, so a search that
 must rewrite a filter builds a copy: see `resolveCIDRFilter` in `search/ec2`.
 

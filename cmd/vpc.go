@@ -57,8 +57,7 @@ var vpcCmd = &cobra.Command{
 	Short: "Search for VPCs.",
 	Long: `
 Search for VPCs.
-You can search VPCs using the following filters:
-  ids, names, tags, tags-key, cidrs, states, default, owner-ids.
+` + filtersHelp("VPCs", vpcFilterFlags) + `
 You can use multiple values for each filter, separated by comma.
 Example: --ids vpc-1230456078901,vpc-1230456078902
 
