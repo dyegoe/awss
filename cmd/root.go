@@ -394,7 +394,7 @@ func sortHelp(cmd, what, def string) string {
 const helpWidth = 100
 
 // filtersHelp builds the sentence of a command's long help that lists its filter flags, wrapped
-// at helpWidth, so adding a filter flag cannot leave the help stale.
+// at helpWidth, so adding a filter flag cannot leave the help stale. It ends without a newline.
 func filtersHelp(what string, flags []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "You can search %s using the following filters:\n", what)
@@ -410,7 +410,7 @@ func filtersHelp(what string, flags []string) string {
 		}
 		line += word
 	}
-	b.WriteString(line + "\n")
+	b.WriteString(line)
 	return b.String()
 }
 

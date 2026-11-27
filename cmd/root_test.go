@@ -59,19 +59,19 @@ func TestFiltersHelp(t *testing.T) {
 		{
 			name:  "one flag",
 			flags: []string{"ids"},
-			want:  "You can search things using the following filters:\n  --ids.\n",
+			want:  "You can search things using the following filters:\n  --ids.",
 		},
 		{
 			name:  "two flags",
 			flags: []string{"ids", "tags"},
-			want:  "You can search things using the following filters:\n  --ids, --tags.\n",
+			want:  "You can search things using the following filters:\n  --ids, --tags.",
 		},
 		{
 			name:  "wrapped",
 			flags: long,
 			want: "You can search things using the following filters:\n" +
 				"  --availability-zones, --instance-states, --private-ips, --public-ips, --volume-ids, --tags-key,\n" +
-				"  --instance-types, --default-for-az, --public-ip-on-launch, --owner-ids.\n",
+				"  --instance-types, --default-for-az, --public-ip-on-launch, --owner-ids.",
 		},
 	}
 	for _, tt := range tests {

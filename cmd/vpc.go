@@ -57,7 +57,8 @@ var vpcCmd = &cobra.Command{
 	Short: "Search for VPCs.",
 	Long: `
 Search for VPCs.
-` + filtersHelp("VPCs", vpcFilterFlags) + `You can use multiple values for each filter, separated by comma.
+` + filtersHelp("VPCs", vpcFilterFlags) + `
+You can use multiple values for each filter, separated by comma.
 Example: --ids vpc-1230456078901,vpc-1230456078902
 
 A CIDR matches when it is exactly one of the IPv4 CIDR blocks associated with the VPC,

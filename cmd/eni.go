@@ -57,7 +57,8 @@ var eniCmd = &cobra.Command{
 	Short: "Search for ENIs (Elastic Network Interfaces).",
 	Long: `
 Search for ENIs (Elastic Network Interfaces).
-` + filtersHelp("ENIs", eniFilterFlags) + `You can use multiple values for each filter, separated by comma. Example: --ids eni-1230456078901,eni-1230456078902
+` + filtersHelp("ENIs", eniFilterFlags) + `
+You can use multiple values for each filter, separated by comma. Example: --ids eni-1230456078901,eni-1230456078902
 
 You can use multiple filters at same time, for example:
 	awss eni -I i-1230456078901,i-1230456078902 -z a,b

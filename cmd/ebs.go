@@ -55,7 +55,8 @@ var ebsCmd = &cobra.Command{
 	Short: "Search for EBS volumes.",
 	Long: `
 Search for EBS volumes.
-` + filtersHelp("EBS volumes", ebsFilterFlags) + `You can use multiple values for each filter, separated by comma.
+` + filtersHelp("EBS volumes", ebsFilterFlags) + `
+You can use multiple values for each filter, separated by comma.
 Example: --ids vol-1230456078901,vol-1230456078902
 
 You can use multiple filters at same time, for example:

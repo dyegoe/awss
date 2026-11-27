@@ -56,7 +56,8 @@ var subnetCmd = &cobra.Command{
 	Short: "Search for subnets.",
 	Long: `
 Search for subnets.
-` + filtersHelp("subnets", subnetFilterFlags) + `You can use multiple values for each filter, separated by comma.
+` + filtersHelp("subnets", subnetFilterFlags) + `
+You can use multiple values for each filter, separated by comma.
 Example: --ids subnet-1230456078901,subnet-1230456078902
 
 A CIDR matches when it is exactly the IPv4 CIDR block of the subnet. Example: --cidrs 10.0.1.0/24

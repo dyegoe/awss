@@ -62,7 +62,8 @@ var ec2Cmd = &cobra.Command{
 	Short: "Search for EC2 instances.",
 	Long: `
 Search for EC2 instances.
-` + filtersHelp("EC2 instances", ec2FilterFlags) + `You can use multiple values for each filter, separated by comma. Example: --names 'Name1,Name2'
+` + filtersHelp("EC2 instances", ec2FilterFlags) + `
+You can use multiple values for each filter, separated by comma. Example: --names 'Name1,Name2'
 
 --cidrs finds the instances that have a private IP inside an IPv4 range, on any of their network
 interfaces (primary or secondary). The range can be a subnet, a VPC CIDR block (primary or
