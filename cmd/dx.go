@@ -122,22 +122,25 @@ func addDXCommand(cmd *cobra.Command) {
 	dxCmd.AddCommand(cmd)
 }
 
+// dxGatewaysEngine is what the dx gateways command runs over every profile and region.
+var dxGatewaysEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		r := searchDXGW.New(profile, region, filters, opts.SortField)
+		r.AccountNames = opts.AccountNames
+		return r
+	},
+	SortFields:     searchDXGW.GetSortFields,
+	SortFieldNames: searchDXGW.SortFieldNames,
+	AccountNames:   true,
+}
+
 // dxGatewaysSubcommand is the dx gateways command: the engine it runs, the values of its fixed-list
 // flags, and how it registers and binds its flags.
 //
 // A Direct Connect gateway is global: the command passes the region searchDXGW.Region.
 var dxGatewaysSubcommand = &subcommand{
-	cmd: dxGatewaysCmd,
-	engine: &search.Engine{
-		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
-			r := searchDXGW.New(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		SortFields:     searchDXGW.GetSortFields,
-		SortFieldNames: searchDXGW.SortFieldNames,
-		AccountNames:   true,
-	},
+	cmd:    dxGatewaysCmd,
+	engine: dxGatewaysEngine,
 	lists: flagValues{
 		flagMatch: searchDXGW.MatchNames, "associated-types": searchDXGW.AssociatedTypeNames,
 		flagStates: searchDXGW.StateNames,
@@ -164,7 +167,7 @@ func dxGatewaysInitFlags() {
 		"Keep the associations of these transit gateways, virtual private gateways or core networks, exact. `tgw-0123`")
 	fl.StringSliceVar(&f.States, flagStates, []string{},
 		listHelp("Keep the associations in these states", searchDXGW.StateNames(), "associated"))
-	fl.String(flagSort, "gateway", sortHelp(dxGatewaysCmd, "gateways", "gateway"))
+	fl.String(flagSort, "gateway", sortHelp(dxGatewaysEngine, "gateways", "gateway"))
 }
 
 func dxGatewaysInitViper() error {

@@ -56,12 +56,13 @@ see this interface. An engine gets everything but `Search` from the embedded
 `common.RowSet[row]` (`common/results.go`): the rows, the profile, region and errors, and the sort
 step. The engine itself holds only its AWS calls, its row parsing and its filters.
 
-**Subcommands and engines** (`cmd/`). Each command file declares one `subcommand`: the cobra
-command, its `search.Engine` (the constructor, the sort field functions and whether it shows
-account names), the values of its fixed-list flags, and the functions that register and bind its
-flags. The `subcommands` list in `cmd/root.go` registers them; `setup` maps each command to its
-engine, so no name string joins a command to its engine. `search` only runs an engine it is
-given: it does not import the engine packages. The `cmd` tests check every engine from that list.
+**Subcommands and engines** (`cmd/`). Each command file declares its `search.Engine` (the
+constructor, the sort field functions and whether it shows account names) and one `subcommand`
+that ties together the cobra command, that engine, the values of its fixed-list flags, and the
+functions that register and bind its flags. The `subcommands` list in `cmd/root.go` registers
+them; `setup` maps each command to its engine, so no name string joins a command to its engine.
+`search` only runs an engine it is given: it does not import the engine packages. The `cmd`
+tests check every engine from that list.
 
 **Row structs and tags.** A row type's fields carry `json`, `header` and `sort` tags; `stack`
 puts a field in the column before it, on a new line, and `hide:"empty"` hides a column that is

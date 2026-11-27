@@ -414,8 +414,8 @@ func bindFlags(cmd *cobra.Command, keys map[string]string) error {
 
 // sortHelp builds the --sort help text of a command from the sort fields of its engine, so the
 // help never drifts from the struct tags.
-func sortHelp(cmd *cobra.Command, what, def string) string {
-	names := common.StringSliceToString(engineOf(cmd).SortFieldNames(), ", ")
+func sortHelp(eng *search.Engine, what, def string) string {
+	names := common.StringSliceToString(eng.SortFieldNames(), ", ")
 	return fmt.Sprintf("Sort %s by %s. %#q", what, names, def)
 }
 

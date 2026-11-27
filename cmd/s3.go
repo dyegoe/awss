@@ -86,16 +86,19 @@ func s3RunE(cmd *cobra.Command, _ []string) error {
 	}, nil, nil, s3F)
 }
 
+// s3Engine is what the s3 command runs over every profile and region.
+var s3Engine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		return searchS3.New(profile, region, filters, opts.SortField, opts.Regex, opts.ShowTags)
+	},
+	SortFields:     searchS3.GetSortFields,
+	SortFieldNames: searchS3.SortFieldNames,
+}
+
 // s3Subcommand is the s3 command: the engine it runs and how it registers and binds its flags.
 var s3Subcommand = &subcommand{
-	cmd: s3Cmd,
-	engine: &search.Engine{
-		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
-			return searchS3.New(profile, region, filters, opts.SortField, opts.Regex, opts.ShowTags)
-		},
-		SortFields:     searchS3.GetSortFields,
-		SortFieldNames: searchS3.SortFieldNames,
-	},
+	cmd:       s3Cmd,
+	engine:    s3Engine,
 	initFlags: s3InitFlags,
 	initViper: s3InitViper,
 }
@@ -109,7 +112,7 @@ func s3InitFlags() {
 		"Filter buckets by name patterns. Globs by default, see --regex. `'prod-*,*-logs'`")
 	s3Cmd.Flags().Bool(flagRegex, false,
 		"Treat --names patterns as Go regular expressions instead of globs.")
-	s3Cmd.Flags().String("sort", "name", sortHelp(s3Cmd, "buckets", "name"))
+	s3Cmd.Flags().String("sort", "name", sortHelp(s3Engine, "buckets", "name"))
 }
 
 func s3InitViper() error {

@@ -187,19 +187,22 @@ func addCleanupCommand(cmd *cobra.Command) {
 // cleanupInitViper binds nothing: the flags of a cleanup command are read from the command only.
 func cleanupInitViper() error { return nil }
 
+// defaultVpcEngine is what the cleanup default-vpc command runs over every profile and region.
+var defaultVpcEngine = &search.Engine{
+	New: func(profile, region string, _ map[string][]string, opts *search.Options) common.Results {
+		return defaultvpc.New(profile, region, opts.Apply)
+	},
+	SortFields:     defaultvpc.GetSortFields,
+	SortFieldNames: defaultvpc.SortFieldNames,
+}
+
 // defaultVpcSubcommand is the default-vpc command: the engine it runs and how it registers and
 // binds its flags.
 //
 // It deletes only with --apply (Options.Apply); otherwise it reports the plan.
 var defaultVpcSubcommand = &subcommand{
-	cmd: defaultVpcCmd,
-	engine: &search.Engine{
-		New: func(profile, region string, _ map[string][]string, opts *search.Options) common.Results {
-			return defaultvpc.New(profile, region, opts.Apply)
-		},
-		SortFields:     defaultvpc.GetSortFields,
-		SortFieldNames: defaultvpc.SortFieldNames,
-	},
+	cmd:       defaultVpcCmd,
+	engine:    defaultVpcEngine,
 	initFlags: defaultVpcInitFlags,
 	initViper: cleanupInitViper,
 }
@@ -207,19 +210,22 @@ var defaultVpcSubcommand = &subcommand{
 // defaultVpcInitFlags registers the default-vpc command.
 func defaultVpcInitFlags() { addCleanupCommand(defaultVpcCmd) }
 
+// dhcpOptionsEngine is what the cleanup dhcp-options command runs over every profile and region.
+var dhcpOptionsEngine = &search.Engine{
+	New: func(profile, region string, _ map[string][]string, opts *search.Options) common.Results {
+		return dhcpoptions.New(profile, region, opts.Apply)
+	},
+	SortFields:     dhcpoptions.GetSortFields,
+	SortFieldNames: dhcpoptions.SortFieldNames,
+}
+
 // dhcpOptionsSubcommand is the dhcp-options command: the engine it runs and how it registers and
 // binds its flags.
 //
 // It deletes only with --apply (Options.Apply); otherwise it reports the unused sets.
 var dhcpOptionsSubcommand = &subcommand{
-	cmd: dhcpOptionsCmd,
-	engine: &search.Engine{
-		New: func(profile, region string, _ map[string][]string, opts *search.Options) common.Results {
-			return dhcpoptions.New(profile, region, opts.Apply)
-		},
-		SortFields:     dhcpoptions.GetSortFields,
-		SortFieldNames: dhcpoptions.SortFieldNames,
-	},
+	cmd:       dhcpOptionsCmd,
+	engine:    dhcpOptionsEngine,
 	initFlags: dhcpOptionsInitFlags,
 	initViper: cleanupInitViper,
 }

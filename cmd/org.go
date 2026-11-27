@@ -88,19 +88,22 @@ func orgRunE(cmd *cobra.Command, _ []string) error {
 	}, nil, nil, orgF)
 }
 
+// orgEngine is what the org command runs over every profile and region.
+var orgEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		return searchOrg.New(profile, region, filters, opts.SortField, opts.ShowTags)
+	},
+	SortFields:     searchOrg.GetSortFields,
+	SortFieldNames: searchOrg.SortFieldNames,
+}
+
 // orgSubcommand is the org command: the engine it runs, the values of its fixed-list flags, and how
 // it registers and binds its flags.
 //
 // org lists one organization: the command passes one profile and the region searchOrg.Region.
 var orgSubcommand = &subcommand{
-	cmd: orgCmd,
-	engine: &search.Engine{
-		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
-			return searchOrg.New(profile, region, filters, opts.SortField, opts.ShowTags)
-		},
-		SortFields:     searchOrg.GetSortFields,
-		SortFieldNames: searchOrg.SortFieldNames,
-	},
+	cmd:       orgCmd,
+	engine:    orgEngine,
 	lists:     flagValues{flagStatuses: searchOrg.StatusNames},
 	initFlags: orgInitFlags,
 	initViper: orgInitViper,
@@ -111,7 +114,7 @@ func orgInitFlags() {
 
 	orgCmd.Flags().StringSliceVarP(&orgF.Statuses, flagStatuses, "s", []string{},
 		listHelp("Keep the accounts with these statuses", searchOrg.StatusNames(), "active,suspended"))
-	orgCmd.Flags().String(flagSort, "name", sortHelp(orgCmd, "accounts", "name"))
+	orgCmd.Flags().String(flagSort, "name", sortHelp(orgEngine, "accounts", "name"))
 }
 
 func orgInitViper() error {

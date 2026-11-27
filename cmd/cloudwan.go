@@ -268,22 +268,25 @@ func addCloudWANCommand(cmd *cobra.Command) {
 	cloudwanCmd.AddCommand(cmd)
 }
 
+// cloudwanRoutesEngine is what the cloudwan routes command runs over every profile and region.
+var cloudwanRoutesEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		r := searchCloudWAN.New(profile, region, filters, opts.SortField)
+		r.AccountNames = opts.AccountNames
+		return r
+	},
+	SortFields:     searchCloudWAN.GetSortFields,
+	SortFieldNames: searchCloudWAN.SortFieldNames,
+	AccountNames:   true,
+}
+
 // cloudwanRoutesSubcommand is the cloudwan routes command: the engine it runs, the values of its
 // fixed-list flags, and how it registers and binds its flags.
 //
 // Network Manager is global: the command passes the region searchCloudWAN.Region.
 var cloudwanRoutesSubcommand = &subcommand{
-	cmd: cloudwanRoutesCmd,
-	engine: &search.Engine{
-		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
-			r := searchCloudWAN.New(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		SortFields:     searchCloudWAN.GetSortFields,
-		SortFieldNames: searchCloudWAN.SortFieldNames,
-		AccountNames:   true,
-	},
+	cmd:    cloudwanRoutesCmd,
+	engine: cloudwanRoutesEngine,
 	lists: flagValues{
 		flagMatch:      searchCloudWAN.MatchNames,
 		"types":        searchCloudWAN.TypeNames,
@@ -316,11 +319,23 @@ func cloudwanRoutesInitFlags() {
 		listHelp("Keep the route destinations of these next hop types ("+aliasHelp+")", cloudwanTargetTypes(), "dx"))
 	fl.StringSliceVar(&f.CoreNetworkIDs, flagCoreNetworkIDs, []string{},
 		"Search these core networks only. `core-network-0123456789abcdef0`")
-	fl.String(flagSort, "segment", sortHelp(cloudwanRoutesCmd, "routes", "segment"))
+	fl.String(flagSort, "segment", sortHelp(cloudwanRoutesEngine, "routes", "segment"))
 }
 
 func cloudwanRoutesInitViper() error {
 	return bindFlags(cloudwanRoutesCmd, map[string]string{labelCloudWANRoutesSort: flagSort})
+}
+
+// cloudwanAttachmentsEngine is what the cloudwan attachments command runs over every profile and region.
+var cloudwanAttachmentsEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		r := searchCloudWANAtt.New(profile, region, filters, opts.SortField)
+		r.AccountNames = opts.AccountNames
+		return r
+	},
+	SortFields:     searchCloudWANAtt.GetSortFields,
+	SortFieldNames: searchCloudWANAtt.SortFieldNames,
+	AccountNames:   true,
 }
 
 // cloudwanAttachmentsSubcommand is the cloudwan attachments command: the engine it runs, the values
@@ -328,17 +343,8 @@ func cloudwanRoutesInitViper() error {
 //
 // Global like cloudwan routes: the command passes the region searchCloudWAN.Region.
 var cloudwanAttachmentsSubcommand = &subcommand{
-	cmd: cloudwanAttachmentsCmd,
-	engine: &search.Engine{
-		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
-			r := searchCloudWANAtt.New(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		SortFields:     searchCloudWANAtt.GetSortFields,
-		SortFieldNames: searchCloudWANAtt.SortFieldNames,
-		AccountNames:   true,
-	},
+	cmd:       cloudwanAttachmentsCmd,
+	engine:    cloudwanAttachmentsEngine,
 	lists:     flagValues{"types": searchCloudWANAtt.TypeNames, flagStates: searchCloudWANAtt.StateNames},
 	initFlags: cloudwanAttachmentsInitFlags,
 	initViper: cloudwanAttachmentsInitViper,
@@ -362,11 +368,23 @@ func cloudwanAttachmentsInitFlags() {
 		listHelp("Filter attachments by state", searchCloudWANAtt.StateNames(), "available"))
 	fl.StringSliceVar(&f.CoreNetworkIDs, flagCoreNetworkIDs, []string{},
 		"List the attachments of these core networks only. `core-network-0123456789abcdef0`")
-	fl.String(flagSort, "segment", sortHelp(cloudwanAttachmentsCmd, "attachments", "segment"))
+	fl.String(flagSort, "segment", sortHelp(cloudwanAttachmentsEngine, "attachments", "segment"))
 }
 
 func cloudwanAttachmentsInitViper() error {
 	return bindFlags(cloudwanAttachmentsCmd, map[string]string{labelCloudWANAttachmentsSort: flagSort})
+}
+
+// cloudwanBGPEngine is what the cloudwan bgp command runs over every profile and region.
+var cloudwanBGPEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		r := searchCloudWAN.NewBGP(profile, region, filters, opts.SortField)
+		r.AccountNames = opts.AccountNames
+		return r
+	},
+	SortFields:     searchCloudWAN.GetBGPSortFields,
+	SortFieldNames: searchCloudWAN.BGPSortFieldNames,
+	AccountNames:   true,
 }
 
 // cloudwanBGPSubcommand is the cloudwan bgp command: the engine it runs, the values of its fixed-
@@ -374,17 +392,8 @@ func cloudwanAttachmentsInitViper() error {
 //
 // Global like cloudwan routes: the command passes the region searchCloudWAN.Region.
 var cloudwanBGPSubcommand = &subcommand{
-	cmd: cloudwanBGPCmd,
-	engine: &search.Engine{
-		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
-			r := searchCloudWAN.NewBGP(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		SortFields:     searchCloudWAN.GetBGPSortFields,
-		SortFieldNames: searchCloudWAN.BGPSortFieldNames,
-		AccountNames:   true,
-	},
+	cmd:    cloudwanBGPCmd,
+	engine: cloudwanBGPEngine,
 	lists: flagValues{
 		flagMatch: searchCloudWAN.MatchNames, "next-hop-types": cloudwanTargetTypes,
 		"installed": searchCloudWAN.InstalledNames,
@@ -415,7 +424,7 @@ func cloudwanBGPInitFlags() {
 		"Keep the routes whose AS path has any of these AS numbers. `65010`")
 	fl.StringSliceVar(&f.CoreNetworkIDs, flagCoreNetworkIDs, []string{},
 		"Search these core networks only. `core-network-0123456789abcdef0`")
-	fl.String(flagSort, "segment", sortHelp(cloudwanBGPCmd, "BGP routes", "segment"))
+	fl.String(flagSort, "segment", sortHelp(cloudwanBGPEngine, "BGP routes", "segment"))
 }
 
 func cloudwanBGPInitViper() error {

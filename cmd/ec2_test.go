@@ -75,7 +75,7 @@ func TestSortHelp_listsEveryField(t *testing.T) {
 		if sub.cmd.Flags().Lookup(flagSort) == nil {
 			continue
 		}
-		help := sortHelp(sub.cmd, "things", "id")
+		help := sortHelp(sub.engine, "things", "id")
 		for _, name := range sub.engine.SortFieldNames() {
 			if !strings.Contains(help, name) {
 				t.Errorf("sortHelp(%s) = %q does not mention sort field %q", sub.cmd.CommandPath(), help, name)

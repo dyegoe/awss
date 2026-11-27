@@ -228,9 +228,10 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
    `common.SortFieldNames` on `dataRow{}`.
 3. Write `cmd/<resource>.go` (see `cmd/ebs.go` as the pattern): a `filter` struct with `filter:""`
    tags matching AWS API filter names, the flags, a `RunE` through `runSearch()` with a `cmdSpec`,
-   and one `<resource>Subcommand` that describes the command in one place: the cobra command, its
-   `search.Engine` (`New`, `SortFields`, `SortFieldNames`, and `AccountNames: true` when the rows
-   have an Owner column), the values of its fixed-list flags, and its `InitFlags`/`InitViper`.
+   its `<resource>Engine` (a `search.Engine`: `New`, `SortFields`, `SortFieldNames`, and
+   `AccountNames: true` when the rows have an Owner column), and one `<resource>Subcommand` that
+   ties them together: the cobra command, the engine, the values of its fixed-list flags, and its
+   `InitFlags`/`InitViper`.
    Add it to the `subcommands` list in `cmd/root.go`; nothing else names the command.
 4. Write tests covering: filter building, result parsing, sort validation, edge cases (nil fields, empty results).
    The `cmd` tests check every subcommand's engine on their own (`TestSubcommands_*`).

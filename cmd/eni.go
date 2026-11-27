@@ -88,19 +88,22 @@ var eniFilterFlags = []string{
 	flagAvailabilityZones, "private-ips", "public-ips", "owner-ids",
 }
 
+// eniEngine is what the eni command runs over every profile and region.
+var eniEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		r := searchENI.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
+		r.AccountNames = opts.AccountNames
+		return r
+	},
+	SortFields:     searchENI.GetSortFields,
+	SortFieldNames: searchENI.SortFieldNames,
+	AccountNames:   true,
+}
+
 // eniSubcommand is the eni command: the engine it runs and how it registers and binds its flags.
 var eniSubcommand = &subcommand{
-	cmd: eniCmd,
-	engine: &search.Engine{
-		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
-			r := searchENI.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		SortFields:     searchENI.GetSortFields,
-		SortFieldNames: searchENI.SortFieldNames,
-		AccountNames:   true,
-	},
+	cmd:       eniCmd,
+	engine:    eniEngine,
 	initFlags: eniInitFlags,
 	initViper: eniInitViper,
 }
@@ -127,7 +130,7 @@ func eniInitFlags() {
 		"Filter ENIs by public IPs. `52.28.19.20,52.30.31.32`")
 	eniCmd.Flags().StringSliceVarP(&eniF.OwnerIDs, "owner-ids", "o", []string{},
 		"Filter ENIs by owner account IDs. `123456789012`")
-	eniCmd.Flags().String(flagSort, "id", sortHelp(eniCmd, "ENIs", "id"))
+	eniCmd.Flags().String(flagSort, "id", sortHelp(eniEngine, "ENIs", "id"))
 	eniCmd.Flags().Bool(flagNoInstanceName, false,
 		"Skip the instance name lookup to speed up the ENI search.")
 }

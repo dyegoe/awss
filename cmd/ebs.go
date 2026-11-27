@@ -88,17 +88,20 @@ func ebsRunE(cmd *cobra.Command, _ []string) error {
 	}, ebsF.AvailabilityZones, ebsF.Tags, ebsF)
 }
 
+// ebsEngine is what the ebs command runs over every profile and region.
+var ebsEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		return searchEBS.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
+	},
+	SortFields:     searchEBS.GetSortFields,
+	SortFieldNames: searchEBS.SortFieldNames,
+}
+
 // ebsSubcommand is the ebs command: the engine it runs, the values of its fixed-list flags, and how
 // it registers and binds its flags.
 var ebsSubcommand = &subcommand{
-	cmd: ebsCmd,
-	engine: &search.Engine{
-		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
-			return searchEBS.New(profile, region, filters, opts.SortField, opts.NoInstanceName)
-		},
-		SortFields:     searchEBS.GetSortFields,
-		SortFieldNames: searchEBS.SortFieldNames,
-	},
+	cmd:       ebsCmd,
+	engine:    ebsEngine,
 	lists:     flagValues{flagStatuses: volumeStateNames, "volume-types": volumeTypeNames, "encrypted": trueFalse},
 	initFlags: ebsInitFlags,
 	initViper: ebsInitViper,
@@ -126,7 +129,7 @@ func ebsInitFlags() {
 		"Filter EBS volumes by attached instance IDs. `i-1230456078901,i-1230456078902`")
 	ebsCmd.Flags().StringSliceVarP(&ebsF.Encrypted, "encrypted", "e", []string{},
 		listHelp("Filter EBS volumes by encryption", trueFalse(), "true"))
-	ebsCmd.Flags().String(flagSort, "id", sortHelp(ebsCmd, "EBS volumes", "id"))
+	ebsCmd.Flags().String(flagSort, "id", sortHelp(ebsEngine, "EBS volumes", "id"))
 	ebsCmd.Flags().Bool(flagNoInstanceName, false,
 		"Skip the instance name lookup to speed up the EBS volume search.")
 }

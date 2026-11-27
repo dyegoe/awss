@@ -212,22 +212,25 @@ func addTGWCommand(cmd *cobra.Command) {
 	tgwCmd.AddCommand(cmd)
 }
 
+// tgwRoutesEngine is what the tgw routes command runs over every profile and region.
+var tgwRoutesEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		r := searchTGW.New(profile, region, filters, opts.SortField)
+		r.AccountNames = opts.AccountNames
+		return r
+	},
+	SortFields:     searchTGW.GetSortFields,
+	SortFieldNames: searchTGW.SortFieldNames,
+	AccountNames:   true,
+}
+
 // tgwRoutesSubcommand is the tgw routes command: the engine it runs, the values of its fixed-list
 // flags, and how it registers and binds its flags.
 //
 // A transit gateway is regional: the search runs per profile and region.
 var tgwRoutesSubcommand = &subcommand{
-	cmd: tgwRoutesCmd,
-	engine: &search.Engine{
-		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
-			r := searchTGW.New(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			return r
-		},
-		SortFields:     searchTGW.GetSortFields,
-		SortFieldNames: searchTGW.SortFieldNames,
-		AccountNames:   true,
-	},
+	cmd:    tgwRoutesCmd,
+	engine: tgwRoutesEngine,
 	lists: flagValues{
 		flagMatch: searchTGW.MatchNames, flagTypes: searchTGW.TypeNames, flagStates: searchTGW.StateNames,
 		"attachment-types": tgwAttachmentTypes,
@@ -261,7 +264,7 @@ func tgwRoutesInitFlags() {
 		"Keep the routes to these attachments, exact. `tgw-attach-0123`")
 	fl.StringSliceVar(&f.ResourceIDs, "resource-ids", []string{},
 		"Keep the routes to the attachments of these resources, such as VPCs, exact. `vpc-0123`")
-	fl.String(flagSort, "route-table", sortHelp(tgwRoutesCmd, "routes", "route-table"))
+	fl.String(flagSort, "route-table", sortHelp(tgwRoutesEngine, "routes", "route-table"))
 }
 
 // tgwAttachmentTypes returns the attachment types of --attachment-types and their short names.
@@ -273,23 +276,26 @@ func tgwRoutesInitViper() error {
 	return bindFlags(tgwRoutesCmd, map[string]string{labelTGWRoutesSort: flagSort})
 }
 
+// tgwAttachmentsEngine is what the tgw attachments command runs over every profile and region.
+var tgwAttachmentsEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		r := searchTGW.NewAttachments(profile, region, filters, opts.SortField)
+		r.AccountNames = opts.AccountNames
+		r.Propagations = opts.Propagations
+		return r
+	},
+	SortFields:     searchTGW.GetAttachmentSortFields,
+	SortFieldNames: searchTGW.AttachmentSortFieldNames,
+	AccountNames:   true,
+}
+
 // tgwAttachmentsSubcommand is the tgw attachments command: the engine it runs, the values of its
 // fixed-list flags, and how it registers and binds its flags.
 //
 // Regional like tgw routes: the search runs per profile and region.
 var tgwAttachmentsSubcommand = &subcommand{
-	cmd: tgwAttachmentsCmd,
-	engine: &search.Engine{
-		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
-			r := searchTGW.NewAttachments(profile, region, filters, opts.SortField)
-			r.AccountNames = opts.AccountNames
-			r.Propagations = opts.Propagations
-			return r
-		},
-		SortFields:     searchTGW.GetAttachmentSortFields,
-		SortFieldNames: searchTGW.AttachmentSortFieldNames,
-		AccountNames:   true,
-	},
+	cmd:       tgwAttachmentsCmd,
+	engine:    tgwAttachmentsEngine,
 	lists:     flagValues{flagTypes: tgwAttachmentTypes, flagStates: searchTGW.AttachmentStateNames},
 	initFlags: tgwAttachmentsInitFlags,
 	initViper: tgwAttachmentsInitViper,
@@ -318,7 +324,7 @@ func tgwAttachmentsInitFlags() {
 		"Filter attachments by a route table they propagate to, exact; implies --propagations. `tgw-rtb-0123`")
 	fl.Bool("propagations", false,
 		"Add the route tables each attachment propagates to: one call per attachment or per route table")
-	fl.String(flagSort, "name", sortHelp(tgwAttachmentsCmd, "attachments", "name"))
+	fl.String(flagSort, "name", sortHelp(tgwAttachmentsEngine, "attachments", "name"))
 }
 
 func tgwAttachmentsInitViper() error {

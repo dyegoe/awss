@@ -110,19 +110,22 @@ func checkCloudFrontPatterns(regex bool) error {
 	return nil
 }
 
+// cloudfrontEngine is what the cloudfront command runs over every profile and region.
+var cloudfrontEngine = &search.Engine{
+	New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
+		return searchCloudFront.New(profile, region, filters, opts.SortField, opts.Regex, opts.ShowTags)
+	},
+	SortFields:     searchCloudFront.GetSortFields,
+	SortFieldNames: searchCloudFront.SortFieldNames,
+}
+
 // cloudfrontSubcommand is the cloudfront command: the engine it runs and how it registers and binds
 // its flags.
 //
 // cloudfront is global: the command passes the region searchCloudFront.Region.
 var cloudfrontSubcommand = &subcommand{
-	cmd: cloudfrontCmd,
-	engine: &search.Engine{
-		New: func(profile, region string, filters map[string][]string, opts *search.Options) common.Results {
-			return searchCloudFront.New(profile, region, filters, opts.SortField, opts.Regex, opts.ShowTags)
-		},
-		SortFields:     searchCloudFront.GetSortFields,
-		SortFieldNames: searchCloudFront.SortFieldNames,
-	},
+	cmd:       cloudfrontCmd,
+	engine:    cloudfrontEngine,
 	initFlags: cloudfrontInitFlags,
 	initViper: cloudfrontInitViper,
 }
@@ -143,7 +146,7 @@ func cloudfrontInitFlags() {
 		"Filter distributions by tags; values accept globs. `'Env=prod:stg,Team=app'`")
 	cloudfrontCmd.Flags().Bool(flagRegex, false,
 		"Treat --domains and --origins patterns as Go regular expressions instead of globs.")
-	cloudfrontCmd.Flags().String(flagSort, "id", sortHelp(cloudfrontCmd, "distributions", "id"))
+	cloudfrontCmd.Flags().String(flagSort, "id", sortHelp(cloudfrontEngine, "distributions", "id"))
 }
 
 func cloudfrontInitViper() error {
