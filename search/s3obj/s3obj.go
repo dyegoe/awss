@@ -55,10 +55,7 @@ type api interface {
 
 // Results describes results of the S3 objects search.
 type Results struct {
-	common.BaseResults
-
-	// Data contains the objects found.
-	Data []dataRow `json:"data"`
+	common.RowSet[dataRow]
 
 	// Filters is a map of strings used to search.
 	Filters map[string][]string `json:"-"`
@@ -103,13 +100,7 @@ func New(
 		maxBuckets = DefaultMaxBuckets
 	}
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile:   profile,
-			Region:    region,
-			Errors:    []string{},
-			SortField: sortField,
-		},
-		Data:       []dataRow{},
+		RowSet:     common.NewRowSet[dataRow](profile, region, sortField),
 		Filters:    filters,
 		Regex:      regex,
 		MaxKeys:    maxKeys,
@@ -123,24 +114,19 @@ func New(
 func (r *Results) Search(ctx context.Context) {
 	matcher, err := common.NewMatcher(r.Filters[FilterKeyKey], r.Regex)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error building filters: %v", err))
+		r.AddError(fmt.Sprintf("error building filters: %v", err))
 		return
 	}
 
 	cfg, err := common.AwsConfig(r.Profile, r.Region)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
+		r.AddError(fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 
 	r.collect(ctx, s3.NewFromConfig(cfg), matcher)
 
-	if r.SortField == "" {
-		return
-	}
-	if err := r.sortResults(r.SortField); err != nil {
-		r.Errors = append(r.Errors, err.Error())
-	}
+	r.SortRows()
 }
 
 // collect scans every requested bucket that lives in r.Region.
@@ -149,13 +135,13 @@ func (r *Results) Search(ctx context.Context) {
 func (r *Results) collect(ctx context.Context, client api, matcher *common.Matcher) {
 	buckets, err := r.bucketsInRegion(ctx, client)
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.AddError(err.Error())
 		return
 	}
 
 	for _, bucket := range buckets {
 		if err := r.collectBucket(ctx, client, bucket, matcher); err != nil {
-			r.Errors = append(r.Errors, err.Error())
+			r.AddError(err.Error())
 		}
 	}
 }
@@ -244,25 +230,6 @@ func parseObject(bucket string, obj *types.Object) dataRow {
 		row.LastModified = obj.LastModified.UTC().Format(time.RFC3339)
 	}
 	return row
-}
-
-// Len returns the length of the results.
-func (r *Results) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the dataRow fields.
-func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
-
-// sortResults sorts the results by the given field.
-func (r *Results) sortResults(field string) error {
-	sortFields, err := GetSortFields(field)
-	if err != nil {
-		return err
-	}
-	common.SortByField(r.Data, sortFields[field])
-	return nil
 }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.

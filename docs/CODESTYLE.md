@@ -46,15 +46,17 @@ if err != nil {
 
 ### Collect errors into the result in Search()
 
-One failing profile or region must not stop the others. `Search()` appends to `r.Errors` and
-returns from its own call only:
+One failing profile or region must not stop the others. `Search()` records the error with
+`r.AddError` and returns from its own call only:
 
 ```go
 if err != nil {
-    r.Errors = append(r.Errors, fmt.Sprintf("describing instances: %v", err))
+    r.AddError(fmt.Sprintf("describing instances: %v", err))
     return
 }
 ```
+
+`r.AddError(msgs...)` records a list of messages at once. Do not append to `r.Errors` directly.
 
 ---
 
@@ -133,7 +135,7 @@ for _, eni := range response.NetworkInterfaces {
     }
     name, err := lookup(*eni.Attachment.InstanceId)
     if err != nil {
-        r.Errors = append(r.Errors, err.Error())
+        r.AddError(err.Error())
         continue
     }
     row.Name = name
@@ -183,18 +185,16 @@ provides:
 
 | Need                                   | Helper                                              |
 | -------------------------------------- | --------------------------------------------------- |
-| Table headers from `header` tags       | `common.Headers(dataRow{})`                         |
+| Rows, headers, `Len` and the sort step | embed `common.RowSet[dataRow]` (section 8)          |
 | Two fields in one column (ID and name) | `stack:""` tag next to `header` on the second field |
-| Rows for the output layer              | `common.Rows(r.Data)`                               |
 | Validate a `--sort` value              | `common.SortFields(dataRow{}, f)`                   |
 | List the valid sort values (help text) | `common.SortFieldNames(dataRow{})`                  |
-| Sort rows by a field (numeric, slices) | `common.SortByField(r.Data, fieldName)`             |
+| Sort rows by a field (numeric, slices) | `common.SortByField(rows, fieldName)`               |
 | Client-side glob/regex matching        | `common.NewMatcher(patterns, regex)` + `.Prefix()`  |
 | Validate CIDR flags                    | `common.CheckCIDRs(values)`                         |
 | Build AWS filters                      | `common.FilterTags`, `FilterNames`, `FilterDefault` |
 
-A resource package's `GetHeaders`, `GetRows`, `GetSortFields`, `SortFieldNames` and
-`sortResults` should each be one line calling these.
+A resource package's `GetSortFields` and `SortFieldNames` should each be one line calling these.
 
 In `cmd`, a command file uses these instead of writing the code or the text by hand:
 
@@ -229,11 +229,32 @@ func terminalSize() terminalSize { ... }
 
 ---
 
-## 8. Shared result fields: BaseResults
+## 8. Shared result base: RowSet
 
-Every resource `Results` embeds `common.BaseResults`, which holds the profile, region, errors and
-sort field and implements their getters. A new resource type embeds it too instead of
-redeclaring those fields (`AGENTS.md`, Adding new resource types).
+Every resource `Results` embeds `common.RowSet[dataRow]`, built by `common.NewRowSet` in `New()`.
+It holds the rows in `Data` and embeds `common.BaseResults` (profile, region, errors, sort field),
+and it implements `Len`, `GetHeaders`, `GetRows`, the getters and `AddError` once for every type.
+A resource package keeps only its AWS calls, its row parsing and its filters:
+
+```go
+type Results struct {
+    common.RowSet[dataRow]
+
+    Filters map[string][]string `json:"-"`
+}
+
+func New(profile, region string, filters map[string][]string, sortField string) *Results {
+    return &Results{
+        RowSet:  common.NewRowSet[dataRow](profile, region, sortField),
+        Filters: filters,
+    }
+}
+```
+
+`Search()` ends with `r.SortRows()`, which sorts by the `sort` tag `--sort` names and records an
+unknown one as an error. A type that sorts its own way passes its sort fields and an order
+function to `r.SortRowsBy` instead: `search/eni` sorts by a field of a nested struct, and
+`search/tgw` keeps each route table together under the sort field.
 
 ---
 
@@ -269,7 +290,7 @@ Go casing is checked by the compiler and `revive`; the CLI values follow the SHO
 | Exported types              | PascalCase             | `Results`, `BaseResults`        |
 | Unexported types            | camelCase              | `dataRow`, `eniInfo`            |
 | Exported functions          | PascalCase verb/noun   | `GetHeaders`, `FilterTags`      |
-| Unexported functions        | camelCase              | `getFilters`, `sortResults`     |
+| Unexported functions        | camelCase              | `getFilters`, `orderRows`       |
 | CLI flag labels (constants) | camelCase with prefix  | `labelProfiles`, `labelEc2Sort` |
 | Test case names             | short lower-case phrase | `"empty filter returns error"` |
 

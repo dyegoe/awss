@@ -71,13 +71,15 @@ func mockDataRow2() dataRow {
 
 func mockResults() *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile:   "default",
-			Region:    "us-east-1",
-			Errors:    []string{},
-			SortField: "id",
+		RowSet: common.RowSet[dataRow]{
+			BaseResults: common.BaseResults{
+				Profile:   "default",
+				Region:    "us-east-1",
+				Errors:    []string{},
+				SortField: "id",
+			},
+			Data: []dataRow{mockDataRow1(), mockDataRow2()},
 		},
-		Data: []dataRow{mockDataRow1(), mockDataRow2()},
 		Filters: map[string][]string{
 			"subnet-id": {"subnet-0000000000000000a"},
 			"vpc-id":    {"vpc-1"},
@@ -89,13 +91,15 @@ func mockResults() *Results {
 func TestNew(t *testing.T) {
 	filters := map[string][]string{"subnet-id": {"subnet-1"}}
 	want := &Results{
-		BaseResults: common.BaseResults{
-			Profile:   "default",
-			Region:    "us-east-1",
-			Errors:    []string{},
-			SortField: "id",
+		RowSet: common.RowSet[dataRow]{
+			BaseResults: common.BaseResults{
+				Profile:   "default",
+				Region:    "us-east-1",
+				Errors:    []string{},
+				SortField: "id",
+			},
+			Data: []dataRow{},
 		},
-		Data:    []dataRow{},
 		Filters: filters,
 	}
 	if got := New("default", "us-east-1", filters, "id"); !reflect.DeepEqual(got, want) {
@@ -235,8 +239,8 @@ func TestParseSubnet(t *testing.T) {
 	}
 }
 
-// TestResults_sortResults tests string and numeric sorting, and the invalid field error.
-func TestResults_sortResults(t *testing.T) {
+// TestResults_sortRows tests string and numeric sorting, and the invalid field error.
+func TestResults_sortRows(t *testing.T) {
 	big := dataRow{SubnetID: "subnet-big", AvailableIPs: 1000, Name: "z"}
 	tests := []struct {
 		name    string
@@ -257,16 +261,17 @@ func TestResults_sortResults(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := mockResults()
 			r.Data = []dataRow{big, mockDataRow2(), mockDataRow1()}
-			err := r.sortResults(tt.field)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("sortResults(%q) error = %v, wantErr %v", tt.field, err, tt.wantErr)
+			r.SortField = tt.field
+			r.SortRows()
+			if gotErr := len(r.Errors) > 0; gotErr != tt.wantErr {
+				t.Fatalf("SortRows() by %q errors = %v, wantErr %v", tt.field, r.Errors, tt.wantErr)
 			}
 			if tt.wantErr {
 				return
 			}
 			got := []string{r.Data[0].SubnetID, r.Data[1].SubnetID, r.Data[2].SubnetID}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("sortResults(%q) order = %v, want %v", tt.field, got, tt.want)
+				t.Errorf("SortRows() by %q order = %v, want %v", tt.field, got, tt.want)
 			}
 		})
 	}

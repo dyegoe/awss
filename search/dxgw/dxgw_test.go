@@ -479,9 +479,9 @@ func TestCheckFlags(t *testing.T) {
 	}
 }
 
-// TestResults_sortResults checks that rows equal on the sort field stay grouped by gateway and
+// TestResults_sortRows checks that rows equal on the sort field stay grouped by gateway and
 // association, with the prefixes in address order.
-func TestResults_sortResults(t *testing.T) {
+func TestResults_sortRows(t *testing.T) {
 	r := collectWith(t, fakeFixture(), map[string][]string{}, "state")
 	want := []string{
 		"dc-cwan|core-network-0aaa||", "dc-legacy|tgw-0leg|10.2.0.0/16|", "dc-legacy|tgw-0leg|10.20.0.0/16|",
@@ -490,7 +490,7 @@ func TestResults_sortResults(t *testing.T) {
 	// state sorts empty first, then associated, then disassociated.
 	want = []string{want[5], want[0], want[1], want[2], want[3], want[4]}
 	if got := keys(r.Data); !reflect.DeepEqual(got, want) {
-		t.Errorf("sortResults(state) = %q, want %q", got, want)
+		t.Errorf("collect() sorted by state = %q, want %q", got, want)
 	}
 }
 

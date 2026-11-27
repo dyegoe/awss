@@ -49,8 +49,10 @@ flowchart TD
 ## The pieces
 
 **`common.Results`** is the contract every engine implements: the profile, region and errors
-of its result set (from the embedded `common.BaseResults`), its rows and headers, and
-`Search(ctx)`. The runner and the output only ever see this interface.
+of its result set, its rows and headers, and `Search(ctx)`. The runner and the output only ever
+see this interface. An engine gets everything but `Search` from the embedded
+`common.RowSet[row]` (`common/results.go`): the rows, the profile, region and errors, and the sort
+step. The engine itself holds only its AWS calls, its row parsing and its filters.
 
 **The engines map** (`search/search.go`) is the registry: one entry per command, keyed by the
 command name, or by its `awss-engine` annotation for a command inside a group (`cloudwan routes`
@@ -84,7 +86,7 @@ outweighs this.
 | Package | What it does |
 |---|---|
 | `cmd/` | Cobra commands and flags, viper binding, `runSearch`, completion, `--stats` |
-| `common/` | The `Results` contract, `BaseResults`, AWS config helpers, filter builders, output, row and sort helpers, matchers |
+| `common/` | The `Results` contract, `BaseResults` and `RowSet`, AWS config helpers, filter builders, output, row and sort helpers, matchers |
 | `search/` | The engines map, `Options` and the profiles × regions fan-out |
 | `search/ec2/` | EC2 instances; also `InstanceNames`, used by ebs and eni |
 | `search/eni/` | Network interfaces |

@@ -69,10 +69,7 @@ const (
 
 // Results describes the distributions of one profile.
 type Results struct {
-	common.BaseResults
-
-	// Data contains the distributions found.
-	Data []dataRow `json:"data"`
+	common.RowSet[dataRow]
 
 	// Filters is a map of strings used to search, keyed by the FilterKey constants.
 	Filters map[string][]string `json:"-"`
@@ -144,13 +141,7 @@ type dataRow struct {
 // only: the search always calls the global endpoint.
 func New(profile, region string, filters map[string][]string, sortField string, regex, showTags bool) *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile:   profile,
-			Region:    region,
-			Errors:    []string{},
-			SortField: sortField,
-		},
-		Data:        []dataRow{},
+		RowSet:      common.NewRowSet[dataRow](profile, region, sortField),
 		Filters:     filters,
 		Regex:       regex,
 		ShowTags:    showTags,
@@ -225,12 +216,12 @@ func (f *localFilters) matchRow(row *dataRow) bool {
 func (r *Results) Search(ctx context.Context) {
 	local, err := newLocalFilters(r.Filters, r.Regex)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error building filters: %v", err))
+		r.AddError(fmt.Sprintf("error building filters: %v", err))
 		return
 	}
 	client, err := newClient(r.Profile)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
+		r.AddError(fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 	r.collect(ctx, client, local)
@@ -240,7 +231,7 @@ func (r *Results) Search(ctx context.Context) {
 // fetches the tags with ShowTags or a tag filter, then sorts the rows.
 func (r *Results) collect(ctx context.Context, client cloudfrontAPI, local *localFilters) {
 	if err := r.collectDistributions(ctx, client, local); err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error with profile %q: %v", r.Profile, err))
+		r.AddError(fmt.Sprintf("error with profile %q: %v", r.Profile, err))
 		return
 	}
 
@@ -252,12 +243,7 @@ func (r *Results) collect(ctx context.Context, client cloudfrontAPI, local *loca
 		r.Data = slices.DeleteFunc(r.Data, func(row dataRow) bool { return !local.tags.Match(row.Tags) })
 	}
 
-	if r.SortField == "" {
-		return
-	}
-	if err := r.sortResults(r.SortField); err != nil {
-		r.Errors = append(r.Errors, err.Error())
-	}
+	r.SortRows()
 }
 
 // collectDistributions lists every distribution, following every page, and appends those that
@@ -310,7 +296,7 @@ func (r *Results) collectTags(ctx context.Context, client listTagsAPIClient) {
 	// Append in row order, so the errors are deterministic.
 	for _, err := range errs {
 		if err != nil {
-			r.Errors = append(r.Errors, err.Error())
+			r.AddError(err.Error())
 		}
 	}
 }
@@ -385,25 +371,6 @@ func formatBool(b *bool) string {
 		return ""
 	}
 	return strconv.FormatBool(*b)
-}
-
-// Len returns the length of the results.
-func (r *Results) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the dataRow fields.
-func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
-
-// sortResults sorts the results by the given field.
-func (r *Results) sortResults(field string) error {
-	sortFields, err := GetSortFields(field)
-	if err != nil {
-		return err
-	}
-	common.SortByField(r.Data, sortFields[field])
-	return nil
 }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.

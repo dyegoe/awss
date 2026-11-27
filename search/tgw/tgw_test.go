@@ -673,16 +673,16 @@ func TestCheckFlags(t *testing.T) {
 	}
 }
 
-// TestResults_sortResults checks a sort by CIDR in address order, the rows equal on it kept in
+// TestResults_sortRows checks a sort by CIDR in address order, the rows equal on it kept in
 // route table order.
-func TestResults_sortResults(t *testing.T) {
+func TestResults_sortRows(t *testing.T) {
 	r := collectWith(t, fakeFixture(), map[string][]string{FilterKeyType: {"propagated"}}, "cidr")
 	want := []string{
 		"prod|10.20.0.0/16|tgw-attach-vpc1|", "dev|10.30.0.0/16|tgw-attach-vpc3|",
 		"prod|10.50.0.0/16|tgw-attach-dx1|", "prod|10.50.0.0/16|tgw-attach-vpn1|",
 	}
 	if got := keys(r.Data); !reflect.DeepEqual(got, want) {
-		t.Errorf("sortResults(cidr) = %q, want %q", got, want)
+		t.Errorf("collect() sorted by cidr = %q, want %q", got, want)
 	}
 }
 

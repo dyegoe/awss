@@ -23,7 +23,7 @@ limitations under the License.
 //   - a gotests "args" struct, a commented-out test, and a package-level var.
 //
 // It reads declarations only, without type checking: a method promoted from an embedded struct
-// (GetProfile from common.BaseResults on search Results) is not a method of the outer type here.
+// (GetProfile or SortRows from common.RowSet on search Results) is not a method of the outer type here.
 // Test such a method on the type that declares it, or in TestResults_accessors.
 package testconv
 

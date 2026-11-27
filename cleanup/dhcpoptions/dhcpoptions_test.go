@@ -199,8 +199,8 @@ func TestResults_accessors(t *testing.T) {
 	}
 }
 
-// TestResults_GetHeaders checks the table headers.
-func TestResults_GetHeaders(t *testing.T) {
+// TestResults_headers checks the table headers GetHeaders builds from the row type.
+func TestResults_headers(t *testing.T) {
 	got := New("p", "r", false).GetHeaders()
 	want := []interface{}{"ID", "Name", "Options", "Status", "Details", "Tags"}
 	if !reflect.DeepEqual(got, want) {
@@ -208,8 +208,8 @@ func TestResults_GetHeaders(t *testing.T) {
 	}
 }
 
-// TestResults_GetRows checks that every row is returned.
-func TestResults_GetRows(t *testing.T) {
+// TestResults_rows checks the rows GetRows returns.
+func TestResults_rows(t *testing.T) {
 	r := New("p", "r", false)
 	r.Data = []dataRow{{ID: "dopt-1"}}
 	if got := r.GetRows(); len(got) != 1 || got[0].(dataRow).ID != "dopt-1" {

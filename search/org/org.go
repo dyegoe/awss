@@ -67,10 +67,7 @@ const joinedLayout = "2006-01-02"
 
 // Results describes the accounts of the organization.
 type Results struct {
-	common.BaseResults
-
-	// Data contains the accounts found.
-	Data []dataRow `json:"data"`
+	common.RowSet[dataRow]
 
 	// Filters is a map of strings used to search: only FilterKeyStatus is used.
 	Filters map[string][]string `json:"-"`
@@ -110,13 +107,7 @@ func New(profile, region string, filters map[string][]string, sortField string, 
 		Filters:     filters,
 		ShowTags:    showTags,
 		tagInterval: tagInterval,
-		BaseResults: common.BaseResults{
-			Profile:   profile,
-			Region:    region,
-			Errors:    []string{},
-			SortField: sortField,
-		},
-		Data: []dataRow{},
+		RowSet:      common.NewRowSet[dataRow](profile, region, sortField),
 	}
 }
 
@@ -144,7 +135,7 @@ var newClient = func(profile string) (orgAPI, error) {
 func (r *Results) Search(ctx context.Context) {
 	client, err := newClient(r.Profile)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
+		r.AddError(fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 	r.collect(ctx, client)
@@ -155,7 +146,7 @@ func (r *Results) Search(ctx context.Context) {
 func (r *Results) collect(ctx context.Context, client orgAPI) {
 	accounts, err := listAccounts(ctx, client)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error with profile %q: %v", r.Profile, err))
+		r.AddError(fmt.Sprintf("error with profile %q: %v", r.Profile, err))
 		return
 	}
 	statuses := r.statuses()
@@ -169,12 +160,7 @@ func (r *Results) collect(ctx context.Context, client orgAPI) {
 		r.collectTags(ctx, client)
 	}
 
-	if r.SortField == "" {
-		return
-	}
-	if err := r.sortResults(r.SortField); err != nil {
-		r.Errors = append(r.Errors, err.Error())
-	}
+	r.SortRows()
 }
 
 // statuses returns the statuses to keep, as AWS writes them: ACTIVE, PENDING_CLOSURE.
@@ -239,7 +225,7 @@ func (r *Results) collectTags(ctx context.Context, client organizations.ListTags
 	// Append in row order, so the errors are deterministic.
 	for _, err := range errs {
 		if err != nil {
-			r.Errors = append(r.Errors, err.Error())
+			r.AddError(err.Error())
 		}
 	}
 }
@@ -333,25 +319,6 @@ func parseAccount(a *types.Account) dataRow {
 		row.Joined = a.JoinedTimestamp.UTC().Format(joinedLayout)
 	}
 	return row
-}
-
-// Len returns the length of the results.
-func (r *Results) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the dataRow fields.
-func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
-
-// sortResults sorts the results by the given field.
-func (r *Results) sortResults(field string) error {
-	sortFields, err := GetSortFields(field)
-	if err != nil {
-		return err
-	}
-	common.SortByField(r.Data, sortFields[field])
-	return nil
 }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.

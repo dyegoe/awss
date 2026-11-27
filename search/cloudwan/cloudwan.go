@@ -36,10 +36,7 @@ import (
 
 // Results describes the Cloud WAN routes found with one profile.
 type Results struct {
-	common.BaseResults
-
-	// Data contains the routes found: one row per route destination.
-	Data []dataRow `json:"data"`
+	common.RowSet[dataRow]
 
 	// Filters is a map of strings used to search, keyed by the FilterKey constants.
 	Filters map[string][]string `json:"-"`
@@ -114,13 +111,7 @@ type dataRow struct {
 // output only: the search always calls HomeRegion.
 func New(profile, region string, filters map[string][]string, sortField string) *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile:   profile,
-			Region:    region,
-			Errors:    []string{},
-			SortField: sortField,
-		},
-		Data:    []dataRow{},
+		RowSet:  common.NewRowSet[dataRow](profile, region, sortField),
 		Filters: filters,
 	}
 }
@@ -150,12 +141,12 @@ var newClient = func(profile string) (routesAPI, error) { return NewClient(profi
 func (r *Results) Search(ctx context.Context) {
 	q, err := newQuery(r.Filters)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error building filters: %v", err))
+		r.AddError(fmt.Sprintf("error building filters: %v", err))
 		return
 	}
 	client, err := newClient(r.Profile)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
+		r.AddError(fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 	r.collect(ctx, client, q)
@@ -171,14 +162,10 @@ func (r *Results) collect(ctx context.Context, client routesAPI, q *query) {
 		denied: "run it with a profile of the account that owns the core network",
 	}
 	rows, msgs := s.run(ctx, client, q, r.AccountNames)
-	r.Data, r.Errors = append(r.Data, rows...), append(r.Errors, msgs...)
+	r.Data = append(r.Data, rows...)
+	r.AddError(msgs...)
 
-	if r.SortField == "" {
-		return
-	}
-	if err := r.sortResults(r.SortField); err != nil {
-		r.Errors = append(r.Errors, err.Error())
-	}
+	r.SortRowsBy(GetSortFields, orderRows)
 }
 
 // coreNetwork is what a route call needs to know of its core network.
@@ -256,27 +243,13 @@ func newAttachmentInfo(a *types.Attachment) attachmentInfo {
 	return info
 }
 
-// sortResults sorts the results by the given field. Rows equal on it stay in route table order
+// orderRows sorts rows by the struct field fieldName. Rows equal on it stay in route table order
 // (tableKey).
-func (r *Results) sortResults(field string) error {
-	sortFields, err := GetSortFields(field)
-	if err != nil {
-		return err
-	}
-	sortRows(r.Data, sortFields[field], func(d *dataRow) tableKey {
+func orderRows(rows []dataRow, fieldName string) {
+	sortRows(rows, fieldName, func(d *dataRow) tableKey {
 		return tableKey{coreNetwork: d.CoreNetworkID, segment: d.Segment, edge: d.Edge, prefix: d.CIDR}
 	})
-	return nil
 }
-
-// Len returns the length of the results.
-func (r *Results) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the dataRow fields.
-func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.
 //

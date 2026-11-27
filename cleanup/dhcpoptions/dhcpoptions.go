@@ -52,12 +52,9 @@ type ec2API interface {
 		*ec2.DeleteDhcpOptionsOutput, error)
 }
 
-// Results describes the unused DHCP options sets of one profile and region.
+// Results describes the unused DHCP options sets of one profile and region: one row per set.
 type Results struct {
-	common.BaseResults
-
-	// Data holds one row per unused set.
-	Data []dataRow `json:"data"`
+	common.RowSet[dataRow]
 
 	// Apply deletes the sets; without it the run only reports them.
 	Apply bool `json:"-"`
@@ -94,12 +91,7 @@ type dataRow struct {
 // them; without apply the run only reports them.
 func New(profile, region string, apply bool) *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile: profile,
-			Region:  region,
-			Errors:  []string{},
-		},
-		Data:       []dataRow{},
+		RowSet:     common.NewRowSet[dataRow](profile, region, ""),
 		Apply:      apply,
 		newClients: awsClients,
 	}
@@ -246,15 +238,6 @@ func (r *Results) delete(ctx context.Context, c ec2API, row *dataRow) {
 	}
 	row.Status = cleanup.StatusDeleted
 }
-
-// Len returns the length of the results.
-func (r *Results) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the dataRow fields.
-func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.
 //

@@ -61,10 +61,7 @@ var subnetsInCIDRs = searchSubnet.InCIDRs
 
 // Results describes results of the EC2 instances search.
 type Results struct {
-	common.BaseResults
-
-	// Data contains the instances found.
-	Data []dataRow `json:"data"`
+	common.RowSet[dataRow]
 
 	// Filters is a map of strings used to search.
 	Filters map[string][]string `json:"-"`
@@ -114,13 +111,7 @@ type dataRow struct {
 // New initiates and returns a new instance of EC2 results.
 func New(profile, region string, filters map[string][]string, sortField string) *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile:   profile,
-			Region:    region,
-			Errors:    []string{},
-			SortField: sortField,
-		},
-		Data:    []dataRow{},
+		RowSet:  common.NewRowSet[dataRow](profile, region, sortField),
 		Filters: filters,
 	}
 }
@@ -132,21 +123,21 @@ func (r *Results) Search(ctx context.Context) {
 	// Resolve the CIDR pseudo-filter, if any, into subnet or VPC IDs for this region.
 	filters, nets, err := r.resolveCIDRFilter(ctx)
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.AddError(err.Error())
 		return
 	}
 
 	// Get search filters.
 	input, err := filtersToInput(filters, r.Region)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error building filters: %v", err))
+		r.AddError(fmt.Sprintf("error building filters: %v", err))
 		return
 	}
 
 	// Get AWS config.
 	cfg, err := common.AwsConfig(r.Profile, r.Region)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
+		r.AddError(fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 
@@ -180,13 +171,11 @@ func (r *Results) collect(
 		})
 	})
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.AddError(err.Error())
 		return
 	}
 
-	if err := r.sortResults(r.SortField); err != nil {
-		r.Errors = append(r.Errors, err.Error())
-	}
+	r.SortRows()
 }
 
 // errCodeInstanceNotFound is the EC2 error code returned when an asked instance ID does not exist.
@@ -323,15 +312,6 @@ func parseVolumeIDs(mappings []types.InstanceBlockDeviceMapping) []string {
 	return volumes
 }
 
-// Len returns the length of the results.
-func (r *Results) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the dataRow fields.
-func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
-
 // resolveCIDRFilter returns the filters to search with, replacing the CIDR pseudo-filter,
 // and the parsed ranges the instances must have a private IP in.
 //
@@ -411,16 +391,6 @@ func filtersToInput(filters map[string][]string, region string) (*ec2.DescribeIn
 		}
 	}
 	return &input, nil
-}
-
-// sortResults sorts the results by the given field.
-func (r *Results) sortResults(field string) error {
-	sortFields, err := GetSortFields(field)
-	if err != nil {
-		return err
-	}
-	common.SortByField(r.Data, sortFields[field])
-	return nil
 }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.

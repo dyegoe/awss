@@ -85,7 +85,7 @@ func (r *AttachmentResults) addPropagations(
 	} else {
 		byAttachment, msgs = propagationsByTable(ctx, client, tableIDs)
 	}
-	r.Errors = append(r.Errors, msgs...)
+	r.AddError(msgs...)
 	for i := range r.Data {
 		props := byAttachment[r.Data[i].ID]
 		for j := range props {

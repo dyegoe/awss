@@ -390,8 +390,8 @@ func TestResults_Search_invalidPattern(t *testing.T) {
 	}
 }
 
-// TestResults_sortResults tests sorting by key, numeric size and chronological modified.
-func TestResults_sortResults(t *testing.T) {
+// TestResults_sortRows tests sorting by key, numeric size and chronological modified.
+func TestResults_sortRows(t *testing.T) {
 	rows := []dataRow{
 		{Key: "b", Size: 10, LastModified: "2024-01-01T00:00:00Z"},
 		{Key: "a", Size: 9, LastModified: "2025-01-01T00:00:00Z"},
@@ -412,16 +412,17 @@ func TestResults_sortResults(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := New("default", "us-east-1", map[string][]string{}, "", false, 0, 0)
 			r.Data = append([]dataRow(nil), rows...)
-			err := r.sortResults(tt.field)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("sortResults(%q) error = %v, wantErr %v", tt.field, err, tt.wantErr)
+			r.SortField = tt.field
+			r.SortRows()
+			if gotErr := len(r.Errors) > 0; gotErr != tt.wantErr {
+				t.Fatalf("SortRows() by %q errors = %v, wantErr %v", tt.field, r.Errors, tt.wantErr)
 			}
 			if tt.wantErr {
 				return
 			}
 			got := []string{r.Data[0].Key, r.Data[1].Key, r.Data[2].Key}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("sortResults(%q) order = %v, want %v", tt.field, got, tt.want)
+				t.Errorf("SortRows() by %q order = %v, want %v", tt.field, got, tt.want)
 			}
 		})
 	}

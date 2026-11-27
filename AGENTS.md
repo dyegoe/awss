@@ -63,7 +63,7 @@ internal/testconv/   — checks the test conventions of every package (run by it
 internal/nesting/    — checks the nesting depth of every function (run by its own test in CI)
 internal/doclist/    — checks this layout and docs/ARCHITECTURE.md list every package (run by its own test)
 scripts/             — coverage.awk: the per-package coverage and test-file check of make test
-common/              — shared: Results interface, BaseResults, AWS helpers, filter builders,
+common/              — shared: Results interface, BaseResults and RowSet (results.go), AWS helpers, filter builders,
                        output formatting, reflection row helpers and Version sorting (rows.go), Matcher
                        (match.go), TagMatcher for client-side tag filters (tagmatch.go), utilities
 ```
@@ -217,10 +217,14 @@ to run and the expected result in the pull request description.
 When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
 
 1. Create `search/<resource>/` package with a `Results` struct and `New()` + `Search()` functions.
-2. Implement all methods of the `common.Results` interface.
+2. Embed `common.RowSet[dataRow]` in `Results` and build it with `common.NewRowSet` in `New()`: it
+   gives `Len`, `GetHeaders`, `GetRows`, the `BaseResults` getters and `AddError`. The package
+   writes only `Search()`, its AWS calls, its row parsing and its filters (see `search/ebs/ebs.go`).
 3. Use struct tags `json`, `header`, `sort` on `dataRow` fields — do not add special-case logic to the output layer.
-   Implement `GetHeaders`, `GetRows`, `GetSortFields` and `sortResults` with the `common.Headers`,
-   `common.Rows`, `common.SortFields` and `common.SortByField` helpers (see `search/ebs/ebs.go`).
+   End `Search()` with `r.SortRows()`; a type that sorts its own way calls
+   `r.SortRowsBy(GetSortFields, order)` instead (see `search/eni` and `search/tgw`). Record every
+   error with `r.AddError`. `GetSortFields` and `SortFieldNames` call `common.SortFields` and
+   `common.SortFieldNames` on `dataRow{}`.
 4. Add a `filter` struct in `cmd/<resource>.go` with `filter:""` tags matching AWS API filter names.
 5. Register the command in `cmd/root.go` via `<resource>InitFlags()` and `<resource>InitViper()`.
 6. Register the command in the `engines` map in `search/search.go` (constructor + `GetSortFields`,
@@ -250,6 +254,8 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
   - Results are `got` and `want`; `t.Fatalf` for a failed precondition, `t.Errorf` for a mismatch.
     A new failure message reads `Func(input) = got, want want`.
   - One `TestResults_accessors` per search package covers `Len` and the `BaseResults` getters.
+    A method promoted from `common.RowSet` is not a method of `Results` for the naming check:
+    name its test as a scenario (`TestResults_sortRows`, `TestResults_headers`).
   - Helpers call `t.Helper()` and take `t` first.
 - Mock AWS calls one of two ways, never with real credentials:
   - a package-level function variable that tests replace (`getAwsProfilesFn` in `common/aws.go`,

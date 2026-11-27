@@ -57,13 +57,15 @@ func TestNew(t *testing.T) {
 			filters:   map[string][]string{"tag:Name": {"test"}},
 			sortField: "id",
 			want: &Results{
-				BaseResults: common.BaseResults{
-					Profile:   "default",
-					Region:    "us-east-1",
-					Errors:    []string{},
-					SortField: "id",
+				RowSet: common.RowSet[dataRow]{
+					BaseResults: common.BaseResults{
+						Profile:   "default",
+						Region:    "us-east-1",
+						Errors:    []string{},
+						SortField: "id",
+					},
+					Data: []dataRow{},
 				},
-				Data:    []dataRow{},
 				Filters: map[string][]string{"tag:Name": {"test"}},
 			},
 		},
@@ -81,12 +83,14 @@ func TestNew(t *testing.T) {
 // mockResultsEmpty returns a new empty result set. Each test gets its own: some sort it in place.
 func mockResultsEmpty() *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile: "",
-			Region:  "",
-			Errors:  []string{},
+		RowSet: common.RowSet[dataRow]{
+			BaseResults: common.BaseResults{
+				Profile: "",
+				Region:  "",
+				Errors:  []string{},
+			},
+			Data: []dataRow{},
 		},
-		Data:    []dataRow{},
 		Filters: map[string][]string{},
 	}
 }
@@ -94,18 +98,20 @@ func mockResultsEmpty() *Results {
 // mockResults returns a new result set with two rows. Each test gets its own: some sort it in place.
 func mockResults() *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile: "default",
-			Region:  "us-east-1",
-			Errors: []string{
-				"error1",
-				"error2",
+		RowSet: common.RowSet[dataRow]{
+			BaseResults: common.BaseResults{
+				Profile: "default",
+				Region:  "us-east-1",
+				Errors: []string{
+					"error1",
+					"error2",
+				},
+				SortField: "id",
 			},
-			SortField: "id",
-		},
-		Data: []dataRow{
-			mockDataRow1(),
-			mockDataRow2(),
+			Data: []dataRow{
+				mockDataRow1(),
+				mockDataRow2(),
+			},
 		},
 		Filters: map[string][]string{
 			"instance-id":                    {"i-1234567890abcdef0", "i-0987654321fedcba9"},
@@ -205,8 +211,8 @@ func TestResults_accessors(t *testing.T) {
 	}
 }
 
-// TestResults_GetHeaders tests the GetHeaders function.
-func TestResults_GetHeaders(t *testing.T) {
+// TestResults_headers checks the table headers GetHeaders builds from the row type.
+func TestResults_headers(t *testing.T) {
 	tests := []struct {
 		name    string
 		results *Results
@@ -227,8 +233,8 @@ func TestResults_GetHeaders(t *testing.T) {
 	}
 }
 
-// TestResults_GetRows tests the GetRows method
-func TestResults_GetRows(t *testing.T) {
+// TestResults_rows checks the rows GetRows returns.
+func TestResults_rows(t *testing.T) {
 	tests := []struct {
 		name    string
 		results *Results
@@ -297,8 +303,8 @@ func TestResults_getFilters(t *testing.T) {
 	}
 }
 
-// TestResults_sortResults tests the sortResults function.
-func TestResults_sortResults(t *testing.T) {
+// TestResults_sortRows tests a valid sort field, and that an invalid one adds an error.
+func TestResults_sortRows(t *testing.T) {
 	tests := []struct {
 		name    string
 		results *Results
@@ -320,8 +326,11 @@ func TestResults_sortResults(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.results.sortResults(tt.field); (err != nil) != tt.wantErr {
-				t.Errorf("Results.sortResults() error = %v, wantErr %v", err, tt.wantErr)
+			before := len(tt.results.Errors)
+			tt.results.SortField = tt.field
+			tt.results.SortRows()
+			if gotErr := len(tt.results.Errors) > before; gotErr != tt.wantErr {
+				t.Errorf("SortRows() by %q errors = %v, wantErr %v", tt.field, tt.results.Errors, tt.wantErr)
 			}
 		})
 	}
@@ -582,8 +591,8 @@ func TestDataRow_jsonKeys(t *testing.T) {
 	}
 }
 
-// TestResults_sortResults_sliceField checks that sorting by a slice column reorders rows.
-func TestResults_sortResults_sliceField(t *testing.T) {
+// TestResults_sortRowsSliceField checks that sorting by a slice column reorders rows.
+func TestResults_sortRowsSliceField(t *testing.T) {
 	r := New("default", "us-east-1", map[string][]string{}, "enis")
 	r.Data = []dataRow{
 		{InstanceID: "i-1", NetworkInterfaces: []string{"eni-zzz"}, Volumes: []string{"vol-b"}},
@@ -601,15 +610,17 @@ func TestResults_sortResults_sliceField(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := r.sortResults(tt.field); err != nil {
-				t.Fatalf("sortResults(%q) error = %v", tt.field, err)
+			r.SortField = tt.field
+			r.SortRows()
+			if len(r.Errors) > 0 {
+				t.Fatalf("SortRows() by %q errors = %v, want none", tt.field, r.Errors)
 			}
 			got := make([]string, 0, len(r.Data))
 			for i := range r.Data {
 				got = append(got, r.Data[i].InstanceID)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("sortResults(%q) order = %v, want %v", tt.field, got, tt.want)
+				t.Errorf("SortRows() by %q order = %v, want %v", tt.field, got, tt.want)
 			}
 		})
 	}

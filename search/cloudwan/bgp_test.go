@@ -545,9 +545,9 @@ func TestBGPResults_collect_installedError(t *testing.T) {
 	}
 }
 
-// TestBGPResults_sortResults checks the route table order under the sort field: prefixes by
+// TestBGPResults_sortRows checks the route table order under the sort field: prefixes by
 // address, and the installed path of a prefix first.
-func TestBGPResults_sortResults(t *testing.T) {
+func TestBGPResults_sortRows(t *testing.T) {
 	r := NewBGP("network", Region, nil, "segment")
 	r.Data = []bgpRow{
 		{Segment: "prod", Prefix: "10.100.0.0/16", Installed: InstalledYes},
@@ -556,8 +556,9 @@ func TestBGPResults_sortResults(t *testing.T) {
 		{Segment: "prod", Prefix: "10.2.0.0/16", Installed: InstalledYes},
 		{Segment: "prod", Prefix: "10.0.0.0/8", Installed: ""},
 	}
-	if err := r.sortResults("segment"); err != nil {
-		t.Fatal(err)
+	r.SortRowsBy(GetBGPSortFields, orderBGPRows)
+	if len(r.Errors) > 0 {
+		t.Fatalf("SortRowsBy() by segment errors = %v, want none", r.Errors)
 	}
 	got := []string{}
 	for i := range r.Data {
@@ -568,13 +569,13 @@ func TestBGPResults_sortResults(t *testing.T) {
 		"prod 10.100.0.0/16 yes",
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("sortResults(segment) = %q, want %q", got, want)
+		t.Errorf("SortRowsBy() by segment = %q, want %q", got, want)
 	}
 }
 
-// TestBGPResults_sortResults_installed checks that --sort installed orders yes, no, none, then an
+// TestBGPResults_sortRowsInstalled checks that --sort installed orders yes, no, none, then an
 // empty value, not alphabetically, and keeps the rows of one value in route table order.
-func TestBGPResults_sortResults_installed(t *testing.T) {
+func TestBGPResults_sortRowsInstalled(t *testing.T) {
 	r := NewBGP("network", Region, nil, "installed")
 	r.Data = []bgpRow{
 		{Segment: "prod", Prefix: "10.2.0.0/16", Installed: InstalledNone},
@@ -584,8 +585,9 @@ func TestBGPResults_sortResults_installed(t *testing.T) {
 		{Segment: "dev", Prefix: "10.1.0.0/16", Installed: InstalledYes},
 		{Segment: "dev", Prefix: "10.3.0.0/16", Installed: InstalledNone},
 	}
-	if err := r.sortResults("installed"); err != nil {
-		t.Fatal(err)
+	r.SortRowsBy(GetBGPSortFields, orderBGPRows)
+	if len(r.Errors) > 0 {
+		t.Fatalf("SortRowsBy() by installed errors = %v, want none", r.Errors)
 	}
 	got := []string{}
 	for i := range r.Data {
@@ -596,6 +598,6 @@ func TestBGPResults_sortResults_installed(t *testing.T) {
 		"none dev 10.3.0.0/16", "none prod 10.2.0.0/16", " prod 10.0.0.0/8",
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("sortResults(installed) = %q, want %q", got, want)
+		t.Errorf("SortRowsBy() by installed = %q, want %q", got, want)
 	}
 }

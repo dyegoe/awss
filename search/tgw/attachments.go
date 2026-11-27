@@ -91,10 +91,7 @@ func CheckAttachmentFlags(filters map[string][]string) error {
 
 // AttachmentResults describes the Transit Gateway attachments found with one profile in one region.
 type AttachmentResults struct {
-	common.BaseResults
-
-	// Data contains the attachments found.
-	Data []attachmentRow `json:"data"`
+	common.RowSet[attachmentRow]
 
 	// Filters is a map of strings used to search, keyed by the FilterKey constants.
 	Filters map[string][]string `json:"-"`
@@ -166,13 +163,7 @@ type attachmentRow struct {
 // NewAttachments initiates and returns a new instance of Transit Gateway attachment results.
 func NewAttachments(profile, region string, filters map[string][]string, sortField string) *AttachmentResults {
 	return &AttachmentResults{
-		BaseResults: common.BaseResults{
-			Profile:   profile,
-			Region:    region,
-			Errors:    []string{},
-			SortField: sortField,
-		},
-		Data:    []attachmentRow{},
+		RowSet:  common.NewRowSet[attachmentRow](profile, region, sortField),
 		Filters: filters,
 	}
 }
@@ -232,12 +223,12 @@ func (q *attachmentQuery) match(row *attachmentRow) bool {
 func (r *AttachmentResults) Search(ctx context.Context) {
 	q, err := newAttachmentQuery(r.Filters)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error building filters: %v", err))
+		r.AddError(fmt.Sprintf("error building filters: %v", err))
 		return
 	}
 	client, err := newClient(r.Profile, r.Region)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
+		r.AddError(fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 	r.collect(ctx, client, q)
@@ -248,7 +239,7 @@ func (r *AttachmentResults) Search(ctx context.Context) {
 func (r *AttachmentResults) collect(ctx context.Context, client ec2API, q *attachmentQuery) {
 	atts, err := attachments(ctx, client, q.awsFilters)
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.AddError(err.Error())
 		return
 	}
 	for i := range atts {
@@ -272,12 +263,7 @@ func (r *AttachmentResults) collect(ctx context.Context, client ec2API, q *attac
 		r.Data = slices.DeleteFunc(r.Data, func(row attachmentRow) bool { return !q.propagatesTo(&row) })
 	}
 
-	if r.SortField == "" {
-		return
-	}
-	if err := r.sortResults(r.SortField); err != nil {
-		r.Errors = append(r.Errors, err.Error())
-	}
+	r.SortRows()
 }
 
 // routeTables lists the route tables of the transit gateways of the rows, for their names and, with
@@ -298,7 +284,7 @@ func (r *AttachmentResults) routeTables(
 	}
 	tables, err := routeTables(ctx, client, &query{tgwID: tgwIDs})
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.AddError(err.Error())
 		return nil, false
 	}
 	return tables, true
@@ -328,26 +314,6 @@ func (r *AttachmentResults) parseAttachment(a *types.TransitGatewayAttachment) a
 	}
 	return row
 }
-
-// sortResults sorts the results by the given field. Rows equal on it stay in the order AWS
-// returned them.
-func (r *AttachmentResults) sortResults(field string) error {
-	sortFields, err := GetAttachmentSortFields(field)
-	if err != nil {
-		return err
-	}
-	common.SortByField(r.Data, sortFields[field])
-	return nil
-}
-
-// Len returns the length of the results.
-func (r *AttachmentResults) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the attachmentRow fields.
-func (r *AttachmentResults) GetHeaders() []interface{} { return common.Headers(attachmentRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *AttachmentResults) GetRows() []interface{} { return common.Rows(r.Data) }
 
 // GetAttachmentSortFields returns a map of the attachment sort fields and their corresponding
 // struct field. It returns an error if the given field is not a valid sort field.

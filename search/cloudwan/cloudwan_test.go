@@ -1154,9 +1154,9 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
-// TestResults_sortResults checks that --sort cidr compares addresses, and that the default sort
+// TestResults_sortRows checks that --sort cidr compares addresses, and that the default sort
 // by segment keeps each route table in prefix order.
-func TestResults_sortResults(t *testing.T) {
+func TestResults_sortRows(t *testing.T) {
 	tests := []struct {
 		name  string
 		field string
@@ -1178,15 +1178,16 @@ func TestResults_sortResults(t *testing.T) {
 				{Segment: "prod", CIDR: "10.100.0.0/16"}, {Segment: "prod", CIDR: "10.2.0.0/16"},
 				{Segment: "dev", CIDR: "10.2.0.0/16"}, {Segment: "prod", CIDR: "10.0.0.0/8"},
 			}
-			if err := r.sortResults(tt.field); err != nil {
-				t.Fatal(err)
+			r.SortRowsBy(GetSortFields, orderRows)
+			if len(r.Errors) > 0 {
+				t.Fatalf("SortRowsBy() by %s errors = %v, want none", tt.field, r.Errors)
 			}
 			got := []string{}
 			for i := range r.Data {
 				got = append(got, r.Data[i].Segment+" "+string(r.Data[i].CIDR))
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("sortResults(%s) = %q, want %q", tt.field, got, tt.want)
+				t.Errorf("SortRowsBy() by %s = %q, want %q", tt.field, got, tt.want)
 			}
 		})
 	}

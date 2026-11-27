@@ -44,10 +44,7 @@ const pageSize int32 = 100
 
 // Results describes results of the RDS DB clusters search.
 type Results struct {
-	common.BaseResults
-
-	// Data contains the DB clusters found.
-	Data []dataRow `json:"data"`
+	common.RowSet[dataRow]
 
 	// Filters is a map of strings used to search, keyed by FilterKeyID and the rds filter keys.
 	Filters map[string][]string `json:"-"`
@@ -123,13 +120,7 @@ type dataRow struct {
 // New initiates and returns a new instance of RDS cluster results.
 func New(profile, region string, filters map[string][]string, sortField string, regex bool) *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile:   profile,
-			Region:    region,
-			Errors:    []string{},
-			SortField: sortField,
-		},
-		Data:    []dataRow{},
+		RowSet:  common.NewRowSet[dataRow](profile, region, sortField),
 		Filters: filters,
 		Regex:   regex,
 	}
@@ -147,13 +138,13 @@ type rdsAPI interface {
 func (r *Results) Search(ctx context.Context) {
 	local, err := searchRDS.NewLocalFilters(r.Filters, r.Regex)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error building filters: %v", err))
+		r.AddError(fmt.Sprintf("error building filters: %v", err))
 		return
 	}
 
 	cfg, err := common.AwsConfig(r.Profile, r.Region)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
+		r.AddError(fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 
@@ -171,7 +162,7 @@ func (r *Results) collect(ctx context.Context, client rdsAPI, local *searchRDS.L
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			r.Errors = append(r.Errors, fmt.Sprintf("error describing DB clusters: %v", err))
+			r.AddError(fmt.Sprintf("error describing DB clusters: %v", err))
 			return
 		}
 		for i := range page.DBClusters {
@@ -183,12 +174,7 @@ func (r *Results) collect(ctx context.Context, client rdsAPI, local *searchRDS.L
 
 	r.fillVpcIDs(ctx, client)
 
-	if r.SortField == "" {
-		return
-	}
-	if err := r.sortResults(r.SortField); err != nil {
-		r.Errors = append(r.Errors, err.Error())
-	}
+	r.SortRows()
 }
 
 // fillVpcIDs sets the VPC of every row from its DB subnet group. DescribeDBClusters returns only
@@ -205,7 +191,7 @@ func (r *Results) fillVpcIDs(ctx context.Context, client rds.DescribeDBSubnetGro
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			r.Errors = append(r.Errors, fmt.Sprintf("error describing DB subnet groups, VPC left empty: %v", err))
+			r.AddError(fmt.Sprintf("error describing DB subnet groups, VPC left empty: %v", err))
 			return
 		}
 		for _, g := range page.DBSubnetGroups {
@@ -268,25 +254,6 @@ func count(n int, noun string) string {
 		return "1 " + noun
 	}
 	return fmt.Sprintf("%d %ss", n, noun)
-}
-
-// Len returns the length of the results.
-func (r *Results) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the dataRow fields.
-func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
-
-// sortResults sorts the results by the given field.
-func (r *Results) sortResults(field string) error {
-	sortFields, err := GetSortFields(field)
-	if err != nil {
-		return err
-	}
-	common.SortByField(r.Data, sortFields[field])
-	return nil
 }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.

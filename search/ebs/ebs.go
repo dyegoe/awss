@@ -35,10 +35,7 @@ import (
 
 // Results describes results of the EBS volumes search.
 type Results struct {
-	common.BaseResults
-
-	// Data contains the volumes found.
-	Data []dataRow `json:"data"`
+	common.RowSet[dataRow]
 
 	// Filters is a map of strings used to search.
 	Filters map[string][]string `json:"-"`
@@ -86,13 +83,7 @@ type dataRow struct {
 // New initiates and returns a new instance of EBS results.
 func New(profile, region string, filters map[string][]string, sortField string, noInstanceName bool) *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile:   profile,
-			Region:    region,
-			Errors:    []string{},
-			SortField: sortField,
-		},
-		Data:           []dataRow{},
+		RowSet:         common.NewRowSet[dataRow](profile, region, sortField),
 		Filters:        filters,
 		NoInstanceName: noInstanceName,
 	}
@@ -119,13 +110,13 @@ const pageSize int32 = 500
 func (r *Results) Search(ctx context.Context) {
 	input, err := r.getFilters()
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error building filters: %v", err))
+		r.AddError(fmt.Sprintf("error building filters: %v", err))
 		return
 	}
 
 	cfg, err := common.AwsConfig(r.Profile, r.Region)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
+		r.AddError(fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 
@@ -136,12 +127,12 @@ func (r *Results) Search(ctx context.Context) {
 func (r *Results) collect(ctx context.Context, client ec2API, input *ec2.DescribeVolumesInput) {
 	instanceIDSet, err := r.collectVolumeRows(ctx, client, input)
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.AddError(err.Error())
 		return
 	}
 
 	r.enrichInstanceNames(ctx, client, instanceIDSet)
-	r.sortIfRequested()
+	r.SortRows()
 }
 
 // collectVolumeRows appends the rows of every volume to r.Data, following every page.
@@ -210,7 +201,7 @@ func (r *Results) enrichInstanceNames(
 
 	names, err := searchEC2.InstanceNames(ctx, client, instanceIDs)
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.AddError(err.Error())
 		return
 	}
 
@@ -218,16 +209,6 @@ func (r *Results) enrichInstanceNames(
 		if id := r.Data[i].InstanceID; id != "" {
 			r.Data[i].InstanceName = names[id]
 		}
-	}
-}
-
-func (r *Results) sortIfRequested() {
-	if r.SortField == "" {
-		return
-	}
-
-	if err := r.sortResults(r.SortField); err != nil {
-		r.Errors = append(r.Errors, err.Error())
 	}
 }
 
@@ -266,15 +247,6 @@ func parseVolume(vol *types.Volume) []dataRow {
 	return rows
 }
 
-// Len returns the length of the results.
-func (r *Results) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the dataRow fields.
-func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
-
 // getFilters returns the filters used to search.
 //
 // The filters are defined in the results.Filters field.
@@ -299,16 +271,6 @@ func (r *Results) getFilters() (*ec2.DescribeVolumesInput, error) {
 		}
 	}
 	return &input, nil
-}
-
-// sortResults sorts the results by the given field.
-func (r *Results) sortResults(field string) error {
-	sortFields, err := GetSortFields(field)
-	if err != nil {
-		return err
-	}
-	common.SortByField(r.Data, sortFields[field])
-	return nil
 }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.
