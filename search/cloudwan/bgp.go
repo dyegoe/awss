@@ -34,10 +34,7 @@ import (
 // BGPResults describes the BGP routes of the Cloud WAN segments found with one profile: the
 // routes before the routing policies, with their BGP attributes.
 type BGPResults struct {
-	common.BaseResults
-
-	// Data contains the BGP routes found: one row per route and next hop.
-	Data []bgpRow `json:"data"`
+	common.RowSet[bgpRow]
 
 	// Filters is a map of strings used to search, keyed by the FilterKey constants.
 	Filters map[string][]string `json:"-"`
@@ -118,13 +115,7 @@ type bgpRow struct {
 // output only: the search always calls HomeRegion.
 func NewBGP(profile, region string, filters map[string][]string, sortField string) *BGPResults {
 	return &BGPResults{
-		BaseResults: common.BaseResults{
-			Profile:   profile,
-			Region:    region,
-			Errors:    []string{},
-			SortField: sortField,
-		},
-		Data:    []bgpRow{},
+		RowSet:  common.NewRowSet[bgpRow](profile, region, sortField),
 		Filters: filters,
 	}
 }
@@ -197,12 +188,12 @@ func newBGPQuery(filters map[string][]string) (*query, error) {
 func (r *BGPResults) Search(ctx context.Context) {
 	q, err := newBGPQuery(r.Filters)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error building filters: %v", err))
+		r.AddError(fmt.Sprintf("error building filters: %v", err))
 		return
 	}
 	client, err := newBGPClient(r.Profile)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
+		r.AddError(fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 	r.collect(ctx, client, q)
@@ -218,14 +209,10 @@ func (r *BGPResults) collect(ctx context.Context, client bgpAPI, q *query) {
 		denied: deniedBGP,
 	}
 	rows, msgs := s.run(ctx, client, q, r.AccountNames)
-	r.Data, r.Errors = append(r.Data, rows...), append(r.Errors, msgs...)
+	r.Data = append(r.Data, rows...)
+	r.AddError(msgs...)
 
-	if r.SortField == "" {
-		return
-	}
-	if err := r.sortResults(r.SortField); err != nil {
-		r.Errors = append(r.Errors, err.Error())
-	}
+	r.SortRowsBy(GetBGPSortFields, orderBGPRows)
 }
 
 // segmentTables returns the segment route tables of the core network that q asks for: AWS keeps
@@ -388,37 +375,23 @@ func parseBGPRoute(route *types.CoreNetworkRoutingInformation, cn *coreNetwork, 
 	return row
 }
 
-// sortResults sorts the results by the given field. Rows equal on it stay in route table order,
+// orderBGPRows sorts rows by the struct field fieldName. Rows equal on it stay in route table order,
 // the installed path of a prefix first (tableKey).
-func (r *BGPResults) sortResults(field string) error {
-	sortFields, err := GetBGPSortFields(field)
-	if err != nil {
-		return err
-	}
-	sortRows(r.Data, sortFields[field], func(d *bgpRow) tableKey {
+func orderBGPRows(rows []bgpRow, fieldName string) {
+	sortRows(rows, fieldName, func(d *bgpRow) tableKey {
 		return tableKey{
 			coreNetwork: d.CoreNetworkID, segment: d.Segment, edge: d.Edge, prefix: d.Prefix,
 			rank: installedRank(d.Installed),
 		}
 	})
-	if field == "installed" {
+	if fieldName == "Installed" {
 		// The values sort by rank, the installed path first, not alphabetically. The sort is stable,
 		// so the rows of one value stay in route table order.
-		slices.SortStableFunc(r.Data, func(a, b bgpRow) int {
+		slices.SortStableFunc(rows, func(a, b bgpRow) int {
 			return cmp.Compare(installedRank(a.Installed), installedRank(b.Installed))
 		})
 	}
-	return nil
 }
-
-// Len returns the length of the results.
-func (r *BGPResults) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the bgpRow fields.
-func (r *BGPResults) GetHeaders() []interface{} { return common.Headers(bgpRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *BGPResults) GetRows() []interface{} { return common.Rows(r.Data) }
 
 // GetBGPSortFields returns a map of the BGP sort fields and their corresponding struct field. It
 // returns an error if the given field is not a valid sort field.
