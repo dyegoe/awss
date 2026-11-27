@@ -98,16 +98,16 @@ func (f *fakeResults) GetHeaders() []interface{} { return nil }
 func (f *fakeResults) GetRows() []interface{}    { return nil }
 
 // countingEngine returns an engine building fakeResults, and how many it built.
-func countingEngine() (*Engine, *int) {
+func countingEngine() (eng *Engine, built *int) {
 	var mu sync.Mutex
-	calls := 0
-	eng := testEngine(func(profile, region string, _ map[string][]string, _ *Options) common.Results {
+	n := 0
+	eng = testEngine(func(profile, region string, _ map[string][]string, _ *Options) common.Results {
 		mu.Lock()
-		calls++
+		n++
 		mu.Unlock()
 		return &fakeResults{common.BaseResults{Profile: profile, Region: region}}
 	})
-	return eng, &calls
+	return eng, &n
 }
 
 // TestExecute_fanOut checks that every profile x region is searched once, and none without profiles.
