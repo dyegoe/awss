@@ -443,9 +443,6 @@ type cmdSpec struct {
 	// filterFlags lists the filter flag names that cannot be combined with --all.
 	filterFlags []string
 
-	// accountNames is true for the commands with an Owner column, which get the account names.
-	accountNames bool
-
 	// optionalFilters is true for a command without --all, such as org: without a filter flag it
 	// lists everything, as --all does.
 	optionalFilters bool
@@ -511,7 +508,7 @@ func runSearch(cmd *cobra.Command, spec *cmdSpec, azs, tags []string, filterStru
 	tagsKeys := viper.GetStringSlice(labelTagsKeys)
 
 	var names map[string]string
-	if spec.accountNames {
+	if search.UsesAccountNames(engineName(cmd)) {
 		names = accountNames(cmd.Context(), cmd.ErrOrStderr())
 	}
 

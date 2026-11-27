@@ -226,7 +226,6 @@ func cloudwanRoutesRunE(cmd *cobra.Command, _ []string) error {
 
 	return runSearch(cmd, &cmdSpec{
 		sortLabel: labelCloudWANRoutesSort, filterFlags: cloudwanRoutesFilterFlags, optionalFilters: true,
-		accountNames: true,
 	}, nil, nil, cloudwanRoutesF)
 }
 
@@ -239,7 +238,6 @@ func cloudwanBGPRunE(cmd *cobra.Command, _ []string) error {
 
 	return runSearch(cmd, &cmdSpec{
 		sortLabel: labelCloudWANBGPSort, filterFlags: cloudwanBGPFilterFlags, optionalFilters: true,
-		accountNames: true,
 	}, nil, nil, cloudwanBGPF)
 }
 
@@ -256,7 +254,7 @@ func cloudwanAttachmentsRunE(cmd *cobra.Command, _ []string) error {
 
 	return runSearch(cmd, &cmdSpec{
 		sortLabel: labelCloudWANAttachmentsSort, filterFlags: cloudwanAttachmentsFilterFlags,
-		optionalFilters: true, accountNames: true,
+		optionalFilters: true,
 	}, nil, nil, cloudwanAttachmentsF)
 }
 

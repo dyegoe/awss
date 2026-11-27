@@ -109,7 +109,6 @@ func dxGatewaysRunE(cmd *cobra.Command, _ []string) error {
 
 	return runSearch(cmd, &cmdSpec{
 		sortLabel: labelDXGatewaysSort, filterFlags: dxGatewaysFilterFlags, optionalFilters: true,
-		accountNames: true,
 	}, nil, nil, dxGatewaysF)
 }
 

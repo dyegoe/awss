@@ -26,6 +26,13 @@ import (
 	searchOrg "github.com/dyegoe/awss/search/org"
 )
 
+// TestOrgFilterFlags_coversStruct checks every orgFilters field has a registered flag in
+// orgFilterFlags, the flags that turn off listing every account.
+func TestOrgFilterFlags_coversStruct(t *testing.T) {
+	resetCLI(t, nil)
+	checkFilterFlags(t, "org", orgCmd, reflect.TypeOf(orgFilters{}).NumField(), orgFilterFlags)
+}
+
 // orgAwsConfig is an AWS config file with two profiles.
 const orgAwsConfig = "[profile org]\nregion = us-east-1\n[profile member]\nregion = us-east-1\n"
 

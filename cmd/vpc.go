@@ -88,10 +88,9 @@ func vpcRunE(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	return runSearch(cmd, &cmdSpec{
-		allLabel:     labelVpcAll,
-		sortLabel:    labelVpcSort,
-		filterFlags:  vpcFilterFlags,
-		accountNames: true,
+		allLabel:    labelVpcAll,
+		sortLabel:   labelVpcSort,
+		filterFlags: vpcFilterFlags,
 	}, nil, vpcF.Tags, vpcF)
 }
 
