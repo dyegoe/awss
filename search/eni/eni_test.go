@@ -55,13 +55,15 @@ func TestNew(t *testing.T) {
 			filters:   map[string][]string{"network-interface-id": {"eni-1234567890abcdef0"}},
 			sortField: "id",
 			want: &Results{
-				BaseResults: common.BaseResults{
-					Profile:   "default",
-					Region:    "us-east-1",
-					Errors:    []string{},
-					SortField: "id",
+				RowSet: common.RowSet[dataRow]{
+					BaseResults: common.BaseResults{
+						Profile:   "default",
+						Region:    "us-east-1",
+						Errors:    []string{},
+						SortField: "id",
+					},
+					Data: []dataRow{},
 				},
-				Data:    []dataRow{},
 				Filters: map[string][]string{"network-interface-id": {"eni-1234567890abcdef0"}},
 			},
 		},
@@ -79,12 +81,14 @@ func TestNew(t *testing.T) {
 // mockResultsEmpty returns a new empty result set. Each test gets its own: some sort it in place.
 func mockResultsEmpty() *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile: "",
-			Region:  "",
-			Errors:  []string{},
+		RowSet: common.RowSet[dataRow]{
+			BaseResults: common.BaseResults{
+				Profile: "",
+				Region:  "",
+				Errors:  []string{},
+			},
+			Data: []dataRow{},
 		},
-		Data:    []dataRow{},
 		Filters: map[string][]string{},
 	}
 }
@@ -92,18 +96,20 @@ func mockResultsEmpty() *Results {
 // mockResults returns a new result set with two rows. Each test gets its own: some sort it in place.
 func mockResults() *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile: "default",
-			Region:  "us-east-1",
-			Errors: []string{
-				"error1",
-				"error2",
+		RowSet: common.RowSet[dataRow]{
+			BaseResults: common.BaseResults{
+				Profile: "default",
+				Region:  "us-east-1",
+				Errors: []string{
+					"error1",
+					"error2",
+				},
+				SortField: "id",
 			},
-			SortField: "id",
-		},
-		Data: []dataRow{
-			mockDataRow1(),
-			mockDataRow2(),
+			Data: []dataRow{
+				mockDataRow1(),
+				mockDataRow2(),
+			},
 		},
 		Filters: map[string][]string{
 			"network-interface-id": {"eni-1234567890abcdef0"},
@@ -217,8 +223,8 @@ func TestResults_accessors(t *testing.T) {
 	}
 }
 
-// TestResults_GetHeaders tests the GetHeaders function.
-func TestResults_GetHeaders(t *testing.T) {
+// TestResults_headers checks the table headers GetHeaders builds from the row type.
+func TestResults_headers(t *testing.T) {
 	tests := []struct {
 		name    string
 		results *Results
@@ -239,8 +245,8 @@ func TestResults_GetHeaders(t *testing.T) {
 	}
 }
 
-// TestResults_GetRows tests the GetRows method
-func TestResults_GetRows(t *testing.T) {
+// TestResults_rows checks the rows GetRows returns.
+func TestResults_rows(t *testing.T) {
 	tests := []struct {
 		name    string
 		results *Results
@@ -308,8 +314,8 @@ func TestResults_getFilters(t *testing.T) {
 	}
 }
 
-// TestResults_sortResults tests sorting on the nested InterfaceInfo fields.
-func TestResults_sortResults(t *testing.T) {
+// TestResults_sortRows tests sorting on the nested InterfaceInfo fields.
+func TestResults_sortRows(t *testing.T) {
 	r := New("default", "us-east-1", map[string][]string{}, "id", false)
 	r.Data = []dataRow{
 		{InterfaceInfo: eniInfo{NetworkInterfaceID: "eni-b", SubnetID: "subnet-2", OwnerID: "333333333333"}},
@@ -329,9 +335,10 @@ func TestResults_sortResults(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := r.sortResults(tt.field)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("sortResults(%q) error = %v, wantErr %v", tt.field, err, tt.wantErr)
+			r.SortField = tt.field
+			r.SortRowsBy(GetSortFields, orderRows)
+			if gotErr := len(r.Errors) > 0; gotErr != tt.wantErr {
+				t.Fatalf("SortRowsBy() by %q errors = %v, wantErr %v", tt.field, r.Errors, tt.wantErr)
 			}
 			if tt.wantErr {
 				return
@@ -341,7 +348,7 @@ func TestResults_sortResults(t *testing.T) {
 				got = append(got, r.Data[i].InterfaceInfo.NetworkInterfaceID)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("sortResults(%q) order = %v, want %v", tt.field, got, tt.want)
+				t.Errorf("SortRowsBy() by %q order = %v, want %v", tt.field, got, tt.want)
 			}
 		})
 	}

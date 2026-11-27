@@ -35,10 +35,7 @@ import (
 
 // Results describes results of the ENIs search.
 type Results struct {
-	common.BaseResults
-
-	// Data contains the instances found.
-	Data []dataRow `json:"data"`
+	common.RowSet[dataRow]
 
 	// Filters is a map of strings used to search.
 	Filters map[string][]string `json:"-"`
@@ -105,13 +102,7 @@ type eniInfo struct {
 // New initiates and returns a new instance of ENI results.
 func New(profile, region string, filters map[string][]string, sortField string, noInstanceName bool) *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile:   profile,
-			Region:    region,
-			Errors:    []string{},
-			SortField: sortField,
-		},
-		Data:           []dataRow{},
+		RowSet:         common.NewRowSet[dataRow](profile, region, sortField),
 		Filters:        filters,
 		NoInstanceName: noInstanceName,
 	}
@@ -132,14 +123,14 @@ func (r *Results) Search(ctx context.Context) {
 	// Get search filters.
 	input, err := r.getFilters()
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error building filters: %v", err))
+		r.AddError(fmt.Sprintf("error building filters: %v", err))
 		return
 	}
 
 	// Get AWS config.
 	cfg, err := common.AwsConfig(r.Profile, r.Region)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %s", err))
+		r.AddError(fmt.Sprintf("error getting aws config: %s", err))
 		return
 	}
 
@@ -150,7 +141,7 @@ func (r *Results) Search(ctx context.Context) {
 func (r *Results) collect(ctx context.Context, client ec2API, input *ec2.DescribeNetworkInterfacesInput) {
 	instanceIDs, err := r.collectENIs(ctx, client, input)
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.AddError(err.Error())
 		return
 	}
 
@@ -158,11 +149,7 @@ func (r *Results) collect(ctx context.Context, client ec2API, input *ec2.Describ
 		r.enrichInstanceNames(ctx, client, instanceIDs)
 	}
 
-	if r.SortField != "" {
-		if err := r.sortResults(r.SortField); err != nil {
-			r.Errors = append(r.Errors, err.Error())
-		}
-	}
+	r.SortRowsBy(GetSortFields, orderRows)
 }
 
 // pageSize is the number of network interfaces asked per DescribeNetworkInterfaces call.
@@ -225,7 +212,7 @@ func (r *Results) appendENIs(enis []types.NetworkInterface) []string {
 func (r *Results) enrichInstanceNames(ctx context.Context, client ec2.DescribeInstancesAPIClient, ids []string) {
 	names, err := searchEC2.InstanceNames(ctx, client, ids)
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.AddError(err.Error())
 		return
 	}
 	for i := range r.Data {
@@ -264,15 +251,6 @@ func parseENIRow(eni *types.NetworkInterface) dataRow {
 	return row
 }
 
-// Len returns the length of the results.
-func (r *Results) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the dataRow fields.
-func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
-
 // getFilters returns the filters used to search.
 //
 // The filters are defined in the results.filters field.
@@ -301,21 +279,14 @@ func (r *Results) getFilters() (*ec2.DescribeNetworkInterfacesInput, error) {
 	return &input, nil
 }
 
-// sortResults sorts the results by the given field of the nested InterfaceInfo struct.
-func (r *Results) sortResults(field string) error {
-	sortFields, err := GetSortFields(field)
-	if err != nil {
-		return err
-	}
-
-	name := sortFields[field]
-	sort.SliceStable(r.Data, func(p, q int) bool {
+// orderRows sorts rows by the struct field fieldName of their nested InterfaceInfo.
+func orderRows(rows []dataRow, fieldName string) {
+	sort.SliceStable(rows, func(p, q int) bool {
 		return common.Less(
-			reflect.ValueOf(r.Data[p].InterfaceInfo).FieldByName(name),
-			reflect.ValueOf(r.Data[q].InterfaceInfo).FieldByName(name),
+			reflect.ValueOf(rows[p].InterfaceInfo).FieldByName(fieldName),
+			reflect.ValueOf(rows[q].InterfaceInfo).FieldByName(fieldName),
 		)
 	})
-	return nil
 }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.
