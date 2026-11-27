@@ -36,10 +36,7 @@ import (
 
 // Results describes the Direct Connect gateways found with one profile.
 type Results struct {
-	common.BaseResults
-
-	// Data contains the gateways found: one row per allowed prefix of each association.
-	Data []dataRow `json:"data"`
+	common.RowSet[dataRow]
 
 	// Filters is a map of strings used to search, keyed by the FilterKey constants.
 	Filters map[string][]string `json:"-"`
@@ -122,13 +119,7 @@ type vifAttachment struct {
 // the output only: the search calls the region of the profile.
 func New(profile, region string, filters map[string][]string, sortField string) *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile:   profile,
-			Region:    region,
-			Errors:    []string{},
-			SortField: sortField,
-		},
-		Data:    []dataRow{},
+		RowSet:  common.NewRowSet[dataRow](profile, region, sortField),
 		Filters: filters,
 	}
 }
@@ -143,12 +134,12 @@ var newClient = func(profile string) (gatewaysAPI, error) { return NewClient(pro
 func (r *Results) Search(ctx context.Context) {
 	q, err := newQuery(r.Filters)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error building filters: %v", err))
+		r.AddError(fmt.Sprintf("error building filters: %v", err))
 		return
 	}
 	client, err := newClient(r.Profile)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
+		r.AddError(fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 	r.collect(ctx, client, q)
@@ -160,7 +151,7 @@ func (r *Results) Search(ctx context.Context) {
 func (r *Results) collect(ctx context.Context, client gatewaysAPI, q *query) {
 	gws, err := gateways(ctx, client)
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.AddError(err.Error())
 		return
 	}
 	for i := range gws {
@@ -170,18 +161,13 @@ func (r *Results) collect(ctx context.Context, client gatewaysAPI, q *query) {
 		}
 		rows, err := r.gatewayRows(ctx, client, q, &gw)
 		if err != nil {
-			r.Errors = append(r.Errors, err.Error())
+			r.AddError(err.Error())
 			continue
 		}
 		r.Data = append(r.Data, rows...)
 	}
 
-	if r.SortField == "" {
-		return
-	}
-	if err := r.sortResults(r.SortField); err != nil {
-		r.Errors = append(r.Errors, err.Error())
-	}
+	r.SortRowsBy(GetSortFields, orderRows)
 }
 
 // gatewayRows returns the rows of one gateway, gw being its gateway columns: one per allowed
@@ -269,14 +255,10 @@ func parseVIF(a *types.DirectConnectGatewayAttachment) vifAttachment {
 	}
 }
 
-// sortResults sorts the results by the given field. Rows equal on it stay grouped by gateway and
+// orderRows sorts rows by the struct field fieldName. Rows equal on it stay grouped by gateway and
 // association, with the allowed prefixes in address order.
-func (r *Results) sortResults(field string) error {
-	sortFields, err := GetSortFields(field)
-	if err != nil {
-		return err
-	}
-	slices.SortStableFunc(r.Data, func(a, b dataRow) int {
+func orderRows(rows []dataRow, fieldName string) {
+	slices.SortStableFunc(rows, func(a, b dataRow) int {
 		if c := cmp.Or(
 			cmp.Compare(a.GatewayName, b.GatewayName), cmp.Compare(a.GatewayID, b.GatewayID),
 			cmp.Compare(a.AssociatedID, b.AssociatedID),
@@ -291,18 +273,8 @@ func (r *Results) sortResults(field string) error {
 		}
 		return 0
 	})
-	common.SortByField(r.Data, sortFields[field])
-	return nil
+	common.SortByField(rows, fieldName)
 }
-
-// Len returns the length of the results.
-func (r *Results) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the dataRow fields.
-func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.
 //
