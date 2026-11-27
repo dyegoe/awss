@@ -26,6 +26,9 @@ in the same PR (`go mod edit -go=<version>`). Do not hardcode the version in doc
 
 ### Package layout
 
+`docs/ARCHITECTURE.md` is the map: how a command runs from the CLI to AWS and back, with a
+diagram, and why the pieces are where they are. Read it before a change to the structure.
+
 ```text
 main.go              — entry point, delegates to cmd.Execute()
 cmd/                 — Cobra CLI commands: root (global flags, runSearch/cmdSpec) + one file per resource
@@ -58,6 +61,7 @@ cleanup/defaultvpc/  — deletes the default VPC and its plumbing, all-or-nothin
 cleanup/dhcpoptions/ — deletes the DHCP options sets no VPC uses; registered as "dhcp-options"
 internal/testconv/   — checks the test conventions of every package (run by its own test in CI)
 internal/nesting/    — checks the nesting depth of every function (run by its own test in CI)
+internal/doclist/    — checks this layout and docs/ARCHITECTURE.md list every package (run by its own test)
 scripts/             — coverage.awk: the per-package coverage and test-file check of make test
 common/              — shared: Results interface, BaseResults, AWS helpers, filter builders,
                        output formatting, reflection row helpers and Version sorting (rows.go), Matcher
@@ -144,7 +148,11 @@ reviewer and the author own it. **SHOULD** rules may be broken with a reason in 
 | A pull request title follows Conventional Commits: the squash merge makes it the commit on `main`. | `cz check` (CI `PR title`) |
 | Pull requests are squash-merged; agents open them and never merge. | repository settings, review |
 | A change to authentication, profiles or shared VPCs carries the exact `awss` commands for the real AWS check in its pull request (see Changes that need a real AWS check). | review |
-| A new flag, command, sort field or config key appears in `README.md`. | review |
+| A new flag, command, sort field or config key appears in `README.md`. | tests for commands, flags and sort fields (`cmd/docs_test.go`); review for config keys |
+| Every package appears in the package layout above and in `docs/ARCHITECTURE.md`. | `internal/doclist` (`TestCheck_repository`) |
+| A change that moves, adds or removes a piece of the map updates `docs/ARCHITECTURE.md` in the same pull request. | review |
+| A pull request description has a "Where this sits on the map" section: the parts of `docs/ARCHITECTURE.md` the change touches, with a small before/after when the structure changes. | review (pull request template) |
+| A pull request description lists the docs and code comments the change made the agent re-read, and says for each whether it was still true or was updated. | review (pull request template) |
 | A pull request names the issue it closes (`Closes #N`), so merging closes it. | review |
 | The `go` directive of `go.mod` is the only Go version; CI and releases read it. | CI (`go-version-file`) |
 
@@ -182,6 +190,11 @@ pull request that closes it (`Closes #N`); never commit straight to `main`. Hist
   `check-release-config` checks the config and builds a snapshot on every pull request; the
   GoReleaser version is pinned in both workflows. Try it locally with
   `goreleaser release --snapshot --clean`.
+- Before the maintainer merges the release-please PR, an agent runs a drift audit: it reads the
+  changes since the last release against `README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md` and the
+  code comments they touch, and opens one issue per statement that is no longer true. The tests
+  catch the lists (commands, flags, sort fields, packages); this audit is for the sentences. It
+  is done by hand for now; it is automated only once it proves it finds real drift.
 
 ### Changes that need a real AWS check
 
@@ -210,10 +223,13 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
    `common.Rows`, `common.SortFields` and `common.SortByField` helpers (see `search/ebs/ebs.go`).
 4. Add a `filter` struct in `cmd/<resource>.go` with `filter:""` tags matching AWS API filter names.
 5. Register the command in `cmd/root.go` via `<resource>InitFlags()` and `<resource>InitViper()`.
-6. Register the command in the `engines` map in `search/search.go` (constructor + `GetSortFields`).
+6. Register the command in the `engines` map in `search/search.go` (constructor + `GetSortFields`,
+   and `accountNames: true` when the rows have an Owner column).
 7. Wire the `RunE` through `runSearch()` with a `cmdSpec` in the command file (see `cmd/ebs.go` as the pattern).
 8. Write tests covering: filter building, result parsing, sort validation, edge cases (nil fields, empty results).
-9. Update `README.md` with the new subcommand, its filters, sort fields, and any additional flags.
+9. Update `README.md` with the new subcommand, its filters, sort fields, and any additional flags,
+   and add the package to the package layout above and to `docs/ARCHITECTURE.md` (both checked by
+   tests).
 
 ---
 
