@@ -80,13 +80,15 @@ func bucket(name string) types.Bucket {
 func TestNew(t *testing.T) {
 	filters := map[string][]string{FilterKeyName: {"prod-*"}}
 	want := &Results{
-		BaseResults: common.BaseResults{
-			Profile:   "default",
-			Region:    "us-east-1",
-			Errors:    []string{},
-			SortField: "name",
+		RowSet: common.RowSet[dataRow]{
+			BaseResults: common.BaseResults{
+				Profile:   "default",
+				Region:    "us-east-1",
+				Errors:    []string{},
+				SortField: "name",
+			},
+			Data: []dataRow{},
 		},
-		Data:     []dataRow{},
 		Filters:  filters,
 		Regex:    true,
 		ShowTags: true,
@@ -268,8 +270,8 @@ func TestResults_Search_earlyErrors(t *testing.T) {
 	}
 }
 
-// TestResults_sortResults tests sorting by name and created, and the invalid field error.
-func TestResults_sortResults(t *testing.T) {
+// TestResults_sortRows tests sorting by name and created, and the invalid field error.
+func TestResults_sortRows(t *testing.T) {
 	rows := []dataRow{
 		{Name: "b", CreationDate: "2024-01-01T00:00:00Z"},
 		{Name: "a", CreationDate: "2025-01-01T00:00:00Z"},
@@ -289,16 +291,17 @@ func TestResults_sortResults(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := New("default", "us-east-1", map[string][]string{}, "", false, false)
 			r.Data = append([]dataRow(nil), rows...)
-			err := r.sortResults(tt.field)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("sortResults(%q) error = %v, wantErr %v", tt.field, err, tt.wantErr)
+			r.SortField = tt.field
+			r.SortRows()
+			if gotErr := len(r.Errors) > 0; gotErr != tt.wantErr {
+				t.Fatalf("SortRows() by %q errors = %v, wantErr %v", tt.field, r.Errors, tt.wantErr)
 			}
 			if tt.wantErr {
 				return
 			}
 			got := []string{r.Data[0].Name, r.Data[1].Name, r.Data[2].Name}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("sortResults(%q) order = %v, want %v", tt.field, got, tt.want)
+				t.Errorf("SortRows() by %q order = %v, want %v", tt.field, got, tt.want)
 			}
 		})
 	}
