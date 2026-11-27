@@ -43,8 +43,8 @@ func (b *BaseResults) GetErrors() []string { return b.Errors }
 // GetSortField returns the field used to sort the results.
 func (b *BaseResults) GetSortField() string { return b.SortField }
 
-// AddError records an error of the search.
-func (b *BaseResults) AddError(msg string) { b.Errors = append(b.Errors, msg) }
+// AddError records errors of the search, in order.
+func (b *BaseResults) AddError(msgs ...string) { b.Errors = append(b.Errors, msgs...) }
 
 // RowSet holds the rows of a result set and gives the Results methods that need only the rows.
 //
