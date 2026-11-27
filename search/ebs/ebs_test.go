@@ -57,13 +57,15 @@ func TestNew(t *testing.T) {
 			filters:   map[string][]string{"volume-id": {"vol-1234567890abcdef0"}},
 			sortField: "id",
 			want: &Results{
-				BaseResults: common.BaseResults{
-					Profile:   "default",
-					Region:    "us-east-1",
-					Errors:    []string{},
-					SortField: "id",
+				RowSet: common.RowSet[dataRow]{
+					BaseResults: common.BaseResults{
+						Profile:   "default",
+						Region:    "us-east-1",
+						Errors:    []string{},
+						SortField: "id",
+					},
+					Data: []dataRow{},
 				},
-				Data:    []dataRow{},
 				Filters: map[string][]string{"volume-id": {"vol-1234567890abcdef0"}},
 			},
 		},
@@ -81,12 +83,14 @@ func TestNew(t *testing.T) {
 // mockResultsEmpty returns a new empty result set. Each test gets its own: some sort it in place.
 func mockResultsEmpty() *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile: "",
-			Region:  "",
-			Errors:  []string{},
+		RowSet: common.RowSet[dataRow]{
+			BaseResults: common.BaseResults{
+				Profile: "",
+				Region:  "",
+				Errors:  []string{},
+			},
+			Data: []dataRow{},
 		},
-		Data:    []dataRow{},
 		Filters: map[string][]string{},
 	}
 }
@@ -94,18 +98,20 @@ func mockResultsEmpty() *Results {
 // mockResults returns a new result set with two rows. Each test gets its own: some sort it in place.
 func mockResults() *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile: "default",
-			Region:  "us-east-1",
-			Errors: []string{
-				"error1",
-				"error2",
+		RowSet: common.RowSet[dataRow]{
+			BaseResults: common.BaseResults{
+				Profile: "default",
+				Region:  "us-east-1",
+				Errors: []string{
+					"error1",
+					"error2",
+				},
+				SortField: "id",
 			},
-			SortField: "id",
-		},
-		Data: []dataRow{
-			mockDataRow1(),
-			mockDataRow2(),
+			Data: []dataRow{
+				mockDataRow1(),
+				mockDataRow2(),
+			},
 		},
 		Filters: map[string][]string{
 			"volume-id":         {"vol-1234567890abcdef0"},
@@ -204,8 +210,8 @@ func TestResults_accessors(t *testing.T) {
 	}
 }
 
-// TestResults_GetHeaders tests the GetHeaders function.
-func TestResults_GetHeaders(t *testing.T) {
+// TestResults_headers checks the table headers GetHeaders builds from the row type.
+func TestResults_headers(t *testing.T) {
 	tests := []struct {
 		name    string
 		results *Results
@@ -229,8 +235,8 @@ func TestResults_GetHeaders(t *testing.T) {
 	}
 }
 
-// TestResults_GetRows tests the GetRows method.
-func TestResults_GetRows(t *testing.T) {
+// TestResults_rows checks the rows GetRows returns.
+func TestResults_rows(t *testing.T) {
 	tests := []struct {
 		name    string
 		results *Results
@@ -277,9 +283,11 @@ func TestResults_getFilters(t *testing.T) {
 		{
 			name: "empty filters",
 			results: &Results{
-				BaseResults: common.BaseResults{},
-				Data:        []dataRow{},
-				Filters:     map[string][]string{},
+				RowSet: common.RowSet[dataRow]{
+					BaseResults: common.BaseResults{},
+					Data:        []dataRow{},
+				},
+				Filters: map[string][]string{},
 			},
 			want: &ec2.DescribeVolumesInput{},
 		},
@@ -317,9 +325,11 @@ func TestResults_getFilters(t *testing.T) {
 // TestResults_getFilters_malformedTag tests getFilters with a malformed tag filter.
 func TestResults_getFilters_malformedTag(t *testing.T) {
 	r := &Results{
-		BaseResults: common.BaseResults{},
-		Data:        []dataRow{},
-		Filters:     map[string][]string{"tag": {"invalid"}},
+		RowSet: common.RowSet[dataRow]{
+			BaseResults: common.BaseResults{},
+			Data:        []dataRow{},
+		},
+		Filters: map[string][]string{"tag": {"invalid"}},
 	}
 	_, err := r.getFilters()
 	if err == nil {
@@ -327,8 +337,8 @@ func TestResults_getFilters_malformedTag(t *testing.T) {
 	}
 }
 
-// TestResults_sortResults tests the sortResults function.
-func TestResults_sortResults(t *testing.T) {
+// TestResults_sortRows checks the sort by each kind of field, and the error of an unknown field.
+func TestResults_sortRows(t *testing.T) {
 	tests := []struct {
 		name      string
 		field     string
@@ -359,39 +369,46 @@ func TestResults_sortResults(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &Results{
-				Data: []dataRow{
-					{VolumeID: "vol-1234567890abcdef1", Size: 200, State: "available"},
-					{VolumeID: "vol-1234567890abcdef0", Size: 100, State: "in-use"},
+				RowSet: common.RowSet[dataRow]{
+					Data: []dataRow{
+						{VolumeID: "vol-1234567890abcdef1", Size: 200, State: "available"},
+						{VolumeID: "vol-1234567890abcdef0", Size: 100, State: "in-use"},
+					},
 				},
 			}
-			err := r.sortResults(tt.field)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("sortResults(%q) error = %v, wantErr %v", tt.field, err, tt.wantErr)
+			r.SortField = tt.field
+			r.SortRows()
+			if gotErr := len(r.Errors) > 0; gotErr != tt.wantErr {
+				t.Errorf("SortRows() by %q errors = %v, wantErr %v", tt.field, r.Errors, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && r.Data[0].VolumeID != tt.wantFirst {
-				t.Errorf("sortResults(%q) first row = %s, want %s", tt.field, r.Data[0].VolumeID, tt.wantFirst)
+				t.Errorf("SortRows() by %q first row = %s, want %s", tt.field, r.Data[0].VolumeID, tt.wantFirst)
 			}
 		})
 	}
 }
 
-// TestResults_sortResults_sizeNumeric verifies size sorts numerically, not lexicographically.
-func TestResults_sortResults_sizeNumeric(t *testing.T) {
+// TestResults_sortRowsSizeNumeric verifies size sorts numerically, not lexicographically.
+func TestResults_sortRowsSizeNumeric(t *testing.T) {
 	r := &Results{
-		Data: []dataRow{
-			{VolumeID: "vol-a", Size: 100},
-			{VolumeID: "vol-b", Size: 20},
-			{VolumeID: "vol-c", Size: 1000},
+		RowSet: common.RowSet[dataRow]{
+			Data: []dataRow{
+				{VolumeID: "vol-a", Size: 100},
+				{VolumeID: "vol-b", Size: 20},
+				{VolumeID: "vol-c", Size: 1000},
+			},
 		},
 	}
-	if err := r.sortResults("size"); err != nil {
-		t.Fatalf("sortResults(size) unexpected error: %v", err)
+	r.SortField = "size"
+	r.SortRows()
+	if len(r.Errors) > 0 {
+		t.Fatalf("SortRows() by size errors = %v, want none", r.Errors)
 	}
 	want := []int32{20, 100, 1000}
 	for i, w := range want {
 		if r.Data[i].Size != w {
-			t.Errorf("sortResults(size) index %d = %d, want %d", i, r.Data[i].Size, w)
+			t.Errorf("SortRows() by size index %d = %d, want %d", i, r.Data[i].Size, w)
 		}
 	}
 }
