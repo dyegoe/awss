@@ -20,13 +20,11 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/dyegoe/awss/common"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -64,10 +62,7 @@ var ec2Cmd = &cobra.Command{
 	Short: "Search for EC2 instances.",
 	Long: `
 Search for EC2 instances.
-You can search EC2 instances using the following filters:
-  ids, names, tags, instance-types, availability-zones, instance-states, private-ips, public-ips,
-  volume-ids and cidrs.
-You can use multiple values for each filter, separated by comma. Example: --names 'Name1,Name2'
+` + filtersHelp("EC2 instances", ec2FilterFlags) + `You can use multiple values for each filter, separated by comma. Example: --names 'Name1,Name2'
 
 --cidrs finds the instances that have a private IP inside an IPv4 range, on any of their network
 interfaces (primary or secondary). The range can be a subnet, a VPC CIDR block (primary or
@@ -104,7 +99,7 @@ func ec2RunE(cmd *cobra.Command, _ []string) error {
 func ec2InitFlags() {
 	rootCmd.AddCommand(ec2Cmd)
 
-	ec2Cmd.Flags().BoolP("all", "a", false,
+	ec2Cmd.Flags().BoolP(flagAll, "a", false,
 		"Search for all EC2 instances without any filter. Cannot be combined with other filters.")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.IDs, flagIDs, "i", []string{},
 		"Filter EC2 instances by ids. `i-1230456078901,i-1230456078902`")
@@ -129,15 +124,12 @@ func ec2InitFlags() {
 		"Filter EC2 instances by attached EBS volume IDs. `vol-1230456078901,vol-1230456078902`")
 	ec2Cmd.Flags().StringSliceVarP(&ec2F.CIDRs, flagCIDRs, "c", []string{},
 		"Filter EC2 instances by IPv4 range: any private IP of any ENI inside it. `100.64.0.0/16`")
-	ec2Cmd.Flags().String("sort", "name", sortHelp("ec2", "EC2 instances", "name"))
+	ec2Cmd.Flags().String(flagSort, "name", sortHelp("ec2", "EC2 instances", "name"))
 }
 
 func ec2InitViper() error {
-	if err := viper.BindPFlag(labelEc2All, ec2Cmd.Flags().Lookup("all")); err != nil {
-		return fmt.Errorf("error binding flag: %w", err)
-	}
-	if err := viper.BindPFlag(labelEc2Sort, ec2Cmd.Flags().Lookup("sort")); err != nil {
-		return fmt.Errorf("error binding flag: %w", err)
-	}
-	return nil
+	return bindFlags(ec2Cmd, map[string]string{
+		labelEc2All:  flagAll,
+		labelEc2Sort: flagSort,
+	})
 }

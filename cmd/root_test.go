@@ -21,6 +21,7 @@ package cmd
 
 import (
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,6 +41,78 @@ func checkFilterFlags(t *testing.T, name string, cmd *cobra.Command, numFields i
 		if cmd.Flags().Lookup(flag) == nil {
 			t.Errorf("%sFilterFlags lists %q but the %s command has no such flag", name, flag, name)
 		}
+	}
+}
+
+// TestFiltersHelp checks the filter list of the long help: every flag with its dashes, a comma
+// between them, a period at the end, and lines wrapped at helpWidth.
+func TestFiltersHelp(t *testing.T) {
+	long := []string{
+		"availability-zones", "instance-states", "private-ips", "public-ips", "volume-ids",
+		"tags-key", "instance-types", "default-for-az", "public-ip-on-launch", "owner-ids",
+	}
+	tests := []struct {
+		name  string
+		flags []string
+		want  string
+	}{
+		{
+			name:  "one flag",
+			flags: []string{"ids"},
+			want:  "You can search things using the following filters:\n  --ids.\n",
+		},
+		{
+			name:  "two flags",
+			flags: []string{"ids", "tags"},
+			want:  "You can search things using the following filters:\n  --ids, --tags.\n",
+		},
+		{
+			name:  "wrapped",
+			flags: long,
+			want: "You can search things using the following filters:\n" +
+				"  --availability-zones, --instance-states, --private-ips, --public-ips, --volume-ids, --tags-key,\n" +
+				"  --instance-types, --default-for-az, --public-ip-on-launch, --owner-ids.\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := filtersHelp("things", tt.flags)
+			if got != tt.want {
+				t.Errorf("filtersHelp(things, %v) = %q, want %q", tt.flags, got, tt.want)
+			}
+			for _, line := range strings.Split(got, "\n") {
+				if len(line) > helpWidth {
+					t.Errorf("filtersHelp(things, %v) has a line of %d characters, want at most %d",
+						tt.flags, len(line), helpWidth)
+				}
+			}
+		})
+	}
+}
+
+// TestFiltersHelp_commands checks the long help of the commands that list their filters names
+// every filter flag, so the list follows the flags.
+func TestFiltersHelp_commands(t *testing.T) {
+	tests := []struct {
+		name  string
+		cmd   *cobra.Command
+		flags []string
+	}{
+		{name: "ec2", cmd: ec2Cmd, flags: ec2FilterFlags},
+		{name: "eni", cmd: eniCmd, flags: eniFilterFlags},
+		{name: "ebs", cmd: ebsCmd, flags: ebsFilterFlags},
+		{name: "vpc", cmd: vpcCmd, flags: vpcFilterFlags},
+		{name: "subnet", cmd: subnetCmd, flags: subnetFilterFlags},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			long := strings.Join(strings.Fields(tt.cmd.Long), " ")
+			for _, flag := range tt.flags {
+				if !strings.Contains(long, "--"+flag+",") && !strings.Contains(long, "--"+flag+".") {
+					t.Errorf("%s long help does not list --%s", tt.name, flag)
+				}
+			}
+		})
 	}
 }
 

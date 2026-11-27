@@ -20,13 +20,11 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/dyegoe/awss/common"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -59,9 +57,7 @@ var eniCmd = &cobra.Command{
 	Short: "Search for ENIs (Elastic Network Interfaces).",
 	Long: `
 Search for ENIs (Elastic Network Interfaces).
-You can search ENIs using the following filters: ids, tags, instance-ids, availability-zones, private-ips, public-ips,
-owner-ids.
-You can use multiple values for each filter, separated by comma. Example: --ids eni-1230456078901,eni-1230456078902
+` + filtersHelp("ENIs", eniFilterFlags) + `You can use multiple values for each filter, separated by comma. Example: --ids eni-1230456078901,eni-1230456078902
 
 You can use multiple filters at same time, for example:
 	awss eni -I i-1230456078901,i-1230456078902 -z a,b
@@ -92,7 +88,7 @@ var eniFilterFlags = []string{
 func eniInitFlags() {
 	rootCmd.AddCommand(eniCmd)
 
-	eniCmd.Flags().BoolP("all", "a", false,
+	eniCmd.Flags().BoolP(flagAll, "a", false,
 		"Search for all ENIs without any filter. Cannot be combined with other filters.")
 	eniCmd.Flags().StringSliceVarP(&eniF.IDs, flagIDs, "i", []string{},
 		"Filter ENIs by ids. `eni-1230456078901,eni-1230456078902`")
@@ -111,20 +107,15 @@ func eniInitFlags() {
 		"Filter ENIs by public IPs. `52.28.19.20,52.30.31.32`")
 	eniCmd.Flags().StringSliceVarP(&eniF.OwnerIDs, "owner-ids", "o", []string{},
 		"Filter ENIs by owner account IDs. `123456789012`")
-	eniCmd.Flags().String("sort", "id", sortHelp("eni", "ENIs", "id"))
-	eniCmd.Flags().Bool("no-instance-name", false,
+	eniCmd.Flags().String(flagSort, "id", sortHelp("eni", "ENIs", "id"))
+	eniCmd.Flags().Bool(flagNoInstanceName, false,
 		"Skip the instance name lookup to speed up the ENI search.")
 }
 
 func eniInitViper() error {
-	if err := viper.BindPFlag(labelEniAll, eniCmd.Flags().Lookup("all")); err != nil {
-		return fmt.Errorf("error binding flag: %w", err)
-	}
-	if err := viper.BindPFlag(labelEniSort, eniCmd.Flags().Lookup("sort")); err != nil {
-		return fmt.Errorf("error binding flag: %w", err)
-	}
-	if err := viper.BindPFlag(labelEniNoInstanceName, eniCmd.Flags().Lookup("no-instance-name")); err != nil {
-		return fmt.Errorf("error binding flag: %w", err)
-	}
-	return nil
+	return bindFlags(eniCmd, map[string]string{
+		labelEniAll:            flagAll,
+		labelEniSort:           flagSort,
+		labelEniNoInstanceName: flagNoInstanceName,
+	})
 }

@@ -20,12 +20,9 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/dyegoe/awss/common"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -58,9 +55,7 @@ var ebsCmd = &cobra.Command{
 	Short: "Search for EBS volumes.",
 	Long: `
 Search for EBS volumes.
-You can search EBS volumes using the following filters:
-  ids, tags, tags-key, availability-zones, statuses, volume-types, instance-ids, encrypted.
-You can use multiple values for each filter, separated by comma.
+` + filtersHelp("EBS volumes", ebsFilterFlags) + `You can use multiple values for each filter, separated by comma.
 Example: --ids vol-1230456078901,vol-1230456078902
 
 You can use multiple filters at same time, for example:
@@ -93,7 +88,7 @@ func ebsRunE(cmd *cobra.Command, _ []string) error {
 func ebsInitFlags() {
 	rootCmd.AddCommand(ebsCmd)
 
-	ebsCmd.Flags().BoolP("all", "a", false,
+	ebsCmd.Flags().BoolP(flagAll, "a", false,
 		"Search for all EBS volumes without any filter. Cannot be combined with other filters.")
 	ebsCmd.Flags().StringSliceVarP(&ebsF.IDs, flagIDs, "i", []string{},
 		"Filter EBS volumes by IDs. `vol-1230456078901,vol-1230456078902`")
@@ -112,20 +107,15 @@ func ebsInitFlags() {
 		"Filter EBS volumes by attached instance IDs. `i-1230456078901,i-1230456078902`")
 	ebsCmd.Flags().StringSliceVarP(&ebsF.Encrypted, "encrypted", "e", []string{},
 		listHelp("Filter EBS volumes by encryption", trueFalse(), "true"))
-	ebsCmd.Flags().String("sort", "id", sortHelp("ebs", "EBS volumes", "id"))
-	ebsCmd.Flags().Bool("no-instance-name", false,
+	ebsCmd.Flags().String(flagSort, "id", sortHelp("ebs", "EBS volumes", "id"))
+	ebsCmd.Flags().Bool(flagNoInstanceName, false,
 		"Skip the instance name lookup to speed up the EBS volume search.")
 }
 
 func ebsInitViper() error {
-	if err := viper.BindPFlag(labelEbsAll, ebsCmd.Flags().Lookup("all")); err != nil {
-		return fmt.Errorf("error binding flag: %w", err)
-	}
-	if err := viper.BindPFlag(labelEbsSort, ebsCmd.Flags().Lookup("sort")); err != nil {
-		return fmt.Errorf("error binding flag: %w", err)
-	}
-	if err := viper.BindPFlag(labelEbsNoInstanceName, ebsCmd.Flags().Lookup("no-instance-name")); err != nil {
-		return fmt.Errorf("error binding flag: %w", err)
-	}
-	return nil
+	return bindFlags(ebsCmd, map[string]string{
+		labelEbsAll:            flagAll,
+		labelEbsSort:           flagSort,
+		labelEbsNoInstanceName: flagNoInstanceName,
+	})
 }

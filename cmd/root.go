@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/dyegoe/awss/common"
@@ -66,8 +67,7 @@ const (
 	// defaultTimeout is generous so --profiles all over many regions is not cut short.
 	defaultTimeout = 5 * time.Minute
 
-	// flagIDs, flagTags, flagTagsKey, and flagAvailabilityZones name the flags
-	// shared by the ec2, eni, and ebs commands' sort-field lists.
+	// flagIDs and the names below name the flags that several commands share.
 	flagIDs               = "ids"
 	flagNames             = "names"
 	flagAll               = "all"
@@ -76,6 +76,7 @@ const (
 	flagTagsKey           = "tags-key"
 	flagAvailabilityZones = "availability-zones"
 	flagStates            = "states"
+	flagNoInstanceName    = "no-instance-name"
 )
 
 // version is overridden at build time via -ldflags.
@@ -387,6 +388,30 @@ func bindFlags(cmd *cobra.Command, keys map[string]string) error {
 // so the help never drifts from the struct tags.
 func sortHelp(cmd, what, def string) string {
 	return fmt.Sprintf("Sort %s by %s. %#q", what, common.StringSliceToString(search.SortFieldNames(cmd), ", "), def)
+}
+
+// helpWidth is the width the generated parts of a command's long help wrap at.
+const helpWidth = 100
+
+// filtersHelp builds the sentence of a command's long help that lists its filter flags, wrapped
+// at helpWidth, so adding a filter flag cannot leave the help stale.
+func filtersHelp(what string, flags []string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "You can search %s using the following filters:\n", what)
+	line := " "
+	for i, flag := range flags {
+		word := " --" + flag + ","
+		if i == len(flags)-1 {
+			word = " --" + flag + "."
+		}
+		if line != " " && len(line)+len(word) > helpWidth {
+			b.WriteString(line + "\n")
+			line = " "
+		}
+		line += word
+	}
+	b.WriteString(line + "\n")
+	return b.String()
 }
 
 // buildFilters validates and builds the filter map for a subcommand.
