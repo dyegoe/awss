@@ -65,13 +65,15 @@ func mockDataRow2() dataRow {
 
 func mockResults() *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile:   "default",
-			Region:    "us-east-1",
-			Errors:    []string{},
-			SortField: "id",
+		RowSet: common.RowSet[dataRow]{
+			BaseResults: common.BaseResults{
+				Profile:   "default",
+				Region:    "us-east-1",
+				Errors:    []string{},
+				SortField: "id",
+			},
+			Data: []dataRow{mockDataRow1(), mockDataRow2()},
 		},
-		Data: []dataRow{mockDataRow1(), mockDataRow2()},
 		Filters: map[string][]string{
 			"vpc-id":   {"vpc-0000000000000000a"},
 			"tag:Name": {"prod", "dev"},
@@ -85,13 +87,15 @@ func mockResults() *Results {
 func TestNew(t *testing.T) {
 	filters := map[string][]string{"vpc-id": {"vpc-1"}}
 	want := &Results{
-		BaseResults: common.BaseResults{
-			Profile:   "default",
-			Region:    "us-east-1",
-			Errors:    []string{},
-			SortField: "id",
+		RowSet: common.RowSet[dataRow]{
+			BaseResults: common.BaseResults{
+				Profile:   "default",
+				Region:    "us-east-1",
+				Errors:    []string{},
+				SortField: "id",
+			},
+			Data: []dataRow{},
 		},
-		Data:    []dataRow{},
 		Filters: filters,
 	}
 	if got := New("default", "us-east-1", filters, "id"); !reflect.DeepEqual(got, want) {
@@ -119,8 +123,8 @@ func TestResults_accessors(t *testing.T) {
 	}
 }
 
-// TestResults_GetHeaders tests the GetHeaders function.
-func TestResults_GetHeaders(t *testing.T) {
+// TestResults_headers checks the table headers GetHeaders builds from the row type.
+func TestResults_headers(t *testing.T) {
 	want := []interface{}{
 		"ID", "Name", "CIDR", "CIDR Blocks", "State", "Default", "Owner ID", "Owner", "DHCP Options ID", "Tags",
 	}
@@ -129,8 +133,8 @@ func TestResults_GetHeaders(t *testing.T) {
 	}
 }
 
-// TestResults_GetRows tests the GetRows function.
-func TestResults_GetRows(t *testing.T) {
+// TestResults_rows checks the rows GetRows returns.
+func TestResults_rows(t *testing.T) {
 	want := []interface{}{mockDataRow1(), mockDataRow2()}
 	if got := mockResults().GetRows(); !reflect.DeepEqual(got, want) {
 		t.Errorf("GetRows()\n%#v\nwant\n%#v", got, want)
@@ -250,8 +254,8 @@ func TestParseVpc(t *testing.T) {
 	}
 }
 
-// TestResults_sortResults tests sorting by string and slice fields, and the invalid field error.
-func TestResults_sortResults(t *testing.T) {
+// TestResults_sortRows tests sorting by string and slice fields, and the invalid field error.
+func TestResults_sortRows(t *testing.T) {
 	tests := []struct {
 		name    string
 		field   string
@@ -268,16 +272,17 @@ func TestResults_sortResults(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := mockResults()
 			r.Data = []dataRow{mockDataRow2(), mockDataRow1()}
-			err := r.sortResults(tt.field)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("sortResults(%q) error = %v, wantErr %v", tt.field, err, tt.wantErr)
+			r.SortField = tt.field
+			r.SortRows()
+			if gotErr := len(r.Errors) > 0; gotErr != tt.wantErr {
+				t.Fatalf("SortRows() by %q errors = %v, wantErr %v", tt.field, r.Errors, tt.wantErr)
 			}
 			if tt.wantErr {
 				return
 			}
 			got := []string{r.Data[0].VpcID, r.Data[1].VpcID}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("sortResults(%q) order = %v, want %v", tt.field, got, tt.want)
+				t.Errorf("SortRows() by %q order = %v, want %v", tt.field, got, tt.want)
 			}
 		})
 	}
