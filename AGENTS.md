@@ -31,8 +31,9 @@ diagram, and why the pieces are where they are. Read it before a change to the s
 
 ```text
 main.go              — entry point, delegates to cmd.Execute()
-cmd/                 — Cobra CLI commands: root (global flags, runSearch/cmdSpec) + one file per resource
-search/              — engine registry (engines map, Options) and the parallel profiles × regions fan-out
+cmd/                 — Cobra CLI commands: root (global flags, subcommands, runSearch/cmdSpec) + one file per
+                       resource, which declares its subcommand: the command, its search.Engine, its flags
+search/              — the search runner: Engine, Options and the parallel profiles × regions fan-out
 search/ec2/          — EC2-specific search logic and result type
 search/eni/          — ENI-specific search logic and result type
 search/ebs/          — EBS volume search logic and result type
@@ -46,19 +47,19 @@ search/org/          — AWS Organization accounts (one profile, global), and th
 search/cloudfront/   — CloudFront distributions (global, once per profile), client-side filters, opt-in tags
 search/cloudwan/     — Cloud WAN routes (global, us-west-2 endpoint): GetNetworkRoutes per segment / function
                        group × edge, one CIDR and match mode per call; the Network Manager client and
-                       helpers the Cloud WAN searches share. Registered as "cloudwan-routes"; bgp.go is the
-                       BGP routes before the policies (ListCoreNetworkRoutingInformation), "cloudwan-bgp"
-search/cloudwanatt/  — Cloud WAN attachments, client-side filters. Registered as "cloudwan-attachments"
+                       helpers the Cloud WAN searches share (awss cloudwan routes); bgp.go is the BGP
+                       routes before the policies (ListCoreNetworkRoutingInformation), awss cloudwan bgp
+search/cloudwanatt/  — Cloud WAN attachments, client-side filters (awss cloudwan attachments)
 search/dxgw/         — Direct Connect gateways (global, once per profile, in the profile's region): their
-                       associations, allowed prefixes and VIFs, client-side filters. "dx-gateways"
+                       associations, allowed prefixes and VIFs, client-side filters (awss dx gateways)
 search/tgw/          — Transit Gateway routes (regional): SearchTransitGatewayRoutes per route table, one CIDR
                        and match mode per call; attachment names from one DescribeTransitGatewayAttachments.
-                       Registered as "tgw-routes"; attachments.go lists the attachments with their associated
-                       route table, "tgw-attachments", and propagations.go their propagations (--propagations)
+                       awss tgw routes; attachments.go lists the attachments with their associated route
+                       table (awss tgw attachments), and propagations.go their propagations (--propagations)
 cleanup/             — what the cleanups share: statuses, CallerAccount, AWS error helpers
 cleanup/defaultvpc/  — deletes the default VPC and its plumbing, all-or-nothing on its ENIs; a plan
-                       unless Apply. Registered in the search engines map as "default-vpc"
-cleanup/dhcpoptions/ — deletes the DHCP options sets no VPC uses; registered as "dhcp-options"
+                       unless Apply (awss cleanup default-vpc)
+cleanup/dhcpoptions/ — deletes the DHCP options sets no VPC uses (awss cleanup dhcp-options)
 internal/testconv/   — checks the test conventions of every package (run by its own test in CI)
 internal/nesting/    — checks the nesting depth of every function (run by its own test in CI)
 internal/doclist/    — checks this layout and docs/ARCHITECTURE.md list every package (run by its own test)
@@ -120,7 +121,7 @@ reviewer and the author own it. **SHOULD** rules may be broken with a reason in 
 | Control statements nest at most 3 levels deep in a function. | `internal/nesting` (`TestCheck_repository`) |
 | Functions stay small: at most 60 lines and 50 statements, cyclomatic complexity at most 15. | `funlen`, `gocyclo` |
 | Every exported symbol has a doc comment; an exported function returns exported types. | `revive` |
-| Never mutate `Results.Filters` inside `Search()`: one map is shared by every goroutine of a run. Copy it to rewrite it. | test (`TestEngines_searchKeepsFilters`), race detector |
+| Never mutate `Results.Filters` inside `Search()`: one map is shared by every goroutine of a run. Copy it to rewrite it. | test (`TestSubcommands_searchKeepsFilters`), race detector |
 | No hardcoded version string; the version comes from `-ldflags`. | CI version-injection smoke test |
 | `//nolint` names the linter and says why, and only where there is no clean fix. | `nolintlint`; review for "no clean fix" |
 | Imports stay inside the allowed modules. | `depguard` |
@@ -217,21 +218,23 @@ to run and the expected result in the pull request description.
 When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
 
 1. Create `search/<resource>/` package with a `Results` struct and `New()` + `Search()` functions.
-2. Embed `common.RowSet[dataRow]` in `Results` and build it with `common.NewRowSet` in `New()`: it
+   Embed `common.RowSet[dataRow]` in `Results` and build it with `common.NewRowSet` in `New()`: it
    gives `Len`, `GetHeaders`, `GetRows`, the `BaseResults` getters and `AddError`. The package
    writes only `Search()`, its AWS calls, its row parsing and its filters (see `search/ebs/ebs.go`).
-3. Use struct tags `json`, `header`, `sort` on `dataRow` fields — do not add special-case logic to the output layer.
+2. Use struct tags `json`, `header`, `sort` on `dataRow` fields — do not add special-case logic to the output layer.
    End `Search()` with `r.SortRows()`; a type that sorts its own way calls
    `r.SortRowsBy(GetSortFields, order)` instead (see `search/eni` and `search/tgw`). Record every
    error with `r.AddError`. `GetSortFields` and `SortFieldNames` call `common.SortFields` and
    `common.SortFieldNames` on `dataRow{}`.
-4. Add a `filter` struct in `cmd/<resource>.go` with `filter:""` tags matching AWS API filter names.
-5. Register the command in `cmd/root.go` via `<resource>InitFlags()` and `<resource>InitViper()`.
-6. Register the command in the `engines` map in `search/search.go` (constructor + `GetSortFields`,
-   and `accountNames: true` when the rows have an Owner column).
-7. Wire the `RunE` through `runSearch()` with a `cmdSpec` in the command file (see `cmd/ebs.go` as the pattern).
-8. Write tests covering: filter building, result parsing, sort validation, edge cases (nil fields, empty results).
-9. Update `README.md` with the new subcommand, its filters, sort fields, and any additional flags,
+3. Write `cmd/<resource>.go` (see `cmd/ebs.go` as the pattern): a `filter` struct with `filter:""`
+   tags matching AWS API filter names, the flags, a `RunE` through `runSearch()` with a `cmdSpec`,
+   and one `<resource>Subcommand` that describes the command in one place: the cobra command, its
+   `search.Engine` (`New`, `SortFields`, `SortFieldNames`, and `AccountNames: true` when the rows
+   have an Owner column), the values of its fixed-list flags, and its `InitFlags`/`InitViper`.
+   Add it to the `subcommands` list in `cmd/root.go`; nothing else names the command.
+4. Write tests covering: filter building, result parsing, sort validation, edge cases (nil fields, empty results).
+   The `cmd` tests check every subcommand's engine on their own (`TestSubcommands_*`).
+5. Update `README.md` with the new subcommand, its filters, sort fields, and any additional flags,
    and add the package to the package layout above and to `docs/ARCHITECTURE.md` (both checked by
    tests).
 

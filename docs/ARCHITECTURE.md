@@ -15,7 +15,7 @@ Take `awss ebs --statuses in-use --profiles a,b --regions all`:
 flowchart TD
   U["awss ebs --statuses in-use"] --> C["cmd/ebs.go<br/>flags, filter struct, cmdSpec"]
   C --> R["cmd/root.go runSearch<br/>checks --sort, builds the filters, reads the config file"]
-  R --> E["search/search.go Execute<br/>looks the command up in the engines map"]
+  R --> E["search/search.go Execute<br/>runs the command's engine"]
   E --> F{"profiles × regions<br/>at most --concurrency at once, bounded by --timeout"}
   F --> S1["search/ebs Search<br/>profile a, eu-west-1"]
   F --> S2["search/ebs Search<br/>profile b, us-east-1"]
@@ -31,12 +31,14 @@ flowchart TD
 
 1. **Command** (`cmd/<resource>.go`). Cobra parses the flags into a filter struct whose
    `filter:"..."` tags are the AWS filter names. The `RunE` calls `runSearch` with a `cmdSpec`
-   that names the command's viper keys and its optional flags.
+   that names the command's viper keys and its optional flags. The same file declares the
+   command's `subcommand`, which holds its `search.Engine`.
 2. **Run** (`cmd/root.go`, `runSearch`). Checks the sort field, turns the filter struct into a
    `map[string][]string`, looks up account names when the engine shows an Owner column, and
-   calls `search.Execute` with the profiles, the regions and a `search.Options`.
-3. **Fan-out** (`search/search.go`, `Execute`). Finds the engine of the command in the `engines`
-   map and runs one search per profile and region on a pool of workers. A search still running
+   calls `search.Execute` with the command's engine, the profiles, the regions and a
+   `search.Options`.
+3. **Fan-out** (`search/search.go`, `Execute`). Runs the engine once per profile and region on a
+   pool of workers. A search still running
    at the `--timeout` deadline is replaced by an empty result set holding a timed-out error; the
    others are kept.
 4. **Search** (`search/<resource>/`). The engine's `New` builds a result set for one profile and
@@ -54,10 +56,12 @@ see this interface. An engine gets everything but `Search` from the embedded
 `common.RowSet[row]` (`common/results.go`): the rows, the profile, region and errors, and the sort
 step. The engine itself holds only its AWS calls, its row parsing and its filters.
 
-**The engines map** (`search/search.go`) is the registry: one entry per command, keyed by the
-command name, or by its `awss-engine` annotation for a command inside a group (`cloudwan routes`
-is `cloudwan-routes`). An entry holds the constructor, the sort field functions and whether the
-engine shows account names. Tests check that the commands and the engines match both ways.
+**Subcommands and engines** (`cmd/`). Each command file declares one `subcommand`: the cobra
+command, its `search.Engine` (the constructor, the sort field functions and whether it shows
+account names), the values of its fixed-list flags, and the functions that register and bind its
+flags. The `subcommands` list in `cmd/root.go` registers them; `setup` maps each command to its
+engine, so no name string joins a command to its engine. `search` only runs an engine it is
+given: it does not import the engine packages. The `cmd` tests check every engine from that list.
 
 **Row structs and tags.** A row type's fields carry `json`, `header` and `sort` tags; `stack`
 puts a field in the column before it, on a new line, and `hide:"empty"` hides a column that is
@@ -74,8 +78,8 @@ gateways are global. Their commands set one region, the engine's `Region`, so th
 once per profile.
 
 **Why the cleanup commands use the search runner.** `cleanup default-vpc` and
-`cleanup dhcp-options` are registered in the same engines map as the searches, so `search`
-imports `cleanup`. This is deliberate: it gives the cleanups the same parallel runner, timeout,
+`cleanup dhcp-options` declare a `search.Engine` like the searches and run through
+`search.Execute`. This is deliberate: it gives the cleanups the same parallel runner, timeout,
 summary and output for free. Deleting stays guarded: a cleanup only reports its plan unless
 `--apply` is given, `--apply` over `--profiles all` or `--regions all` also needs `--confirm-all`,
 and neither flag is bound to the config file. Do not move them out without a reason that
@@ -85,9 +89,9 @@ outweighs this.
 
 | Package | What it does |
 |---|---|
-| `cmd/` | Cobra commands and flags, viper binding, `runSearch`, completion, `--stats` |
+| `cmd/` | Cobra commands and flags, each command's `subcommand` and engine, viper binding, `runSearch`, completion, `--stats` |
 | `common/` | The `Results` contract, `BaseResults` and `RowSet`, AWS config helpers, filter builders, output, row and sort helpers, matchers |
-| `search/` | The engines map, `Options` and the profiles × regions fan-out |
+| `search/` | The search runner: `Engine`, `Options` and the profiles × regions fan-out |
 | `search/ec2/` | EC2 instances; also `InstanceNames`, used by ebs and eni |
 | `search/eni/` | Network interfaces |
 | `search/ebs/` | EBS volumes, one row per attachment |
