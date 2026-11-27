@@ -101,8 +101,8 @@ A pull request meets the MUST rules of `AGENTS.md` (Standards and guardrails). M
 checked by `make test`, `make lint` and CI; the ones marked *review* are on you and the reviewer,
 so read that table before opening the pull request. A new resource type follows the "Adding new
 resource types" checklist in `AGENTS.md`; `docs/CODESTYLE.md` explains the code rules with
-examples, and `docs/ARCHITECTURE.md` is the map of how a command runs and which package does
-what. The pull request template asks where the change sits on that map and which docs and
+examples, `docs/ARCHITECTURE.md` is the map of how a command runs and which package does
+what, and `docs/GLOSSARY.md` defines the AWS and project terms. The pull request template asks where the change sits on that map and which docs and
 comments you re-read.
 
 ## Releasing (maintainers)

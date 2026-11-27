@@ -28,6 +28,7 @@ in the same PR (`go mod edit -go=<version>`). Do not hardcode the version in doc
 
 `docs/ARCHITECTURE.md` is the map: how a command runs from the CLI to AWS and back, with a
 diagram, and why the pieces are where they are. Read it before a change to the structure.
+`docs/GLOSSARY.md` defines the AWS and project terms the code and the docs use.
 
 ```text
 main.go              — entry point, delegates to cmd.Execute()
@@ -152,6 +153,7 @@ reviewer and the author own it. **SHOULD** rules may be broken with a reason in 
 | A new flag, command, sort field or config key appears in `README.md`. | tests for commands, flags and sort fields (`cmd/docs_test.go`); review for config keys |
 | Every package appears in the package layout above and in `docs/ARCHITECTURE.md`. | `internal/doclist` (`TestCheck_repository`) |
 | A change that moves, adds or removes a piece of the map updates `docs/ARCHITECTURE.md` in the same pull request. | review |
+| A pull request that introduces an AWS or project term (in code, `README.md` or the docs) defines it in `docs/GLOSSARY.md`, with one meaning per term. | review |
 | A pull request description has a "Where this sits on the map" section: the parts of `docs/ARCHITECTURE.md` the change touches, with a small before/after when the structure changes. | review (pull request template) |
 | A pull request description lists the docs and code comments the change made the agent re-read, and says for each whether it was still true or was updated. | review (pull request template) |
 | A pull request names the issue it closes (`Closes #N`), so merging closes it. | review |
@@ -192,10 +194,27 @@ pull request that closes it (`Closes #N`); never commit straight to `main`. Hist
   GoReleaser version is pinned in both workflows. Try it locally with
   `goreleaser release --snapshot --clean`.
 - Before the maintainer merges the release-please PR, an agent runs a drift audit: it reads the
-  changes since the last release against `README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md` and the
-  code comments they touch, and opens one issue per statement that is no longer true. The tests
-  catch the lists (commands, flags, sort fields, packages); this audit is for the sentences. It
-  is done by hand for now; it is automated only once it proves it finds real drift.
+  changes since the last release against `README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md`,
+  `docs/GLOSSARY.md` and the code comments they touch, and opens one issue per statement that is
+  no longer true. The tests catch the lists (commands, flags, sort fields, packages); this audit
+  is for the sentences. It is done by hand for now; it is automated only once it proves it finds
+  real drift.
+
+### Before writing issues: grill the idea
+
+A vague idea ("make the output easier to read", "support security groups") does not go straight
+into issues. First the agent interviews the maintainer about it:
+
+- One question at a time, each with the agent's recommended answer and why, so the maintainer
+  can reply "yes" or correct it. Questions the code or the docs can answer are not asked: the
+  agent looks them up.
+- It goes on until every open decision is resolved: what the user sees, what is in and out of
+  scope, the trade-offs, and how to check the result. The words follow `docs/GLOSSARY.md`; a new
+  term gets its definition.
+- Then it writes the issues, each with the decisions it rests on, and reads them back to the
+  maintainer before opening them.
+
+A clear, small request (a bug with steps, a named flag) skips the interview.
 
 ### Changes that need a real AWS check
 
