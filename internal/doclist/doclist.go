@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 // Package doclist checks that the docs list every Go package of the module (AGENTS.md, Standards
 // and guardrails), so a new package cannot be left off the package layout of AGENTS.md or the map
 // of docs/ARCHITECTURE.md.
