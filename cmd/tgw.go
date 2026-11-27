@@ -190,7 +190,7 @@ func tgwAttachmentsRunE(cmd *cobra.Command, _ []string) error {
 	}
 	return runSearch(cmd, &cmdSpec{
 		sortLabel: labelTGWAttachmentsSort, filterFlags: tgwAttachmentsFilterFlags, optionalFilters: true,
-		accountNames: true, propagationsLabel: labelTGWAttachmentsPropagations,
+		propagationsLabel: labelTGWAttachmentsPropagations,
 	}, nil, nil, tgwAttachmentsF)
 }
 
@@ -199,7 +199,7 @@ func tgwRoutesRunE(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	return runSearch(cmd, &cmdSpec{
-		sortLabel: labelTGWRoutesSort, filterFlags: tgwRoutesFilterFlags, optionalFilters: true, accountNames: true,
+		sortLabel: labelTGWRoutesSort, filterFlags: tgwRoutesFilterFlags, optionalFilters: true,
 	}, nil, nil, tgwRoutesF)
 }
 

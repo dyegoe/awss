@@ -30,18 +30,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/dyegoe/awss/common"
-	searchCloudWAN "github.com/dyegoe/awss/search/cloudwan"
-	searchCloudWANAtt "github.com/dyegoe/awss/search/cloudwanatt"
-	searchDXGW "github.com/dyegoe/awss/search/dxgw"
-	searchENI "github.com/dyegoe/awss/search/eni"
-	searchSubnet "github.com/dyegoe/awss/search/subnet"
-	searchTGW "github.com/dyegoe/awss/search/tgw"
-	searchVPC "github.com/dyegoe/awss/search/vpc"
 )
 
 // mockEngines swaps the registry for a single "test" engine and restores it after the test.
@@ -154,33 +148,30 @@ func TestEngines_searchKeepsFilters(t *testing.T) {
 	}
 }
 
-// TestEngines_registeredCommands checks every built-in command has both a constructor and sort fields.
+// TestEngines_registeredCommands checks every registered command has a constructor and sort fields
+// that agree, and that the constructor of every search passes SortField through. A cleanup, such
+// as default-vpc, has no --sort and is known by its package under cleanup/.
 func TestEngines_registeredCommands(t *testing.T) {
-	for _, cmd := range []string{
-		"ec2", "eni", "ebs", "vpc", "subnet", "s3", "s3obj", "org", "rds", "rds-cluster", "cloudfront",
-		"cloudwan-routes", "cloudwan-bgp", "cloudwan-attachments", "dx-gateways", "tgw-routes", "tgw-attachments",
-	} {
-		eng, ok := engines[cmd]
-		if !ok {
-			t.Errorf("engines[%q] missing", cmd)
-			continue
-		}
-		if eng.new == nil || eng.sortFields == nil || eng.sortFieldNames == nil {
-			t.Errorf("engines[%q] must define new, sortFields and sortFieldNames", cmd)
-		}
-		for _, name := range eng.sortFieldNames() {
-			if _, err := eng.sortFields(name); err != nil {
-				t.Errorf("engines[%q]: sortFieldNames lists %q but sortFields rejects it: %v", cmd, name, err)
+	for _, cmd := range EngineNames() {
+		t.Run(cmd, func(t *testing.T) {
+			eng := engines[cmd]
+			if eng.new == nil || eng.sortFields == nil || eng.sortFieldNames == nil {
+				t.Fatalf("engines[%q] must define new, sortFields and sortFieldNames", cmd)
 			}
-		}
-		r := eng.new("default", "us-east-1", map[string][]string{}, &Options{SortField: "id", NoInstanceName: true})
-		if r == nil {
-			t.Errorf("engines[%q].new returned nil", cmd)
-			continue
-		}
-		if got := r.GetSortField(); got != "id" {
-			t.Errorf("engines[%q].new did not pass SortField through, got %q", cmd, got)
-		}
+			for _, name := range eng.sortFieldNames() {
+				if _, err := eng.sortFields(name); err != nil {
+					t.Errorf("engines[%q]: sortFieldNames lists %q but sortFields rejects it: %v", cmd, name, err)
+				}
+			}
+			r := eng.new("default", "us-east-1", map[string][]string{}, &Options{SortField: "id", NoInstanceName: true})
+			if r == nil {
+				t.Fatalf("engines[%q].new returned nil", cmd)
+			}
+			cleanup := strings.HasPrefix(reflect.TypeOf(r).Elem().PkgPath(), "github.com/dyegoe/awss/cleanup/")
+			if got := r.GetSortField(); !cleanup && got != "id" {
+				t.Errorf("engines[%q].new SortField = %q, want %q", cmd, got, "id")
+			}
+		})
 	}
 }
 
@@ -595,44 +586,29 @@ func TestWorkerCount(t *testing.T) {
 	}
 }
 
-// TestEngines_accountNames checks that the searches with an Owner column receive the account
-// names of the run.
+// TestEngines_accountNames checks that every search with an AccountNames field, the ones with an
+// Owner column, is marked accountNames and receives the account names of the run, and that no
+// other search is marked.
 func TestEngines_accountNames(t *testing.T) {
 	names := map[string]string{"111111111111": "network"}
 	opts := &Options{AccountNames: names}
-	tests := []struct {
-		name string
-		get  func(common.Results) map[string]string
-	}{
-		{name: "vpc", get: func(r common.Results) map[string]string { return r.(*searchVPC.Results).AccountNames }},
-		{
-			name: "subnet",
-			get:  func(r common.Results) map[string]string { return r.(*searchSubnet.Results).AccountNames },
-		},
-		{name: "eni", get: func(r common.Results) map[string]string { return r.(*searchENI.Results).AccountNames }},
-		{
-			name: "cloudwan-routes",
-			get:  func(r common.Results) map[string]string { return r.(*searchCloudWAN.Results).AccountNames },
-		},
-		{
-			name: "cloudwan-bgp",
-			get:  func(r common.Results) map[string]string { return r.(*searchCloudWAN.BGPResults).AccountNames },
-		},
-		{name: "cloudwan-attachments", get: func(r common.Results) map[string]string {
-			return r.(*searchCloudWANAtt.Results).AccountNames
-		}},
-		{name: "dx-gateways", get: func(r common.Results) map[string]string { return r.(*searchDXGW.Results).AccountNames }},
-		{name: "tgw-routes", get: func(r common.Results) map[string]string { return r.(*searchTGW.Results).AccountNames }},
-		{name: "tgw-attachments", get: func(r common.Results) map[string]string {
-			return r.(*searchTGW.AttachmentResults).AccountNames
-		}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := engines[tt.name].new("default", "us-east-1", map[string][]string{}, opts)
-			if got := tt.get(r); !reflect.DeepEqual(got, names) {
-				t.Errorf("engines[%q].new AccountNames = %v, want %v", tt.name, got, names)
+	for _, cmd := range EngineNames() {
+		t.Run(cmd, func(t *testing.T) {
+			r := engines[cmd].new("default", "us-east-1", map[string][]string{}, opts)
+			field := reflect.ValueOf(r).Elem().FieldByName("AccountNames")
+			if got, want := UsesAccountNames(cmd), field.IsValid(); got != want {
+				t.Fatalf("UsesAccountNames(%q) = %v, want %v: true exactly when the result has an AccountNames field",
+					cmd, got, want)
+			}
+			if !field.IsValid() {
+				return
+			}
+			if got := field.Interface(); !reflect.DeepEqual(got, names) {
+				t.Errorf("engines[%q].new AccountNames = %v, want %v", cmd, got, names)
 			}
 		})
+	}
+	if UsesAccountNames("unknown") {
+		t.Errorf("UsesAccountNames(%q) = true, want false", "unknown")
 	}
 }

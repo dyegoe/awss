@@ -20,8 +20,11 @@ limitations under the License.
 package cmd
 
 import (
+	"slices"
 	"testing"
 	"time"
+
+	"github.com/dyegoe/awss/search"
 
 	"github.com/spf13/cobra"
 )
@@ -124,5 +127,19 @@ func TestParseTimeout(t *testing.T) {
 				t.Errorf("parseTimeout(%v) = %v, want %v", tt.value, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestSubcommands_matchEngines checks that every subcommand has a search engine and every search
+// engine has a subcommand, joined by engineName.
+func TestSubcommands_matchEngines(t *testing.T) {
+	resetCLI(t, nil)
+	got := make([]string, 0, len(subcommands))
+	for _, sub := range subcommands {
+		got = append(got, engineName(sub.cmd))
+	}
+	slices.Sort(got)
+	if want := search.EngineNames(); !slices.Equal(got, want) {
+		t.Errorf("engine names of the subcommands = %v, want the search engines %v", got, want)
 	}
 }

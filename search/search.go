@@ -25,7 +25,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -120,6 +122,10 @@ type engine struct {
 
 	// sortFieldNames returns the valid sort fields, used to build the --sort help text.
 	sortFieldNames func() []string
+
+	// accountNames is true for the searches with an Owner column: new sets their AccountNames
+	// from Options.AccountNames, and the cmd package looks the names up only for them.
+	accountNames bool
 }
 
 // engines is the registry of search commands, keyed by the cobra command name.
@@ -142,6 +148,7 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchENI.GetSortFields,
 		sortFieldNames: searchENI.SortFieldNames,
+		accountNames:   true,
 	},
 	"ebs": {
 		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
@@ -158,6 +165,7 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchVPC.GetSortFields,
 		sortFieldNames: searchVPC.SortFieldNames,
+		accountNames:   true,
 	},
 	"subnet": {
 		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
@@ -167,6 +175,7 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchSubnet.GetSortFields,
 		sortFieldNames: searchSubnet.SortFieldNames,
+		accountNames:   true,
 	},
 	"s3": {
 		new: func(profile, region string, filters map[string][]string, opts *Options) common.Results {
@@ -222,6 +231,7 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchCloudWAN.GetSortFields,
 		sortFieldNames: searchCloudWAN.SortFieldNames,
+		accountNames:   true,
 	},
 	// cloudwan-bgp is awss cloudwan bgp, global like cloudwan-routes.
 	"cloudwan-bgp": {
@@ -232,6 +242,7 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchCloudWAN.GetBGPSortFields,
 		sortFieldNames: searchCloudWAN.BGPSortFieldNames,
+		accountNames:   true,
 	},
 	// cloudwan-attachments is awss cloudwan attachments, global like cloudwan-routes.
 	"cloudwan-attachments": {
@@ -242,6 +253,7 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchCloudWANAtt.GetSortFields,
 		sortFieldNames: searchCloudWANAtt.SortFieldNames,
+		accountNames:   true,
 	},
 	// dx-gateways is awss dx gateways. A Direct Connect gateway is global: the command passes the
 	// region searchDXGW.Region.
@@ -253,6 +265,7 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchDXGW.GetSortFields,
 		sortFieldNames: searchDXGW.SortFieldNames,
+		accountNames:   true,
 	},
 	// tgw-routes is awss tgw routes. A transit gateway is regional: it runs per profile and region.
 	"tgw-routes": {
@@ -263,6 +276,7 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchTGW.GetSortFields,
 		sortFieldNames: searchTGW.SortFieldNames,
+		accountNames:   true,
 	},
 	// tgw-attachments is awss tgw attachments, regional like tgw-routes.
 	"tgw-attachments": {
@@ -274,6 +288,7 @@ var engines = map[string]engine{
 		},
 		sortFields:     searchTGW.GetAttachmentSortFields,
 		sortFieldNames: searchTGW.AttachmentSortFieldNames,
+		accountNames:   true,
 	},
 	// default-vpc is the cleanup of the default VPCs (awss cleanup default-vpc). It deletes only
 	// with opts.Apply; otherwise it reports the plan.
@@ -497,6 +512,18 @@ func CheckSortField(cmd, f string) error {
 	}
 
 	return nil
+}
+
+// UsesAccountNames reports whether the search of the given command has an Owner column and so
+// reads Options.AccountNames. It is false for an unknown command.
+func UsesAccountNames(cmd string) bool {
+	return engines[cmd].accountNames
+}
+
+// EngineNames returns the names of every registered command, sorted alphabetically. The cmd
+// package tests check them against its command tree.
+func EngineNames() []string {
+	return slices.Sorted(maps.Keys(engines))
 }
 
 // SortFieldNames returns the valid sort fields of the given command, sorted alphabetically.
