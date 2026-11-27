@@ -38,10 +38,7 @@ import (
 
 // Results describes the Transit Gateway routes found with one profile in one region.
 type Results struct {
-	common.BaseResults
-
-	// Data contains the routes found: one row per attachment of each route.
-	Data []dataRow `json:"data"`
+	common.RowSet[dataRow]
 
 	// Filters is a map of strings used to search, keyed by the FilterKey constants.
 	Filters map[string][]string `json:"-"`
@@ -113,13 +110,7 @@ type dataRow struct {
 // New initiates and returns a new instance of Transit Gateway route results.
 func New(profile, region string, filters map[string][]string, sortField string) *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile:   profile,
-			Region:    region,
-			Errors:    []string{},
-			SortField: sortField,
-		},
-		Data:    []dataRow{},
+		RowSet:  common.NewRowSet[dataRow](profile, region, sortField),
 		Filters: filters,
 	}
 }
@@ -138,12 +129,12 @@ var newClient = func(profile, region string) (ec2API, error) {
 func (r *Results) Search(ctx context.Context) {
 	q, err := newQuery(r.Filters)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error building filters: %v", err))
+		r.AddError(fmt.Sprintf("error building filters: %v", err))
 		return
 	}
 	client, err := newClient(r.Profile, r.Region)
 	if err != nil {
-		r.Errors = append(r.Errors, fmt.Sprintf("error getting aws config: %v", err))
+		r.AddError(fmt.Sprintf("error getting aws config: %v", err))
 		return
 	}
 	r.collect(ctx, client, q)
@@ -155,7 +146,7 @@ func (r *Results) Search(ctx context.Context) {
 func (r *Results) collect(ctx context.Context, client ec2API, q *query) {
 	tables, err := routeTables(ctx, client, q)
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.AddError(err.Error())
 		return
 	}
 	tableNames := make(map[string]string, len(tables))
@@ -168,7 +159,7 @@ func (r *Results) collect(ctx context.Context, client ec2API, q *query) {
 		}
 		rows, err := r.tableRows(ctx, client, q, &base)
 		if err != nil {
-			r.Errors = append(r.Errors, err.Error())
+			r.AddError(err.Error())
 			if isUnauthorized(err) || ctx.Err() != nil {
 				break
 			}
@@ -183,12 +174,7 @@ func (r *Results) collect(ctx context.Context, client ec2API, q *query) {
 	}
 	r.nameAttachments(ctx, client, tableNames)
 
-	if r.SortField == "" {
-		return
-	}
-	if err := r.sortResults(r.SortField); err != nil {
-		r.Errors = append(r.Errors, err.Error())
-	}
+	r.SortRowsBy(GetSortFields, orderRows)
 }
 
 // tableRows returns the rows of one route table, base being its route table columns: one call per
@@ -203,7 +189,7 @@ func (r *Results) tableRows(ctx context.Context, client ec2API, q *query, base *
 			return nil, err
 		}
 		if truncated {
-			r.Errors = append(r.Errors, fmt.Sprintf(
+			r.AddError(fmt.Sprintf(
 				"route table %s has more routes than AWS returns in one search; narrow it with --cidrs", base.RouteTableID))
 		}
 		if q.longest {
@@ -250,7 +236,7 @@ func (r *Results) nameAttachments(ctx context.Context, client ec2API, tableNames
 	}
 	atts, err := attachments(ctx, client, appendFilter(nil, awsFilterAttTGWID, tgwIDs))
 	if err != nil {
-		r.Errors = append(r.Errors, err.Error())
+		r.AddError(err.Error())
 		return
 	}
 	byID := make(map[string]*types.TransitGatewayAttachment, len(atts))
@@ -305,14 +291,10 @@ func parseRoute(route *types.TransitGatewayRoute, base *dataRow, query string) [
 	return rows
 }
 
-// sortResults sorts the results by the given field. Rows equal on it stay in route table order:
+// orderRows sorts rows by the struct field fieldName. Rows equal on it stay in route table order:
 // route table, then destination by address.
-func (r *Results) sortResults(field string) error {
-	sortFields, err := GetSortFields(field)
-	if err != nil {
-		return err
-	}
-	slices.SortStableFunc(r.Data, func(a, b dataRow) int {
+func orderRows(rows []dataRow, fieldName string) {
+	slices.SortStableFunc(rows, func(a, b dataRow) int {
 		if c := cmp.Or(
 			cmp.Compare(a.RouteTableName, b.RouteTableName), cmp.Compare(a.RouteTableID, b.RouteTableID),
 		); c != 0 {
@@ -326,18 +308,8 @@ func (r *Results) sortResults(field string) error {
 		}
 		return cmp.Or(cmp.Compare(a.PrefixListID, b.PrefixListID), cmp.Compare(a.AttachmentID, b.AttachmentID))
 	})
-	common.SortByField(r.Data, sortFields[field])
-	return nil
+	common.SortByField(rows, fieldName)
 }
-
-// Len returns the length of the results.
-func (r *Results) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the dataRow fields.
-func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.
 //
