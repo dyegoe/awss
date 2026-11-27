@@ -73,10 +73,7 @@ const (
 // Results describes the default VPC of one profile and region: no row when the region has none,
 // otherwise one row.
 type Results struct {
-	common.BaseResults
-
-	// Data holds the default VPC, if any.
-	Data []dataRow `json:"data"`
+	common.RowSet[dataRow]
 
 	// Apply deletes the VPC; without it the run only reports the plan.
 	Apply bool `json:"-"`
@@ -108,12 +105,7 @@ type dataRow struct {
 // apply the run only reports the plan.
 func New(profile, region string, apply bool) *Results {
 	return &Results{
-		BaseResults: common.BaseResults{
-			Profile: profile,
-			Region:  region,
-			Errors:  []string{},
-		},
-		Data:         []dataRow{},
+		RowSet:       common.NewRowSet[dataRow](profile, region, ""),
 		Apply:        apply,
 		pollInterval: defaultPollInterval,
 		newClients:   awsClients,
@@ -223,15 +215,6 @@ func defaultVPC(ctx context.Context, c ec2API) (*types.Vpc, error) {
 	}
 	return &vpcs[0], nil
 }
-
-// Len returns the length of the results.
-func (r *Results) Len() int { return len(r.Data) }
-
-// GetHeaders returns the `header` tag of the dataRow fields.
-func (r *Results) GetHeaders() []interface{} { return common.Headers(dataRow{}) }
-
-// GetRows returns the results as a slice of interface{}.
-func (r *Results) GetRows() []interface{} { return common.Rows(r.Data) }
 
 // GetSortFields returns a map of the sort fields and their corresponding struct field.
 //
