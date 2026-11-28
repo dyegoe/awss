@@ -106,7 +106,8 @@ type dataRow struct {
 	// OwnerID is the account that owns the attachment.
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
 
-	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
+	// OwnerName is the name of the owner account, from the accounts map or --org-profile; empty
+	// when it is unknown.
 	OwnerName string `json:"owner_name,omitempty" header:"Name" stack:"" sort:"owner-name"`
 
 	// PolicyRule is the attachment policy rule number that placed it in its segment.

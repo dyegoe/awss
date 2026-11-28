@@ -93,7 +93,7 @@ type dataRow struct {
 	// CidrBlock is the primary IPv4 CIDR block of the VPC.
 	CidrBlock string `json:"cidr,omitempty" header:"CIDR"`
 
-	// Status is one of the Status constants.
+	// Status is deletable, blocked, denied, deleted or failed (the Status constants).
 	Status string `json:"status" header:"Status" sort:"status"`
 
 	// Details are the blockers of a blocked VPC, the plan of a deletable or deleted one, or the

@@ -64,6 +64,8 @@ cleanup/dhcpoptions/ — deletes the DHCP options sets no VPC uses (awss cleanup
 internal/testconv/   — checks the test conventions of every package (run by its own test in CI)
 internal/nesting/    — checks the nesting depth of every function (run by its own test in CI)
 internal/doclist/    — checks this layout and docs/ARCHITECTURE.md list every package (run by its own test)
+internal/fielddoc/   — go generate ./cmd: copies the doc comments of the row fields into cmd/fielddocs_gen.go,
+                       for the Fields section of --help (its test fails when the file is stale)
 scripts/             — coverage.awk: the per-package coverage and test-file check of make test
 common/              — shared: Results interface, BaseResults and RowSet (results.go), AWS helpers, filter builders,
                        output formatting, reflection row helpers and Version sorting (rows.go), Matcher
@@ -76,6 +78,8 @@ A field with `stack:""` as well as `header` shares the table column of the field
 its name), to keep wide tables inside the terminal.
 A field with `hide:"empty"` as well as `header` has its column hidden when it is empty in every row: an opt-in
 column, such as one a flag fills, takes no width without the flag.
+The same tags, with the first sentence of each field's doc comment, make the Fields section at the end of every
+command's `--help`. After changing a row field or its comment, run `go generate ./cmd`.
 
 ---
 
@@ -135,6 +139,7 @@ reviewer and the author own it. **SHOULD** rules may be broken with a reason in 
 
 | Rule | Enforced by |
 |---|---|
+| Every row field has a doc comment, and `cmd/fielddocs_gen.go` is what `go generate ./cmd` writes now. | tests (`TestFieldsHelp` in `cmd`, `TestGenerate_repository` in `internal/fielddoc`) |
 | Every package has tests and covers at least 80% of its statements. | `make test` (`scripts/coverage.awk`) |
 | Tests pass with the race detector, in any order, and when run twice. | `make test` (`-race -count=2 -shuffle=on`) |
 | Tests follow the naming and structure convention of Testing conventions. | `internal/testconv`, `thelper` |
@@ -241,6 +246,9 @@ When adding a new AWS resource type (e.g. `search/sg/` for Security Groups):
    gives `Len`, `GetHeaders`, `GetRows`, the `BaseResults` getters and `AddError`. The package
    writes only `Search()`, its AWS calls, its row parsing and its filters (see `search/ebs/ebs.go`).
 2. Use struct tags `json`, `header`, `sort` on `dataRow` fields — do not add special-case logic to the output layer.
+   Give every field a doc comment ("Name is …"): its first sentence is the field's line in the Fields section of
+   `--help`. Run `go generate ./cmd` to copy it into `cmd/fielddocs_gen.go` (a test fails when it is stale or a
+   field has none).
    End `Search()` with `r.SortRows()`; a type that sorts its own way calls
    `r.SortRowsBy(GetSortFields, order)` instead (see `search/eni` and `search/tgw`). Record every
    error with `r.AddError`. `GetSortFields` and `SortFieldNames` call `common.SortFields` and

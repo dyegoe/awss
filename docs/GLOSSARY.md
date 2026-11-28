@@ -142,6 +142,10 @@ is given. Over `--profiles all` or `--regions all`, `--apply` also needs `--conf
 with globs, versions, tags of some services, the Cloud WAN and Direct Connect filters. Compare
 *AWS filter*.
 
+**Fields section.** The end of every command's `--help`: one line per field of the rows, with
+its JSON name, its table column (or "JSON only"), its sort field and the first sentence of its doc
+comment.
+
 **Fixed-list flag.** A flag that accepts only a known list of values, such as `--states`. Its help
 lists the values, and shell completion offers them.
 
@@ -186,6 +190,9 @@ accepts, and whether it shows account names. Each command file declares its own,
 `vpcEngine`.
 
 **Fan-out.** `search.Execute` running one search per profile and region on a pool of workers.
+
+**`fieldDocs`.** The generated map (`cmd/fielddocs_gen.go`) of each row field's description, written
+by `go generate ./cmd` (`internal/fielddoc`) from the doc comments.
 
 **Order function.** A function such as `orderRows` that sorts the rows of an engine its own way,
 passed to `RowSet.SortRowsBy` (eni, dxgw, tgw, cloudwan).

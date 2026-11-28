@@ -81,7 +81,8 @@ type dataRow struct {
 	// OwnerID is the account that owns the associated gateway or core network.
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
 
-	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
+	// OwnerName is the name of the owner account, from the accounts map or --org-profile; empty
+	// when it is unknown.
 	OwnerName string `json:"owner_name,omitempty" header:"Name" stack:"" sort:"owner-name"`
 
 	// State is the state of the association, such as associated.
@@ -109,10 +110,17 @@ type dataRow struct {
 
 // vifAttachment is a virtual interface attached to a Direct Connect gateway.
 type vifAttachment struct {
-	ID      string `json:"id,omitempty"`
-	Region  string `json:"region,omitempty"`
+	// ID is the ID of the virtual interface.
+	ID string `json:"id,omitempty"`
+
+	// Region is the region of the virtual interface.
+	Region string `json:"region,omitempty"`
+
+	// OwnerID is the account that owns the virtual interface.
 	OwnerID string `json:"owner_id,omitempty"`
-	State   string `json:"state,omitempty"`
+
+	// State is the state of the attachment, such as attached.
+	State string `json:"state,omitempty"`
 }
 
 // New initiates and returns a new instance of Direct Connect gateway results. region is kept for

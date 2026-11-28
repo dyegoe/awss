@@ -15,6 +15,8 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - Output formats: `--output table` (default), `--output json`, `--output json-pretty`. To keep the
   table narrow, some columns hold two or three values on separate lines, such as an ID with its name
   under it; the header cell names each line. JSON keeps one field for each.
+- Field reference in `--help`: every command's help ends with a **Fields** section, one line per
+  field of the result: its JSON name, its table column (or "JSON only"), its sort field and what it means
 - Show empty results: `--show-empty`
 - Show tags in table output: `--show-tags`
 - Restrict which tag keys are shown in table output: `--show-tags-keys Name,Environment` (implies `--show-tags`)

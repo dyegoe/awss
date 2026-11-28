@@ -133,7 +133,7 @@ type dataRow struct {
 	// chronologically. CloudFront returns no creation time.
 	Modified string `json:"modified,omitempty" sort:"modified"`
 
-	// Tags are the tags of the distribution, filled only when ShowTags is set or a tag filter is.
+	// Tags are the tags of the distribution, filled only with --show-tags or a tag filter.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
 }
 

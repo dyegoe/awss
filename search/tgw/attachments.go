@@ -141,13 +141,15 @@ type attachmentRow struct {
 	// column is hidden when no row has any.
 	PropagatedRTs []string `json:"-" header:"Propagated RTs" hide:"empty"`
 
-	// Propagations are the propagations of PropagatedRTs, for JSON.
+	// Propagations are the route tables the attachment propagates its routes to, with their
+	// state (the Propagated RTs column); filled with --propagations.
 	Propagations []propagation `json:"propagations,omitempty"`
 
 	// OwnerID is the account that owns the resource of the attachment, such as the VPC.
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
 
-	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
+	// OwnerName is the name of the owner account, from the accounts map or --org-profile; empty
+	// when it is unknown.
 	OwnerName string `json:"owner_name,omitempty" header:"Name" stack:"" sort:"owner-name"`
 
 	// TransitGatewayOwnerID is the account that owns the transit gateway.

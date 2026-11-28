@@ -96,7 +96,7 @@ type dataRow struct {
 	// Joined is the date the account joined the organization, as YYYY-MM-DD in UTC.
 	Joined string `json:"joined,omitempty" header:"Joined" sort:"joined"`
 
-	// Tags are the tags of the account, filled only when ShowTags is set.
+	// Tags are the tags of the account, filled only with --show-tags.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
 }
 
