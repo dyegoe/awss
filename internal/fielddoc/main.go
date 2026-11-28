@@ -43,6 +43,9 @@ import (
 	"unicode/utf8"
 )
 
+// fileMode is the permission of the written file: only its owner reads and writes it.
+const fileMode = 0o600
+
 // scanned are the directories, relative to the module root, whose packages hold result types.
 var scanned = []string{"search", "cleanup"}
 
@@ -63,7 +66,7 @@ func run(root, out, pkg string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(out, src, 0o600); err != nil {
+	if err := os.WriteFile(out, src, fileMode); err != nil {
 		return fmt.Errorf("writing %s: %w", out, err)
 	}
 	return nil
