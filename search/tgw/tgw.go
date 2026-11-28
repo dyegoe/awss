@@ -99,7 +99,8 @@ type dataRow struct {
 	// OwnerID is the account that owns the resource of the attachment, such as the VPC.
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
 
-	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
+	// OwnerName is the name of the owner account, from the accounts map or --org-profile; empty
+	// when it is unknown.
 	OwnerName string `json:"owner_name,omitempty" header:"Name" stack:"" sort:"owner-name"`
 
 	// AnnouncementID is the route table announcement of the route, for a route from a Cloud WAN

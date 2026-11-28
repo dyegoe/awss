@@ -32,12 +32,23 @@ const (
 	awssInheritedFlags  = "flagUsages .InheritedFlags"
 )
 
-// setUsageTemplate makes --help list the flags with flagUsages instead of pflag's FlagUsages. The
-// subcommands inherit the template of the root command.
+// fieldsTemplate ends --help with the Fields section of a command with an engine (fieldsHelp).
+// It follows the usage, which ends with a new line.
+const fieldsTemplate = "{{with fieldsHelp .}}\n{{.}}\n{{end}}"
+
+// setUsageTemplate makes --help list the flags with flagUsages instead of pflag's FlagUsages, and
+// end with the Fields section. The subcommands inherit the templates of the root command.
+//
+// The Fields section is in the help template, not the usage one: a wrong flag prints the usage,
+// which stays short.
 func setUsageTemplate() {
 	cobra.AddTemplateFunc("flagUsages", flagUsages)
+	cobra.AddTemplateFunc("fieldsHelp", fieldsHelp)
 	tmpl := strings.ReplaceAll(rootCmd.UsageTemplate(), cobraLocalFlags, awssLocalFlags)
 	rootCmd.SetUsageTemplate(strings.ReplaceAll(tmpl, cobraInheritedFlags, awssInheritedFlags))
+	if !strings.HasSuffix(rootCmd.HelpTemplate(), fieldsTemplate) {
+		rootCmd.SetHelpTemplate(rootCmd.HelpTemplate() + fieldsTemplate)
+	}
 }
 
 // flagUsages lists the flags as pflag does, but prints an example placeholder once. A help text

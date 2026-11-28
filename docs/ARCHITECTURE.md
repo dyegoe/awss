@@ -69,6 +69,12 @@ puts a field in the column before it, on a new line, and `hide:"empty"` hides a 
 empty in every row. `common.Headers`, `common.Rows`, `common.SortFields` and
 `common.SortByField` (`common/rows.go`) read these tags, so a new column is one field.
 
+**The Fields section of `--help`** (`cmd/fields.go`) lists the fields of the engine's row type from
+the same tags: JSON name, table column or "JSON only", sort field. Its descriptions are the first
+sentences of the fields' doc comments, which the binary cannot read: `go generate ./cmd` runs
+`internal/fielddoc`, which parses the `search/` and `cleanup/` packages and writes them to
+`cmd/fielddocs_gen.go`. A test fails when that file is stale, so the help cannot drift from the code.
+
 **Filters** travel as `map[string][]string`, keyed by the AWS filter name. Each engine turns
 them into its AWS input in `getFilters`; engines with client-side filters (names, versions,
 tags, CloudFront, Cloud WAN) match the rows after the AWS call. The map is shared by every
@@ -90,7 +96,7 @@ outweighs this.
 
 | Package | What it does |
 |---|---|
-| `cmd/` | Cobra commands and flags, each command's `subcommand` and engine, viper binding, `runSearch`, completion, `--stats` |
+| `cmd/` | Cobra commands and flags, each command's `subcommand` and engine, viper binding, `runSearch`, completion, `--stats`, the Fields section of `--help` |
 | `common/` | The `Results` contract, `BaseResults` and `RowSet`, AWS config helpers, filter builders, output, row and sort helpers, matchers |
 | `search/` | The search runner: `Engine`, `Options` and the profiles × regions fan-out |
 | `search/ec2/` | EC2 instances; also `InstanceNames`, used by ebs and eni |
@@ -114,6 +120,7 @@ outweighs this.
 | `internal/testconv/` | Checks the test naming and structure convention |
 | `internal/nesting/` | Checks the nesting depth of every function |
 | `internal/doclist/` | Checks this table and the package layout of `AGENTS.md` list every package |
+| `internal/fielddoc/` | `go generate ./cmd`: copies the row fields' doc comments into `cmd/fielddocs_gen.go` |
 
 `main.go` only calls `cmd.Execute()`.
 

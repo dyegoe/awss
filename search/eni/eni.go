@@ -80,22 +80,23 @@ type eniInfo struct {
 	// SubnetID is the ID of the subnet that the network interface is in.
 	SubnetID string `json:"subnet_id,omitempty" header:"Subnet ID" sort:"subnet-id"`
 
-	// InstanceID is the ID of the instance that this interface is associate.
+	// InstanceID is the ID of the instance the network interface is attached to.
 	InstanceID string `json:"instance_id,omitempty" header:"Instance ID" sort:"instance-id"`
 
-	// InstanceName is the name of the instance that this interface is associate.
+	// InstanceName is the name of the instance the network interface is attached to.
 	InstanceName string `json:"instance_name,omitempty" header:"Instance Name" sort:"instance-name"`
 
 	// OwnerID is the ID of the AWS account that owns the network interface.
 	OwnerID string `json:"owner_id,omitempty" header:"Owner ID" sort:"owner"`
 
-	// OwnerName is the name of the owner account, from AccountNames; empty when it is unknown.
+	// OwnerName is the name of the owner account, from the accounts map or --org-profile; empty
+	// when it is unknown.
 	OwnerName string `json:"owner_name,omitempty" header:"Owner" sort:"owner-name"`
 
-	// RequesterID is the account or service that created the network interface (JSON output only).
+	// RequesterID is the account or service that created the network interface.
 	RequesterID string `json:"requester_id,omitempty"`
 
-	// RequesterManaged reports whether an AWS service manages the network interface (JSON output only).
+	// RequesterManaged reports whether an AWS service manages the network interface.
 	RequesterManaged bool `json:"requester_managed,omitempty"`
 }
 

@@ -77,7 +77,7 @@ type dataRow struct {
 	// OptionLines are the configuration of the set, one "key: values" per line, for the table.
 	OptionLines []string `json:"-" header:"Options"`
 
-	// Status is one of the cleanup statuses.
+	// Status is deletable, denied, deleted or failed (the cleanup statuses).
 	Status string `json:"status" header:"Status" sort:"status"`
 
 	// Details say why a set is denied or failed.

@@ -81,7 +81,7 @@ type dataRow struct {
 	// ARN is the Amazon Resource Name of the bucket.
 	ARN string `json:"arn,omitempty" header:"ARN" sort:"arn"`
 
-	// Tags are the tags of the bucket, filled only when ShowTags is set.
+	// Tags are the tags of the bucket, filled only with --show-tags.
 	Tags map[string]string `json:"tags,omitempty" header:"Tags"`
 }
 
