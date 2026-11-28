@@ -133,6 +133,13 @@ Connect gateway.
 **Account names.** The names shown in the **Owner** column next to an account ID, from the
 `accounts` map of the config file or, with `--org-profile`, from AWS Organizations.
 
+**Agent harness.** A tool that runs an LLM with access to a shell, such as Claude Code, GitHub
+Copilot or Antigravity. It loads agent skills.
+
+**Agent skill.** A `SKILL.md` file (Agent Skills format: YAML front matter with `name` and
+`description`, then Markdown) that a harness loads when its description fits the task.
+`awss skill` prints the one for awss.
+
 **Apply, plan.** A cleanup command only reports its plan (what it would delete) unless `--apply`
 is given. Over `--profiles all` or `--regions all`, `--apply` also needs `--confirm-all`.
 

@@ -33,7 +33,8 @@ diagram, and why the pieces are where they are. Read it before a change to the s
 ```text
 main.go              — entry point, delegates to cmd.Execute()
 cmd/                 — Cobra CLI commands: root (global flags, subcommands, runSearch/cmdSpec) + one file per
-                       resource, which declares its subcommand: the command, its search.Engine, its flags
+                       resource, which declares its subcommand: the command, its search.Engine, its flags;
+                       skill.go + skill.md: awss skill, the agent skill (guide embedded, command list generated)
 search/              — the search runner: Engine, Options and the parallel profiles × regions fan-out
 search/ec2/          — EC2-specific search logic and result type
 search/eni/          — ENI-specific search logic and result type
