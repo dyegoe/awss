@@ -178,6 +178,7 @@ func setup() error {
 	}
 	// After the subcommands are added, so they get it too. ResetFlags drops it, so every setup sets it.
 	rootCmd.SetGlobalNormalizationFunc(normalizeFlagName)
+	setUsageTemplate()
 	if err := registerCompletions(); err != nil {
 		return err
 	}
@@ -281,15 +282,15 @@ func initFlags() {
 		"Config file: a `name` such as devops-lz2, read as ~/.awss/devops-lz2.yaml, or a path to a YAML "+
 			"file. AWSS_CONFIG sets it for every command; this flag wins. Default ~/.awss/config.yaml.")
 	rootCmd.PersistentFlags().StringSlice(labelProfiles, []string{},
-		"Select the profile from the AWS config file (AWS_CONFIG_FILE, or ~/.aws/config). --profile works too. You can pass "+
-			"multiple profiles separated by comma. e.g. `profile1,profile2`. `all` uses the all-profiles list of "+
+		"Select the profiles from the AWS config file (AWS_CONFIG_FILE, or ~/.aws/config), separated by comma. "+
+			"--profile works too. \"all\" uses the all-profiles list of "+
 			"the config file, or every profile in the AWS config file when that list is not set. "+
 			"If not set, falls back to the AWS SDK's default credential "+
-			"resolution (AWS_PROFILE, static env credentials, or the `default` profile).")
+			"resolution (AWS_PROFILE, static env credentials, or the \"default\" profile). `profile1,profile2`")
 	rootCmd.PersistentFlags().StringSlice(labelRegions, []string{},
 		fmt.Sprintf(
-			"Select a region to perform your API calls. --region works too. You can pass multiple regions separated by comma. "+
-				"e.g. `region1,region2`. If not set, falls back to AWS_REGION/AWS_DEFAULT_REGION, or %s.",
+			"Select the regions to perform your API calls in, separated by comma. --region works too. "+
+				"If not set, falls back to AWS_REGION/AWS_DEFAULT_REGION, or %s. `region1,region2`",
 			common.DefaultRegion,
 		))
 	rootCmd.PersistentFlags().String(labelOutput, "table",
@@ -299,7 +300,7 @@ func initFlags() {
 	rootCmd.PersistentFlags().Bool(labelShowTagsCobra, false,
 		"Show tags for resources. Default is false.")
 	rootCmd.PersistentFlags().StringSlice(labelTagsKeysCobra, []string{},
-		"Restrict the tags shown to these keys. Implies --show-tags. e.g. `Name,Environment`")
+		"Restrict the tags shown to these keys. Implies --show-tags. `Name,Environment`")
 	rootCmd.PersistentFlags().Duration(labelTimeout, defaultTimeout,
 		"Stop waiting for the searches after this `duration` (e.g. 90s, 5m). The profiles and regions "+
 			"that did not finish are reported as timed out; the others are printed. 0 disables it.")
