@@ -124,7 +124,7 @@ func skillCommands(cmd *cobra.Command) string {
 			continue
 		}
 		if c.Runnable() {
-			lines = append(lines, fmt.Sprintf("- `%s`: %s", c.CommandPath(), c.Short))
+			lines = append(lines, fmt.Sprintf("- %#q: %s", c.CommandPath(), c.Short))
 		}
 		if sub := skillCommands(c); sub != "" {
 			lines = append(lines, sub)
