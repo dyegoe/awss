@@ -131,9 +131,9 @@ func s3objInitFlags() {
 	s3objCmd.Flags().Bool(flagRegex, false,
 		"Treat --keys patterns as Go regular expressions instead of globs.")
 	s3objCmd.Flags().Int(flagMaxKeys, s3obj.DefaultMaxKeys,
-		"Maximum number of keys scanned per bucket before stopping.")
+		"Maximum number of keys scanned per bucket before stopping. `50000`")
 	s3objCmd.Flags().Int(flagMaxBuckets, s3obj.DefaultMaxBuckets,
-		"Maximum number of buckets the patterns may match in one region; above it the region scans nothing.")
+		"Maximum number of buckets the patterns may match in one region; above it the region scans nothing. `50`")
 	s3objCmd.Flags().String(flagSort, "key", sortHelp(s3objEngine, "objects", "key"))
 }
 

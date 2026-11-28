@@ -276,8 +276,6 @@ func parseTimeout(v interface{}) (time.Duration, error) {
 
 // initFlags initializes cobras flags.
 func initFlags() {
-	validOutputs, _ := common.ValidOutputs("")
-
 	rootCmd.PersistentFlags().String(labelConfig, "",
 		"Config file: a `name` such as devops-lz2, read as ~/.awss/devops-lz2.yaml, or a path to a YAML "+
 			"file. AWSS_CONFIG sets it for every command; this flag wins. Default ~/.awss/config.yaml.")
@@ -294,7 +292,7 @@ func initFlags() {
 			common.DefaultRegion,
 		))
 	rootCmd.PersistentFlags().String(labelOutput, "table",
-		fmt.Sprintf("Select the output format. Valid outputs are: %s", validOutputs))
+		listHelp("Select the output format", common.OutputNames(), "json"))
 	rootCmd.PersistentFlags().Bool(labelShowEmptyCobra, false,
 		"Show empty resources. Default is false.")
 	rootCmd.PersistentFlags().Bool(labelShowTagsCobra, false,
@@ -305,7 +303,7 @@ func initFlags() {
 		"Stop waiting for the searches after this `duration` (e.g. 90s, 5m). The profiles and regions "+
 			"that did not finish are reported as timed out; the others are printed. 0 disables it.")
 	rootCmd.PersistentFlags().Int(labelConcurrency, search.DefaultConcurrency,
-		"How many profile and region searches run at once. The others wait for a free slot.")
+		"How many profile and region searches run at once. The others wait for a free slot. `8`")
 	rootCmd.PersistentFlags().String(labelOrgProfile, "",
 		"Add the account names of the AWS Organization to the Owner column of vpc, subnet, eni, cloudwan, dx and tgw, "+
 			"listed with this `profile` (it needs organizations:ListAccounts). The accounts map of the "+
