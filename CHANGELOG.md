@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## [0.24.0](https://github.com/dyegoe/awss/compare/v0.23.0...v0.24.0) (2026-11-28)
+
+
+### Features
+
+* **cmd:** end every --help with a Fields section ([#280](https://github.com/dyegoe/awss/issues/280)) ([#285](https://github.com/dyegoe/awss/issues/285)) ([6121a84](https://github.com/dyegoe/awss/commit/6121a84cb8805f65978f4bb4bf91c009d4743aa6))
+
+
+### Bug Fixes
+
+* **cmd:** print each flag's example once in --help ([#279](https://github.com/dyegoe/awss/issues/279)) ([#283](https://github.com/dyegoe/awss/issues/283)) ([4eeb137](https://github.com/dyegoe/awss/commit/4eeb137450798ee956888b2377c62e673b499879))
+
 ## [0.23.0](https://github.com/dyegoe/awss/compare/v0.22.2...v0.23.0) (2026-11-18)
 
 
