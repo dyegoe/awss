@@ -15,7 +15,8 @@ output, a package). When the structure changes, a small before/after, and update
 ## Docs and comments re-read
 
 <!-- Every doc section and code comment the change made you re-read, each "still true" or
-"updated": README.md, AGENTS.md, docs/ARCHITECTURE.md, the comments of the changed code. -->
+"updated": README.md, AGENTS.md, docs/ARCHITECTURE.md, docs/GLOSSARY.md, the comments of the
+changed code. A new term goes in docs/GLOSSARY.md. -->
 
 ## Verification
 
