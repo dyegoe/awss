@@ -176,6 +176,7 @@ func setup() error {
 	for _, sub := range subcommands {
 		sub.initFlags()
 	}
+	initSkillCmd()
 	// After the subcommands are added, so they get it too. ResetFlags drops it, so every setup sets it.
 	rootCmd.SetGlobalNormalizationFunc(normalizeFlagName)
 	setUsageTemplate()

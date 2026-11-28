@@ -80,6 +80,13 @@ them into its AWS input in `getFilters`; engines with client-side filters (names
 tags, CloudFront, Cloud WAN) match the rows after the AWS call. The map is shared by every
 search of a run, so an engine copies it before changing it.
 
+**The agent skill** (`cmd/skill.go`). `awss skill` prints a `SKILL.md` for LLM agents. Its
+hand-written guide and question map are `cmd/skill.md`, embedded in the binary; the list of
+commands is built from the command tree when it runs, so the skill always matches the binary.
+It does not run the root command's checks: it needs no config file or profile. A test checks
+every command and flag the guide names exists. The flags and fields stay in `--help`, which the
+skill tells the LLM to read.
+
 **Global services.** Organizations, CloudFront, Network Manager (Cloud WAN) and Direct Connect
 gateways are global. Their commands set one region, the engine's `Region`, so the fan-out runs
 once per profile.
@@ -96,7 +103,7 @@ outweighs this.
 
 | Package | What it does |
 |---|---|
-| `cmd/` | Cobra commands and flags, each command's `subcommand` and engine, viper binding, `runSearch`, completion, `--stats`, the Fields section of `--help` |
+| `cmd/` | Cobra commands and flags, each command's `subcommand` and engine, viper binding, `runSearch`, completion, `--stats`, the Fields section of `--help`, `awss skill` |
 | `common/` | The `Results` contract, `BaseResults` and `RowSet`, AWS config helpers, filter builders, output, row and sort helpers, matchers |
 | `search/` | The search runner: `Engine`, `Options` and the profiles × regions fan-out |
 | `search/ec2/` | EC2 instances; also `InstanceNames`, used by ebs and eni |

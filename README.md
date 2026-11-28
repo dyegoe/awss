@@ -29,6 +29,7 @@ Built in Go with AWS SDK Go v2, Cobra, and Viper.
 - AWS Direct Connect: list the gateways, what they are associated with and the prefixes they advertise to the data centres (`awss dx gateways`); see [Direct Connect gateways](#direct-connect-gateways-awss-dx-gateways)
 - AWS Transit Gateway: find a CIDR in the Transit Gateway route tables and see which attachment (VPC, VPN, Direct Connect, peering) holds it (`awss tgw routes`), and list the attachments with the route table each one is associated with (`awss tgw attachments`); see [Transit Gateway routes](#transit-gateway-routes-awss-tgw-routes) and [Transit Gateway attachments](#transit-gateway-attachments-awss-tgw-attachments)
 - Cleanup of the default VPCs with no workload (`awss cleanup default-vpc`) and of the unused DHCP options sets (`awss cleanup dhcp-options`), a preview unless `--apply`; see [Cleanup](#cleanup)
+- Agent skill: `awss skill` prints a `SKILL.md` that teaches an LLM in Claude Code, GitHub Copilot or Antigravity to use awss; see [Agent skill](#agent-skill-awss-skill)
 - Configuration file: `--config` (default `~/.awss/config.yaml`)
 - Version injected at build time via `-ldflags`
 
@@ -1281,6 +1282,26 @@ The search commands take no arguments, only flags, and the shell lists flag name
 typed. So `awss ec2 <TAB>` offers no file names. In bash and zsh it shows a hint instead:
 `ec2 takes no arguments; type - and press TAB to see its flags`. Set `AWSS_ACTIVE_HELP=0` to
 hide the hint, or `COBRA_ACTIVE_HELP=0` to hide it for every Cobra-based tool.
+
+### Agent skill (`awss skill`)
+
+`awss skill` prints an agent skill: a `SKILL.md` file in the Agent Skills format that teaches an
+LLM in an agent harness how to use awss. It tells the LLM to read `awss <command> --help` before
+using a flag, to use `--output json` with `jq`, to check the errors of every profile and region,
+how to choose `--config`, `--profiles` and `--regions` (and to ask, or say so before an org-wide
+search), and never to add `--apply` to a cleanup on its own. It lists the commands of the
+installed binary and maps common questions (which route an IP takes, who owns an IP) to commands.
+
+`--dir <path>` writes it to `<path>/awss/SKILL.md` instead, creating the folders and replacing an
+older copy. Point it at the skills folder of your harness:
+
+```bash
+awss skill --dir ~/.claude/skills           # Claude Code (GitHub Copilot reads this folder too)
+awss skill --dir ~/.gemini/config/skills    # Antigravity
+```
+
+The skill matches the binary that wrote it: run the command again after upgrading awss. It needs
+no config file and no AWS credentials.
 
 ## Contributing
 
